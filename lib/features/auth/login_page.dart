@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../services/user_service.dart';
+import 'forgot_password_page.dart';
 
 // Halaman login. Mendukung login via email/password dan Google.
 class LoginPage extends StatefulWidget {
@@ -200,7 +201,21 @@ class _LoginPageState extends State<LoginPage> {
                           )
                         : const Text('Login'),
                   ),
-                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ForgotPasswordPage(),
+                          ),
+                        );
+                      },
+                      child: const Text('Lupa Password?'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       const Expanded(child: Divider()),

@@ -6,10 +6,21 @@ import '../../services/user_service.dart';
 import 'forgot_password_page.dart';
 
 // Halaman login. Mendukung login via email/password dan Google.
+// Google login akan validasi apakah akun sudah terdaftar di Firestore sebelum
+// mengizinkan masuk.
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, required this.onRegisterPressed});
+  const LoginPage({
+    super.key,
+    required this.onRegisterPressed,
+    required this.onSetAuthActionPending,
+    this.showRegistrationSuccess = false,
+  });
 
   final VoidCallback onRegisterPressed;
+  // Callback untuk menandai proses auth async sedang berjalan/selesai di AuthGate.
+  final ValueChanged<bool> onSetAuthActionPending;
+  // Jika true, tampilkan banner sukses registrasi di atas form.
+  final bool showRegistrationSuccess;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -52,13 +63,17 @@ class _LoginPageState extends State<LoginPage> {
       );
       await UserService.ensureUserDocument(result.user!);
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = _mapAuthError(e.code);
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = _mapAuthError(e.code);
+        });
+      }
     } catch (_) {
-      setState(() {
-        _errorMessage = 'Terjadi kesalahan. Coba lagi sebentar.';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Terjadi kesalahan. Coba lagi sebentar.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -68,34 +83,101 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // Login pakai Google Sign-In, lalu simpan/update user doc di Firestore.
+  // Login pakai Google Sign-In dengan validasi: hanya izinkan masuk jika akun
+  // sudah terdaftar di Firestore. Jika belum terdaftar, sign out dan tampilkan error.
   Future<void> _loginWithGoogle() async {
     setState(() {
       _isGoogleLoading = true;
       _errorMessage = null;
     });
 
+    // Cegah AuthGate navigasi ke HomePage selama proses validasi.
+    widget.onSetAuthActionPending(true);
+
     try {
       final googleUser = await GoogleSignIn.instance.authenticate();
       final idToken = googleUser.authentication.idToken;
 
       final credential = GoogleAuthProvider.credential(idToken: idToken);
-      final result = await FirebaseAuth.instance.signInWithCredential(credential);
+      final result =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+
+      // Validasi: cek apakah akun Google ini sudah terdaftar di Firestore.
+      final isRegistered =
+          await UserService.isUserRegistered(result.user!.uid);
+      if (!isRegistered) {
+        // Belum terdaftar → tampilkan dialog SEBELUM sign out agar context
+        // masih valid (sign out men-trigger AuthGate rebuild yang bisa
+        // menghancurkan widget State).
+        bool goToRegister = false;
+        if (mounted) {
+          goToRegister = await showDialog<bool>(
+                context: context,
+                barrierDismissible: false,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Email Belum Terdaftar'),
+                  content: const Text(
+                    'Akun Google ini belum terdaftar. '
+                    'Silakan register terlebih dahulu.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Batal'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Register'),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+        }
+
+        // Sign out setelah dialog ditutup.
+        await GoogleSignIn.instance.signOut();
+        await FirebaseAuth.instance.signOut();
+
+        // Jika user pilih Register, arahkan ke halaman register.
+        if (goToRegister && mounted) {
+          widget.onRegisterPressed();
+        }
+        return;
+      }
+
+      // Sudah terdaftar → update lastLogin dan biarkan AuthGate tampilkan HomePage.
       await UserService.ensureUserDocument(result.user!);
+      widget.onSetAuthActionPending(false);
     } on GoogleSignInException catch (_) {
-      // User cancelled or other Google Sign-In error
-      setState(() {
-        _errorMessage = 'Login dengan Google dibatalkan.';
-      });
+      // Google auth dibatalkan user, belum sampai Firebase sign-in.
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Login dengan Google dibatalkan.';
+        });
+      }
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = _mapAuthError(e.code);
-      });
+      // Sign out jika user sempat ter-sign in sebelum error.
+      await GoogleSignIn.instance.signOut();
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        setState(() {
+          _errorMessage = _mapAuthError(e.code);
+        });
+      }
     } catch (_) {
-      setState(() {
-        _errorMessage = 'Gagal login dengan Google. Coba lagi.';
-      });
+      // Sign out jika user sempat ter-sign in sebelum error
+      // (misal ensureUserDocument gagal setelah signInWithCredential berhasil).
+      await GoogleSignIn.instance.signOut();
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Gagal login dengan Google. Coba lagi.';
+        });
+      }
     } finally {
+      // Reset pending flag untuk semua error/cancel cases.
+      widget.onSetAuthActionPending(false);
       if (mounted) {
         setState(() => _isGoogleLoading = false);
       }
@@ -133,6 +215,22 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Banner sukses registrasi, ditampilkan setelah user berhasil register.
+                  if (widget.showRegistrationSuccess)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.shade300),
+                      ),
+                      child: Text(
+                        'Registrasi berhasil! Silakan login dengan akun yang sudah didaftarkan.',
+                        style: TextStyle(color: Colors.green.shade800),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   Text(
                     'Masuk ke akun kamu',
                     style: Theme.of(context).textTheme.headlineSmall,
@@ -166,7 +264,9 @@ class _LoginPageState extends State<LoginPage> {
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() => _obscurePassword = !_obscurePassword);
@@ -188,7 +288,8 @@ class _LoginPageState extends State<LoginPage> {
                   if (_errorMessage != null)
                     Text(
                       _errorMessage!,
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error),
                     ),
                   const SizedBox(height: 16),
                   ElevatedButton(
@@ -197,7 +298,8 @@ class _LoginPageState extends State<LoginPage> {
                         ? const SizedBox(
                             height: 18,
                             width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Login'),
                   ),
@@ -220,7 +322,8 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       const Expanded(child: Divider()),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
                           'atau',
                           style: TextStyle(color: Colors.grey.shade600),
@@ -238,14 +341,17 @@ class _LoginPageState extends State<LoginPage> {
                         ? const SizedBox(
                             height: 18,
                             width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Image.asset('assets/images/google_logo.png', height: 20),
+                        : Image.asset('assets/images/google_logo.png',
+                            height: 20),
                     label: const Text('Login dengan Google'),
                   ),
                   const SizedBox(height: 8),
                   TextButton(
-                    onPressed: _isLoading ? null : widget.onRegisterPressed,
+                    onPressed:
+                        _isLoading ? null : widget.onRegisterPressed,
                     child: const Text('Belum punya akun? Register'),
                   ),
                 ],
@@ -257,4 +363,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

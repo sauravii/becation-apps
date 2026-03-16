@@ -31,6 +31,7 @@ class _ManageRolesPageState extends State<ManageRolesPage> {
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
     final users = await UserService.getAllUsers();
+    if (!mounted) return;
     setState(() {
       _users = users;
       _isLoading = false;
@@ -47,6 +48,7 @@ class _ManageRolesPageState extends State<ManageRolesPage> {
 
     setState(() => _isLoading = true);
     final users = await UserService.searchUsersByEmail(email);
+    if (!mounted) return;
     setState(() {
       _users = users;
       _isLoading = false;

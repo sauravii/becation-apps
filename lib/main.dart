@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -48,18 +49,71 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _showLogin = true;
+  bool _showRegisterSuccess = false;
+  // Flag untuk mencegah AuthGate navigasi ke HomePage saat proses auth async
+  // (register / login Google) sedang berjalan. Tanpa flag ini, StreamBuilder
+  // akan sempat menampilkan HomePage sesaat sebelum signOut selesai.
+  bool _pendingAuthAction = false;
+  String? _lastProcessedUid;
+
+  // Cache stream agar StreamBuilder tidak re-subscribe saat AuthGate rebuild
+  // (re-subscribe menyebabkan connectionState kembali ke waiting → widget
+  // child sesaat diganti loading Scaffold → State child dihancurkan).
+  late final Stream<User?> _authStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _authStream = FirebaseAuth.instance.authStateChanges();
+  }
 
   // Toggle antara halaman Login dan Register.
   void _toggleAuthScreen() {
     setState(() {
       _showLogin = !_showLogin;
+      _showRegisterSuccess = false;
+      _pendingAuthAction = false;
     });
+  }
+
+  // Dipanggil oleh LoginPage/RegisterPage untuk menandai bahwa proses auth
+  // async sedang berjalan (true) atau sudah selesai (false).
+  // Saat pending=true: hanya set flag tanpa rebuild, agar StreamBuilder tidak
+  // re-run builder prematur dan menghancurkan State child.
+  // Saat pending=false: panggil setState untuk trigger rebuild.
+  void _setAuthActionPending(bool pending) {
+    _pendingAuthAction = pending;
+    if (!pending) {
+      setState(() {});
+    }
+  }
+
+  // Dipanggil setelah register berhasil. Reset flag, arahkan ke halaman login,
+  // dan tampilkan pesan sukses.
+  void _onRegisterSuccess() {
+    setState(() {
+      _pendingAuthAction = false;
+      _showLogin = true;
+      _showRegisterSuccess = true;
+    });
+  }
+
+  // Jalankan ensureUserDocument sekali per sign-in (bukan tiap rebuild).
+  void _onAuthUserChanged(User? user) {
+    if (user != null && user.uid != _lastProcessedUid) {
+      _lastProcessedUid = user.uid;
+      UserService.ensureUserDocument(user).catchError((e) {
+        debugPrint('[AuthGate] ensureUserDocument failed: $e');
+      });
+    } else if (user == null) {
+      _lastProcessedUid = null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+      stream: _authStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -67,17 +121,31 @@ class _AuthGateState extends State<AuthGate> {
           );
         }
 
-        if (snapshot.hasData) {
-          // Pastikan user doc ada di Firestore
-          UserService.ensureUserDocument(snapshot.data!);
+        // Tampilkan HomePage hanya jika user sudah login DAN tidak ada
+        // proses auth async yang sedang berjalan.
+        if (snapshot.hasData && !_pendingAuthAction) {
+          _onAuthUserChanged(snapshot.data);
+          _showRegisterSuccess = false;
           return const HomePage();
         }
 
-        if (_showLogin) {
-          return LoginPage(onRegisterPressed: _toggleAuthScreen);
+        if (!snapshot.hasData) {
+          _onAuthUserChanged(null);
         }
 
-        return RegisterPage(onLoginPressed: _toggleAuthScreen);
+        if (_showLogin) {
+          return LoginPage(
+            onRegisterPressed: _toggleAuthScreen,
+            onSetAuthActionPending: _setAuthActionPending,
+            showRegistrationSuccess: _showRegisterSuccess,
+          );
+        }
+
+        return RegisterPage(
+          onLoginPressed: _toggleAuthScreen,
+          onSetAuthActionPending: _setAuthActionPending,
+          onRegisterSuccess: _onRegisterSuccess,
+        );
       },
     );
   }

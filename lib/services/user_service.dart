@@ -9,33 +9,39 @@ class UserService {
       _firestore.collection('users');
 
   // Buat user doc baru (role default: student) atau update lastLogin kalau sudah ada.
-  static Future<void> ensureUserDocument(User user) async {
-    try {
-      debugPrint('[UserService] ensureUserDocument called for ${user.email} (${user.uid})');
-      final doc = _usersRef.doc(user.uid);
-      final snapshot = await doc.get();
+  // [displayName] opsional — dipakai saat register email/password untuk menyimpan
+  // nama yang diisi user. Kalau null, ambil dari user.displayName (Google Sign-In).
+  // Throws on failure — callers harus handle error sendiri.
+  static Future<void> ensureUserDocument(User user, {String? displayName}) async {
+    debugPrint('[UserService] ensureUserDocument called for ${user.email} (${user.uid})');
+    final name = displayName ?? user.displayName ?? '';
+    final doc = _usersRef.doc(user.uid);
+    final snapshot = await doc.get();
 
-      if (!snapshot.exists) {
-        debugPrint('[UserService] Doc not found, creating new user doc...');
-        await doc.set({
-          'email': user.email,
-          'displayName': user.displayName ?? '',
-          'role': 'student',
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastLogin': FieldValue.serverTimestamp(),
-        });
-        debugPrint('[UserService] User doc created!');
-      } else {
-        debugPrint('[UserService] Doc exists, updating lastLogin...');
-        await doc.update({
-          'lastLogin': FieldValue.serverTimestamp(),
-          if (user.displayName != null) 'displayName': user.displayName,
-        });
-        debugPrint('[UserService] lastLogin updated!');
-      }
-    } catch (e) {
-      debugPrint('[UserService] ERROR: $e');
+    if (!snapshot.exists) {
+      debugPrint('[UserService] Doc not found, creating new user doc...');
+      await doc.set({
+        'email': user.email,
+        'displayName': name,
+        'role': 'student',
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastLogin': FieldValue.serverTimestamp(),
+      });
+      debugPrint('[UserService] User doc created!');
+    } else {
+      debugPrint('[UserService] Doc exists, updating lastLogin...');
+      await doc.update({
+        'lastLogin': FieldValue.serverTimestamp(),
+        if (name.isNotEmpty) 'displayName': name,
+      });
+      debugPrint('[UserService] lastLogin updated!');
     }
+  }
+
+  // Cek apakah user sudah terdaftar di Firestore (punya doc di collection 'users').
+  static Future<bool> isUserRegistered(String uid) async {
+    final snapshot = await _usersRef.doc(uid).get();
+    return snapshot.exists;
   }
 
   // Ambil role user (return 'student' kalau doc belum ada).
@@ -51,8 +57,13 @@ class UserService {
     return _usersRef.doc(uid).snapshots();
   }
 
+  static const allowedRoles = {'student', 'teacher'};
+
   // Update role user (misal: student -> teacher).
   static Future<void> updateUserRole(String uid, String role) async {
+    if (!allowedRoles.contains(role)) {
+      throw ArgumentError('Invalid role "$role". Allowed: $allowedRoles');
+    }
     await _usersRef.doc(uid).update({'role': role});
   }
 

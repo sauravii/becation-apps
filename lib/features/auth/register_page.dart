@@ -1,410 +1,354 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:becation_apps/features/auth/login_page.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../../services/user_service.dart';
-
-// Halaman register. Mendukung daftar via email/password dan Google.
-// Setelah register berhasil, user akan di-sign out dan diarahkan ke halaman
-// login (tidak auto-login).
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({
-    super.key,
-    required this.onLoginPressed,
-    required this.onSetAuthActionPending,
-    required this.onRegisterSuccess,
-  });
-
-  final VoidCallback onLoginPressed;
-  // Callback untuk menandai proses auth async sedang berjalan/selesai di AuthGate.
-  final ValueChanged<bool> onSetAuthActionPending;
-  // Dipanggil setelah register berhasil & sign out — AuthGate akan menampilkan
-  // halaman login dengan pesan sukses.
-  final VoidCallback onRegisterSuccess;
+  const RegisterPage({super.key});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final fullNameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
 
-  bool _isLoading = false;
-  String? _errorMessage;
-  bool _isGoogleLoading = false;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+  bool obscurePassword = true;
+  bool agreeTerms = false;
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
-  }
+  String? nameError;
+  String? emailError;
+  String? passwordError;
+  String? termsError;
 
-  // Register akun baru pakai email & password. Setelah berhasil, buat user doc
-  // di Firestore, sign out, lalu arahkan ke halaman login dengan pesan sukses.
-  Future<void> _register() async {
-    FocusScope.of(context).unfocus();
-
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
+  void validateRegister() {
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+      nameError = null;
+      emailError = null;
+      passwordError = null;
+      termsError = null;
+
+      if (fullNameController.text.trim().isEmpty) {
+        nameError = "Full name is required.";
+      }
+
+      if (emailController.text.trim().isEmpty) {
+        emailError = "Email is required.";
+      } else if (!emailController.text.contains("@")) {
+        emailError = "Please enter a valid email address.";
+      }
+
+      if (passwordController.text.isEmpty) {
+        passwordError = "Password is required.";
+      } else if (passwordController.text.length < 6) {
+        passwordError = "Password must be at least 6 characters long.";
+      }
+
+      if (!agreeTerms) {
+        termsError = "You must agree to the terms.";
+      }
     });
-
-    // Cegah AuthGate navigasi ke HomePage saat createUser otomatis sign-in.
-    widget.onSetAuthActionPending(true);
-
-    try {
-      final result =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      await UserService.ensureUserDocument(
-        result.user!,
-        displayName: _nameController.text.trim(),
-      );
-
-      // Sign out agar user harus login manual setelah register.
-      await FirebaseAuth.instance.signOut();
-
-      // Arahkan ke halaman login dengan pesan sukses.
-      widget.onRegisterSuccess();
-    } on FirebaseAuthException catch (e) {
-      // createUserWithEmailAndPassword gagal → user belum ter-sign in.
-      if (mounted) {
-        setState(() {
-          _errorMessage = _mapAuthError(e.code);
-        });
-      }
-    } catch (_) {
-      // Sign out jika user sempat ter-sign in (createUser berhasil tapi
-      // ensureUserDocument gagal) agar tidak stuck di HomePage tanpa Firestore doc.
-      if (FirebaseAuth.instance.currentUser != null) {
-        await FirebaseAuth.instance.signOut();
-      }
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Terjadi kesalahan. Coba lagi sebentar.';
-        });
-      }
-    } finally {
-      if (mounted) {
-        widget.onSetAuthActionPending(false);
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
   }
 
-  // Daftar pakai Google Sign-In. Jika akun Google sudah terdaftar di Firestore,
-  // tampilkan error. Jika belum, buat doc user, sign out, lalu arahkan ke login.
-  Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isGoogleLoading = true;
-      _errorMessage = null;
-    });
-
-    // Cegah AuthGate navigasi ke HomePage selama proses registrasi.
-    widget.onSetAuthActionPending(true);
-
-    try {
-      final googleUser = await GoogleSignIn.instance.authenticate();
-      final idToken = googleUser.authentication.idToken;
-
-      final credential = GoogleAuthProvider.credential(idToken: idToken);
-      final result =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-
-      // Cek apakah akun Google ini sudah pernah terdaftar.
-      final isRegistered =
-          await UserService.isUserRegistered(result.user!.uid);
-      if (isRegistered) {
-        // Sudah terdaftar → tampilkan dialog SEBELUM sign out agar context
-        // masih valid (sign out men-trigger AuthGate rebuild yang bisa
-        // menghancurkan widget State).
-        bool goToLogin = false;
-        if (mounted) {
-          goToLogin = await showDialog<bool>(
-                context: context,
-                barrierDismissible: false,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Akun Sudah Terdaftar'),
-                  content: const Text(
-                    'Akun Google ini sudah terdaftar. '
-                    'Silakan login dengan akun ini.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Batal'),
-                    ),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Login'),
-                    ),
-                  ],
-                ),
-              ) ??
-              false;
-        }
-
-        // Sign out setelah dialog ditutup.
-        await GoogleSignIn.instance.signOut();
-        await FirebaseAuth.instance.signOut();
-
-        // Jika user pilih Login, arahkan ke halaman login.
-        if (goToLogin && mounted) {
-          widget.onLoginPressed();
-        }
-        return;
-      }
-
-      // Belum terdaftar → buat doc user di Firestore.
-      await UserService.ensureUserDocument(result.user!);
-
-      // Sign out agar user harus login manual setelah register.
-      await GoogleSignIn.instance.signOut();
-      await FirebaseAuth.instance.signOut();
-
-      // Arahkan ke halaman login dengan pesan sukses.
-      widget.onRegisterSuccess();
-    } on GoogleSignInException catch (_) {
-      // Google auth dibatalkan user, belum sampai Firebase sign-in.
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Daftar dengan Google dibatalkan.';
-        });
-      }
-    } on FirebaseAuthException catch (e) {
-      // Sign out jika user sempat ter-sign in sebelum error.
-      await GoogleSignIn.instance.signOut();
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        setState(() {
-          _errorMessage = _mapAuthError(e.code);
-        });
-      }
-    } catch (_) {
-      // Sign out jika user sempat ter-sign in (signInWithCredential berhasil tapi
-      // ensureUserDocument gagal) agar tidak stuck di HomePage tanpa Firestore doc.
-      await GoogleSignIn.instance.signOut();
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Gagal daftar dengan Google. Coba lagi.';
-        });
-      }
-    } finally {
-      if (mounted) {
-        widget.onSetAuthActionPending(false);
-        setState(() => _isGoogleLoading = false);
-      }
-    }
+  Widget buildIcon(IconData icon) {
+    return Padding(
+      padding: EdgeInsets.only(right: 12.w),
+      child: Container(
+        width: 42.w,
+        height: 42.w,
+        decoration: BoxDecoration(
+          color: const Color(0xFF875DFC).withOpacity(0.15),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: const Color(0xFF875DFC), size: 22.sp),
+      ),
+    );
   }
 
-  // Konversi kode error Firebase Auth ke pesan yang user-friendly (Bahasa Indonesia).
-  String _mapAuthError(String code) {
-    switch (code) {
-      case 'email-already-in-use':
-        return 'Email ini sudah dipakai akun lain.';
-      case 'invalid-email':
-        return 'Format email tidak valid.';
-      case 'weak-password':
-        return 'Password terlalu lemah.';
-      case 'too-many-requests':
-        return 'Terlalu banyak percobaan. Coba lagi nanti.';
-      default:
-        return 'Gagal register. Silakan coba lagi.';
-    }
+  Widget buildError(String? error) {
+    return SizedBox(
+      height: 20.h,
+      child: Padding(
+        padding: EdgeInsets.only(left: 54.w),
+        child: Text(
+          error ?? "",
+          style: TextStyle(color: Colors.red, fontSize: 12.sp),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Register')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Buat akun baru',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  TextFormField(
-                    controller: _nameController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(
-                      labelText: 'Nama Lengkap',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      final text = (value ?? '').trim();
-                      if (text.isEmpty) {
-                        return 'Nama wajib diisi.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      final text = (value ?? '').trim();
-                      if (text.isEmpty) {
-                        return 'Email wajib diisi.';
-                      }
-                      if (!text.contains('@')) {
-                        return 'Masukkan email yang valid.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setState(
-                              () => _obscurePassword = !_obscurePassword);
-                        },
-                      ),
-                    ),
-                    validator: (value) {
-                      final text = (value ?? '').trim();
-                      if (text.isEmpty) {
-                        return 'Password wajib diisi.';
-                      }
-                      if (text.length < 6) {
-                        return 'Password minimal 6 karakter.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _confirmPasswordController,
-                    obscureText: _obscureConfirmPassword,
-                    decoration: InputDecoration(
-                      labelText: 'Konfirmasi Password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirmPassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setState(() => _obscureConfirmPassword =
-                              !_obscureConfirmPassword);
-                        },
-                      ),
-                    ),
-                    validator: (value) {
-                      final confirmText = (value ?? '').trim();
-                      if (confirmText.isEmpty) {
-                        return 'Konfirmasi password wajib diisi.';
-                      }
-                      if (confirmText !=
-                          _passwordController.text.trim()) {
-                        return 'Konfirmasi password tidak sama.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  if (_errorMessage != null)
+      backgroundColor: const Color(0xFFFEF7FF),
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 30.h),
+
+              IconButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                icon: Icon(Icons.arrow_back_sharp, size: 24.sp),
+              ),
+
+              SizedBox(height: 10.h),
+
+              Center(
+                child: Column(
+                  children: [
                     Text(
-                      _errorMessage!,
+                      "Create an Account",
                       style: TextStyle(
-                          color: Theme.of(context).colorScheme.error),
-                    ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _register,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Register'),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'atau',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
+                        fontSize: 28.sp,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const Expanded(child: Divider()),
-                    ],
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      "Let's get you started!",
+                      style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 30.h),
+
+              /// FULL NAME
+              Transform.translate(
+                offset: Offset(0, 15.h),
+                child: Padding(
+                  padding: EdgeInsets.only(left: 54.w),
+                  child: Text(
+                    "Full Name",
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: (_isLoading || _isGoogleLoading)
-                        ? null
-                        : _signInWithGoogle,
-                    icon: _isGoogleLoading
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Image.asset('assets/images/google_logo.png',
-                            height: 20),
-                    label: const Text('Daftar dengan Google'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed:
-                        _isLoading ? null : widget.onLoginPressed,
-                    child: const Text('Sudah punya akun? Login'),
+                ),
+              ),
+
+              Row(
+                children: [
+                  buildIcon(Icons.person),
+                  Expanded(
+                    child: TextField(
+                      controller: fullNameController,
+                      decoration: InputDecoration(
+                        border: const UnderlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
+
+              buildError(nameError),
+
+              /// EMAIL
+              Transform.translate(
+                offset: Offset(0, 15.h),
+                child: Padding(
+                  padding: EdgeInsets.only(left: 54.w),
+                  child: Text(
+                    "Email Address",
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+
+              Row(
+                children: [
+                  buildIcon(Icons.email),
+                  Expanded(
+                    child: TextField(
+                      controller: emailController,
+                      decoration: InputDecoration(
+                        border: const UnderlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              buildError(emailError),
+
+              /// PASSWORD
+              Transform.translate(
+                offset: Offset(0, 15.h),
+                child: Padding(
+                  padding: EdgeInsets.only(left: 54.w),
+                  child: Text(
+                    "Password",
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+
+              Row(
+                children: [
+                  buildIcon(Icons.lock),
+                  Expanded(
+                    child: TextField(
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      decoration: InputDecoration(
+                        border: const UnderlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              obscurePassword = !obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              buildError(passwordError),
+
+              SizedBox(height: 10.h),
+
+              /// TERMS
+              Row(
+                children: [
+                  Checkbox(
+                    value: agreeTerms,
+                    activeColor: const Color(0xFF875DFC),
+                    onChanged: (value) {
+                      setState(() {
+                        agreeTerms = value!;
+                      });
+                    },
+                  ),
+                  Expanded(
+                    child: Text(
+                      "I agree to the terms & conditions",
+                      style: TextStyle(fontSize: 13.sp),
+                    ),
+                  ),
+                ],
+              ),
+
+              SizedBox(
+                height: 18.h,
+                child: Text(
+                  termsError ?? "",
+                  style: TextStyle(color: Colors.red, fontSize: 12.sp),
+                ),
+              ),
+
+              SizedBox(height: 30.h),
+
+              /// SIGN UP BUTTON
+              SizedBox(
+                width: double.infinity,
+                height: 50.h,
+                child: ElevatedButton(
+                  onPressed: validateRegister,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF875DFC),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30.r),
+                    ),
+                  ),
+                  child: Text(
+                    "Sign Up",
+                    style: TextStyle(fontSize: 16.sp, color: Colors.white),
+                  ),
+                ),
+              ),
+
+              const Spacer(),
+
+              /// OR
+              Center(
+                child: Text(
+                  "or",
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 30.h),
+
+              /// GOOGLE LOGIN
+              Center(
+                child: InkWell(
+                  onTap: () {},
+                  borderRadius: BorderRadius.circular(50.r),
+                  child: Container(
+                    width: 52.w,
+                    height: 52.w,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF875DFC).withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Image.network(
+                        "https://cdn-icons-png.flaticon.com/512/281/281764.png",
+                        width: 26.w,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const Spacer(),
+
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Already have an account? ",
+                      style: TextStyle(fontSize: 14.sp),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoginPage(),
+                          ),
+                        );
+                      },
+                      child: Text("Log In", style: TextStyle(fontSize: 14.sp)),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 50.h),
+            ],
           ),
         ),
       ),

@@ -1,363 +1,345 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:becation_apps/features/auth/forgot_page.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:becation_apps/features/auth/register_page.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../../services/user_service.dart';
-import 'forgot_password_page.dart';
-
-// Halaman login. Mendukung login via email/password dan Google.
-// Google login akan validasi apakah akun sudah terdaftar di Firestore sebelum
-// mengizinkan masuk.
 class LoginPage extends StatefulWidget {
-  const LoginPage({
-    super.key,
-    required this.onRegisterPressed,
-    required this.onSetAuthActionPending,
-    this.showRegistrationSuccess = false,
-  });
-
-  final VoidCallback onRegisterPressed;
-  // Callback untuk menandai proses auth async sedang berjalan/selesai di AuthGate.
-  final ValueChanged<bool> onSetAuthActionPending;
-  // Jika true, tampilkan banner sukses registrasi di atas form.
-  final bool showRegistrationSuccess;
+  const LoginPage({super.key});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
 
-  bool _isLoading = false;
-  String? _errorMessage;
-  bool _isGoogleLoading = false;
-  bool _obscurePassword = true;
+  bool obscurePassword = true;
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
+  String? emailError;
+  String? passwordError;
 
-  // Login pakai email & password, lalu simpan/update user doc di Firestore.
-  Future<void> _login() async {
-    FocusScope.of(context).unfocus();
-
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
+  void validateLogin() {
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+      emailError = null;
+      passwordError = null;
 
-    try {
-      final result = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      await UserService.ensureUserDocument(result.user!);
-    } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = _mapAuthError(e.code);
-        });
+      if (emailController.text.isEmpty) {
+        emailError = "Email is required.";
+      } else if (!emailController.text.contains("@")) {
+        emailError = "Please enter a valid email address.";
       }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Terjadi kesalahan. Coba lagi sebentar.';
-        });
+
+      if (passwordController.text.isEmpty) {
+        passwordError = "Password is required.";
+      } else if (passwordController.text.length < 6) {
+        passwordError = "Password must be at least 6 characters long.";
       }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+    });
   }
 
-  // Login pakai Google Sign-In dengan validasi: hanya izinkan masuk jika akun
-  // sudah terdaftar di Firestore. Jika belum terdaftar, sign out dan tampilkan error.
-  Future<void> _loginWithGoogle() async {
-    setState(() {
-      _isGoogleLoading = true;
-      _errorMessage = null;
-    });
-
-    // Cegah AuthGate navigasi ke HomePage selama proses validasi.
-    widget.onSetAuthActionPending(true);
-
-    try {
-      final googleUser = await GoogleSignIn.instance.authenticate();
-      final idToken = googleUser.authentication.idToken;
-
-      final credential = GoogleAuthProvider.credential(idToken: idToken);
-      final result =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-
-      // Validasi: cek apakah akun Google ini sudah terdaftar di Firestore.
-      final isRegistered =
-          await UserService.isUserRegistered(result.user!.uid);
-      if (!isRegistered) {
-        // Belum terdaftar → tampilkan dialog SEBELUM sign out agar context
-        // masih valid (sign out men-trigger AuthGate rebuild yang bisa
-        // menghancurkan widget State).
-        bool goToRegister = false;
-        if (mounted) {
-          goToRegister = await showDialog<bool>(
-                context: context,
-                barrierDismissible: false,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Email Belum Terdaftar'),
-                  content: const Text(
-                    'Akun Google ini belum terdaftar. '
-                    'Silakan register terlebih dahulu.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Batal'),
-                    ),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Register'),
-                    ),
-                  ],
-                ),
-              ) ??
-              false;
-        }
-
-        // Sign out setelah dialog ditutup.
-        await GoogleSignIn.instance.signOut();
-        await FirebaseAuth.instance.signOut();
-
-        // Jika user pilih Register, arahkan ke halaman register.
-        if (goToRegister && mounted) {
-          widget.onRegisterPressed();
-        }
-        return;
-      }
-
-      // Sudah terdaftar → update lastLogin dan biarkan AuthGate tampilkan HomePage.
-      await UserService.ensureUserDocument(result.user!);
-      widget.onSetAuthActionPending(false);
-    } on GoogleSignInException catch (_) {
-      // Google auth dibatalkan user, belum sampai Firebase sign-in.
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Login dengan Google dibatalkan.';
-        });
-      }
-    } on FirebaseAuthException catch (e) {
-      // Sign out jika user sempat ter-sign in sebelum error.
-      await GoogleSignIn.instance.signOut();
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        setState(() {
-          _errorMessage = _mapAuthError(e.code);
-        });
-      }
-    } catch (_) {
-      // Sign out jika user sempat ter-sign in sebelum error
-      // (misal ensureUserDocument gagal setelah signInWithCredential berhasil).
-      await GoogleSignIn.instance.signOut();
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Gagal login dengan Google. Coba lagi.';
-        });
-      }
-    } finally {
-      // Reset pending flag untuk semua error/cancel cases.
-      widget.onSetAuthActionPending(false);
-      if (mounted) {
-        setState(() => _isGoogleLoading = false);
-      }
-    }
-  }
-
-  // Konversi kode error Firebase Auth ke pesan yang user-friendly (Bahasa Indonesia).
-  String _mapAuthError(String code) {
-    switch (code) {
-      case 'user-not-found':
-        return 'Akun tidak ditemukan.';
-      case 'wrong-password':
-      case 'invalid-credential':
-        return 'Email atau password salah.';
-      case 'invalid-email':
-        return 'Format email tidak valid.';
-      case 'too-many-requests':
-        return 'Terlalu banyak percobaan login. Coba lagi nanti.';
-      default:
-        return 'Gagal login. Silakan coba lagi.';
-    }
+  Widget buildIcon(IconData icon) {
+    return Padding(
+      padding: EdgeInsets.only(right: 12.w),
+      child: Container(
+        width: 42.w,
+        height: 42.w,
+        decoration: BoxDecoration(
+          color: const Color(0xFF875DFC).withOpacity(0.15),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: const Color(0xFF875DFC), size: 22.sp),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Banner sukses registrasi, ditampilkan setelah user berhasil register.
-                  if (widget.showRegistrationSuccess)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green.shade300),
-                      ),
-                      child: Text(
-                        'Registrasi berhasil! Silakan login dengan akun yang sudah didaftarkan.',
-                        style: TextStyle(color: Colors.green.shade800),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  Text(
-                    'Masuk ke akun kamu',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      final text = (value ?? '').trim();
-                      if (text.isEmpty) {
-                        return 'Email wajib diisi.';
-                      }
-                      if (!text.contains('@')) {
-                        return 'Masukkan email yang valid.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setState(() => _obscurePassword = !_obscurePassword);
-                        },
-                      ),
-                    ),
-                    validator: (value) {
-                      final text = (value ?? '').trim();
-                      if (text.isEmpty) {
-                        return 'Password wajib diisi.';
-                      }
-                      if (text.length < 6) {
-                        return 'Password minimal 6 karakter.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  if (_errorMessage != null)
-                    Text(
-                      _errorMessage!,
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error),
-                    ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Login'),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ForgotPasswordPage(),
+      backgroundColor: const Color(0xFFFEF7FF),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24.w),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: 90.h),
+
+                        /// HEADER
+                        Center(
+                          child: Column(
+                            children: [
+                              Text(
+                                "Welcome back",
+                                style: TextStyle(
+                                  fontSize: 28.sp,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 6.h),
+                              Text(
+                                "Good to See You!",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14.sp,
+                                ),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                      child: const Text('Lupa Password?'),
+                        ),
+
+                        SizedBox(height: 30.h),
+
+                        /// EMAIL LABEL
+                        Transform.translate(
+                          offset: Offset(0, 15.h),
+                          child: Padding(
+                            padding: EdgeInsets.only(left: 54.w),
+                            child: Text(
+                              "Email Address",
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: 6.h),
+
+                        /// EMAIL FIELD
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                buildIcon(Icons.email),
+                                Expanded(
+                                  child: TextField(
+                                    controller: emailController,
+                                    decoration: InputDecoration(
+                                      border: const UnderlineInputBorder(),
+                                      contentPadding: EdgeInsets.symmetric(
+                                        vertical: 16.h,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(
+                              height: 20.h,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: 54.w),
+                                child: Text(
+                                  emailError ?? "",
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        /// PASSWORD LABEL
+                        Transform.translate(
+                          offset: Offset(0, 15.h),
+                          child: Padding(
+                            padding: EdgeInsets.only(left: 54.w),
+                            child: Text(
+                              "Password",
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: 6.h),
+
+                        /// PASSWORD FIELD
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                buildIcon(Icons.lock),
+                                Expanded(
+                                  child: TextField(
+                                    controller: passwordController,
+                                    obscureText: obscurePassword,
+                                    decoration: InputDecoration(
+                                      border: const UnderlineInputBorder(),
+                                      contentPadding: EdgeInsets.symmetric(
+                                        vertical: 16.h,
+                                      ),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          obscurePassword
+                                              ? Icons.visibility_off
+                                              : Icons.visibility,
+                                          size: 22.sp,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            obscurePassword = !obscurePassword;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(
+                              height: 20.h,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: 54.w),
+                                child: Text(
+                                  passwordError ?? "",
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(height: 20.h),
+
+                        /// FORGOT PASSWORD
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ForgotpassPage(),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              "Forgot Password",
+                              style: TextStyle(fontSize: 14.sp),
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: 30.h),
+
+                        /// LOGIN BUTTON
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50.h,
+                          child: ElevatedButton(
+                            onPressed: validateLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF875DFC),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30.r),
+                              ),
+                            ),
+                            child: Text(
+                              "Log In",
+                              style: TextStyle(fontSize: 16.sp),
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: 30.h),
+
+                        /// OR
+                        Center(
+                          child: Text(
+                            "or",
+                            style: TextStyle(
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: 30.h),
+
+                        /// GOOGLE LOGIN
+                        Center(
+                          child: InkWell(
+                            onTap: () {},
+                            borderRadius: BorderRadius.circular(50.r),
+                            child: Container(
+                              width: 52.w,
+                              height: 52.w,
+                              decoration: BoxDecoration(
+                                color: const Color(
+                                  0xFF875DFC,
+                                ).withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Image.network(
+                                  "https://cdn-icons-png.flaticon.com/512/281/281764.png",
+                                  width: 26.w,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const Spacer(),
+
+                        /// SIGN UP
+                        Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Don't have an account? ",
+                                style: TextStyle(fontSize: 14.sp),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const RegisterPage(),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  "Sign Up",
+                                  style: TextStyle(fontSize: 14.sp),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        SizedBox(height: 50.h),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'atau',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: (_isLoading || _isGoogleLoading)
-                        ? null
-                        : _loginWithGoogle,
-                    icon: _isGoogleLoading
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Image.asset('assets/images/google_logo.png',
-                            height: 20),
-                    label: const Text('Login dengan Google'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed:
-                        _isLoading ? null : widget.onRegisterPressed,
-                    child: const Text('Belum punya akun? Register'),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );

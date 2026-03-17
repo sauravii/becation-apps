@@ -1,79 +1,74 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:becation_apps/features/auth/login_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'login.dart';
+import 'home.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  _SplashScreenState createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> {
+
   @override
   void initState() {
     super.initState();
+    checkLogin();
+  }
 
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+  void checkLogin() async {
 
-    Future.delayed(const Duration(seconds: 3), () {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (_, animation, __) => const LoginPage(),
-          transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
+    await Future.delayed(Duration(seconds: 2));
+
+    User? user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Home(),
         ),
       );
-    });
+
+    } else {
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Login(),
+        ),
+      );
+
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
 
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("lib/assets/front_ui.png"),
-            fit: BoxFit.cover,
-          ),
-        ),
+            Icon(
+              Icons.travel_explore,
+              size: 80,
+            ),
 
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset("lib/assets/bee_logo.png", width: 220),
+            SizedBox(height: 20),
 
-              const SizedBox(height: 20),
-
-              const Text(
-                "BECATION",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
+            Text(
+              "BECATION",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
               ),
+            )
 
-              const SizedBox(height: 6),
-
-              const Text(
-                "BETTER EDUCATION",
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:becation_apps/features/auth/login_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:becation_apps/features/home/home_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,13 +14,34 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   @override
-  void initState() {
+void initState() {
     super.initState();
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
 
-    Future.delayed(const Duration(seconds: 3), () {
-      Navigator.of(context).pushReplacement(
+    _checkAuthState();
+  }
+
+  Future<void> _checkAuthState() async {
+    await Future.delayed(const Duration(seconds: 3));
+    
+    if (!mounted) return;
+    
+    final User? user = FirebaseAuth.instance.currentUser;
+    
+    if (user != null) {
+      Navigator.of(context).pushAndRemoveUntil(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 800),
+          pageBuilder: (_, animation, __) => const HomePage(),
+          transitionsBuilder: (_, animation, __, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
+        (route) => false,
+      );
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 800),
           pageBuilder: (_, animation, __) => const LoginPage(),
@@ -26,8 +49,9 @@ class _SplashScreenState extends State<SplashScreen>
             return FadeTransition(opacity: animation, child: child);
           },
         ),
+        (route) => false,
       );
-    });
+    }
   }
 
   @override

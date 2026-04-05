@@ -2,6 +2,10 @@ import 'package:becation_apps/features/auth/forgot_page.dart';
 import 'package:flutter/material.dart';
 import 'package:becation_apps/features/auth/register_page.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:becation_apps/services/user_service.dart';
+import 'package:becation_apps/features/home/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,14 +19,18 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
 
   bool obscurePassword = true;
+  bool isEmailLoading = false;
+  bool isGoogleLoading = false;
 
   String? emailError;
   String? passwordError;
+  String? generalError;
 
-  void validateLogin() {
+  void validateLogin() async {
     setState(() {
       emailError = null;
       passwordError = null;
+      generalError = null;
 
       if (emailController.text.isEmpty) {
         emailError = "Email is required.";
@@ -36,6 +44,103 @@ class _LoginPageState extends State<LoginPage> {
         passwordError = "Password must be at least 6 characters long.";
       }
     });
+
+    if (emailError == null && passwordError == null) {
+      await _signInWithEmail();
+    }
+  }
+
+  Future<void> _signInWithEmail() async {
+    setState(() => isEmailLoading = true);
+    
+    try {
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text,
+      );
+
+      if (credential.user != null) {
+        await UserService.ensureUserDocument(credential.user!);
+        
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomePage()),
+            (route) => false,
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        switch (e.code) {
+          case 'user-not-found':
+            generalError = 'No user found for this email.';
+            break;
+          case 'wrong-password':
+            generalError = 'Wrong password provided.';
+            break;
+          case 'invalid-email':
+            generalError = 'Invalid email address.';
+            break;
+          case 'user-disabled':
+            generalError = 'This user account has been disabled.';
+            break;
+          case 'too-many-requests':
+            generalError = 'Too many requests. Try again later.';
+            break;
+          default:
+            generalError = 'Login failed: ${e.message}';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        generalError = 'An unexpected error occurred. Please try again.';
+      });
+    } finally {
+      setState(() => isEmailLoading = false);
+    }
+  }
+
+  static final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => isGoogleLoading = true);
+    
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() => isGoogleLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      
+      if (userCredential.user != null) {
+        await UserService.ensureUserDocument(userCredential.user!);
+        
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomePage()),
+            (route) => false,
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        generalError = 'Google sign in failed: ${e.message}';
+      });
+    } catch (e) {
+      setState(() {
+        generalError = 'An unexpected error occurred during Google sign in.';
+      });
+    } finally {
+      setState(() => isGoogleLoading = false);
+    }
   }
 
   Widget buildIcon(IconData icon) {
@@ -241,14 +346,35 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
 
-                        SizedBox(height: 30.h),
+                        SizedBox(height: 20.h),
+
+                        /// GENERAL ERROR MESSAGE
+                        if (generalError != null)
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(12.w),
+                            margin: EdgeInsets.only(bottom: 20.h),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8.r),
+                              border: Border.all(color: Colors.red.withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              generalError!,
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 14.sp,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
 
                         /// LOGIN BUTTON
                         SizedBox(
                           width: double.infinity,
                           height: 50.h,
                           child: ElevatedButton(
-                            onPressed: validateLogin,
+                            onPressed: isEmailLoading ? null : validateLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF875DFC),
                               foregroundColor: Colors.white,
@@ -256,10 +382,19 @@ class _LoginPageState extends State<LoginPage> {
                                 borderRadius: BorderRadius.circular(30.r),
                               ),
                             ),
-                            child: Text(
-                              "Log In",
-                              style: TextStyle(fontSize: 16.sp),
-                            ),
+                            child: isEmailLoading
+                                ? SizedBox(
+                                    height: 20.h,
+                                    width: 20.h,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : Text(
+                                    "Log In",
+                                    style: TextStyle(fontSize: 16.sp),
+                                  ),
                           ),
                         ),
 
@@ -281,7 +416,7 @@ class _LoginPageState extends State<LoginPage> {
                         /// GOOGLE LOGIN
                         Center(
                           child: InkWell(
-                            onTap: () {},
+                            onTap: isGoogleLoading ? null : _signInWithGoogle,
                             borderRadius: BorderRadius.circular(50.r),
                             child: Container(
                               width: 52.w,
@@ -292,12 +427,23 @@ class _LoginPageState extends State<LoginPage> {
                                 ).withOpacity(0.15),
                                 shape: BoxShape.circle,
                               ),
-                              child: Center(
-                                child: Image.network(
-                                  "https://cdn-icons-png.flaticon.com/512/281/281764.png",
-                                  width: 26.w,
-                                ),
-                              ),
+                              child: isGoogleLoading
+                                  ? Center(
+                                      child: SizedBox(
+                                        height: 20.h,
+                                        width: 20.h,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF875DFC)),
+                                        ),
+                                      ),
+                                    )
+                                  : Center(
+                                      child: Image.network(
+                                        "https://cdn-icons-png.flaticon.com/512/281/281764.png",
+                                        width: 26.w,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),

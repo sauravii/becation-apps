@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:becation_apps/features/auth/login_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:becation_apps/features/home/home_page.dart';
+import 'package:becation_apps/features/student/studentdashboard_page.dart';
+import 'package:becation_apps/features/teacher/teacherdashboard_page.dart';
+import 'package:becation_apps/services/user_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,44 +16,56 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   @override
-void initState() {
+  void initState() {
     super.initState();
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-
     _checkAuthState();
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
   }
 
   Future<void> _checkAuthState() async {
     await Future.delayed(const Duration(seconds: 3));
-    
+
     if (!mounted) return;
-    
+
     final User? user = FirebaseAuth.instance.currentUser;
-    
-    if (user != null) {
-      Navigator.of(context).pushAndRemoveUntil(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (_, animation, __) => const HomePage(),
-          transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
-        (route) => false,
-      );
+
+    Widget targetPage;
+
+    if (user == null) {
+      targetPage = const LoginPage();
     } else {
-      Navigator.of(context).pushAndRemoveUntil(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (_, animation, __) => const LoginPage(),
-          transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
-        (route) => false,
-      );
+      final role = await UserService.getUserRole(user.uid);
+
+      switch (role) {
+        case 'teacher':
+          targetPage = const TeacherDashboard();
+          break;
+        case 'student':
+        default:
+          targetPage = const StudentDashboard();
+          break;
+      }
     }
+
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 800),
+        pageBuilder: (_, animation, __) => targetPage,
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+      (route) => false,
+    );
   }
 
   @override
@@ -60,22 +74,18 @@ void initState() {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: AssetImage("lib/assets/front_ui.png"),
             fit: BoxFit.cover,
           ),
         ),
-
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Image.asset("lib/assets/bee_logo.png", width: 220),
-
               const SizedBox(height: 20),
-
               const Text(
                 "BECATION",
                 style: TextStyle(
@@ -85,9 +95,7 @@ void initState() {
                   letterSpacing: 2,
                 ),
               ),
-
               const SizedBox(height: 6),
-
               const Text(
                 "BETTER EDUCATION",
                 style: TextStyle(

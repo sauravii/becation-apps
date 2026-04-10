@@ -5,7 +5,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:becation_apps/services/user_service.dart';
-import 'package:becation_apps/features/home/home_page.dart';
+import 'package:becation_apps/features/student/studentdashboard_page.dart';
+import 'package:becation_apps/features/teacher/teacherdashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -26,21 +27,33 @@ class _LoginPageState extends State<LoginPage> {
   String? passwordError;
   String? generalError;
 
+  static final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
   void validateLogin() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+
     setState(() {
       emailError = null;
       passwordError = null;
       generalError = null;
 
-      if (emailController.text.isEmpty) {
+      if (email.isEmpty) {
         emailError = "Email is required.";
-      } else if (!emailController.text.contains("@")) {
+      } else if (!_isValidEmail(email)) {
         emailError = "Please enter a valid email address.";
       }
 
-      if (passwordController.text.isEmpty) {
+      if (password.isEmpty) {
         passwordError = "Password is required.";
-      } else if (passwordController.text.length < 6) {
+      } else if (password.length < 6) {
         passwordError = "Password must be at least 6 characters long.";
       }
     });
@@ -50,9 +63,37 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  bool _isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+    return emailRegex.hasMatch(email);
+  }
+
+  Future<void> _navigateByRole(User user) async {
+    final role = await UserService.getUserRole(user.uid);
+
+    if (!mounted) return;
+
+    Widget targetPage;
+
+    switch (role) {
+      case 'teacher':
+        targetPage = const TeacherDashboard();
+        break;
+      case 'student':
+      default:
+        targetPage = const StudentDashboard();
+        break;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => targetPage),
+      (route) => false,
+    );
+  }
+
   Future<void> _signInWithEmail() async {
     setState(() => isEmailLoading = true);
-    
+
     try {
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
@@ -61,17 +102,14 @@ class _LoginPageState extends State<LoginPage> {
 
       if (credential.user != null) {
         await UserService.ensureUserDocument(credential.user!);
-        
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomePage()),
-            (route) => false,
-          );
-        }
+        await _navigateByRole(credential.user!);
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
         switch (e.code) {
+          case 'invalid-credential':
+            generalError = 'Email or password is incorrect.';
+            break;
           case 'user-not-found':
             generalError = 'No user found for this email.';
             break;
@@ -96,39 +134,44 @@ class _LoginPageState extends State<LoginPage> {
         generalError = 'An unexpected error occurred. Please try again.';
       });
     } finally {
-      setState(() => isEmailLoading = false);
+      if (mounted) {
+        setState(() => isEmailLoading = false);
+      }
     }
   }
 
-  static final GoogleSignIn _googleSignIn = GoogleSignIn();
-
   Future<void> _signInWithGoogle() async {
-    setState(() => isGoogleLoading = true);
-    
+    setState(() {
+      isGoogleLoading = true;
+      generalError = null;
+    });
+
     try {
+      await _googleSignIn.signOut();
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        setState(() => isGoogleLoading = false);
+        if (mounted) {
+          setState(() => isGoogleLoading = false);
+        }
         return;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+
       if (userCredential.user != null) {
         await UserService.ensureUserDocument(userCredential.user!);
-        
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomePage()),
-            (route) => false,
-          );
-        }
+        await _navigateByRole(userCredential.user!);
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -139,7 +182,9 @@ class _LoginPageState extends State<LoginPage> {
         generalError = 'An unexpected error occurred during Google sign in.';
       });
     } finally {
-      setState(() => isGoogleLoading = false);
+      if (mounted) {
+        setState(() => isGoogleLoading = false);
+      }
     }
   }
 
@@ -176,7 +221,6 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         SizedBox(height: 90.h),
 
-                        /// HEADER
                         Center(
                           child: Column(
                             children: [
@@ -201,7 +245,6 @@ class _LoginPageState extends State<LoginPage> {
 
                         SizedBox(height: 30.h),
 
-                        /// EMAIL LABEL
                         Transform.translate(
                           offset: Offset(0, 15.h),
                           child: Padding(
@@ -219,7 +262,6 @@ class _LoginPageState extends State<LoginPage> {
 
                         SizedBox(height: 6.h),
 
-                        /// EMAIL FIELD
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -230,6 +272,7 @@ class _LoginPageState extends State<LoginPage> {
                                 Expanded(
                                   child: TextField(
                                     controller: emailController,
+                                    keyboardType: TextInputType.emailAddress,
                                     decoration: InputDecoration(
                                       border: const UnderlineInputBorder(),
                                       contentPadding: EdgeInsets.symmetric(
@@ -256,7 +299,6 @@ class _LoginPageState extends State<LoginPage> {
                           ],
                         ),
 
-                        /// PASSWORD LABEL
                         Transform.translate(
                           offset: Offset(0, 15.h),
                           child: Padding(
@@ -274,7 +316,6 @@ class _LoginPageState extends State<LoginPage> {
 
                         SizedBox(height: 6.h),
 
-                        /// PASSWORD FIELD
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -327,7 +368,6 @@ class _LoginPageState extends State<LoginPage> {
 
                         SizedBox(height: 20.h),
 
-                        /// FORGOT PASSWORD
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
@@ -348,7 +388,6 @@ class _LoginPageState extends State<LoginPage> {
 
                         SizedBox(height: 20.h),
 
-                        /// GENERAL ERROR MESSAGE
                         if (generalError != null)
                           Container(
                             width: double.infinity,
@@ -357,7 +396,9 @@ class _LoginPageState extends State<LoginPage> {
                             decoration: BoxDecoration(
                               color: Colors.red.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8.r),
-                              border: Border.all(color: Colors.red.withOpacity(0.3)),
+                              border: Border.all(
+                                color: Colors.red.withOpacity(0.3),
+                              ),
                             ),
                             child: Text(
                               generalError!,
@@ -369,7 +410,6 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
 
-                        /// LOGIN BUTTON
                         SizedBox(
                           width: double.infinity,
                           height: 50.h,
@@ -386,9 +426,12 @@ class _LoginPageState extends State<LoginPage> {
                                 ? SizedBox(
                                     height: 20.h,
                                     width: 20.h,
-                                    child: CircularProgressIndicator(
+                                    child: const CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor:
+                                          AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   )
                                 : Text(
@@ -400,7 +443,6 @@ class _LoginPageState extends State<LoginPage> {
 
                         SizedBox(height: 30.h),
 
-                        /// OR
                         Center(
                           child: Text(
                             "or",
@@ -413,7 +455,6 @@ class _LoginPageState extends State<LoginPage> {
 
                         SizedBox(height: 30.h),
 
-                        /// GOOGLE LOGIN
                         Center(
                           child: InkWell(
                             onTap: isGoogleLoading ? null : _signInWithGoogle,
@@ -434,7 +475,10 @@ class _LoginPageState extends State<LoginPage> {
                                         width: 20.h,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF875DFC)),
+                                          valueColor:
+                                              const AlwaysStoppedAnimation<Color>(
+                                            Color(0xFF875DFC),
+                                          ),
                                         ),
                                       ),
                                     )
@@ -450,7 +494,6 @@ class _LoginPageState extends State<LoginPage> {
 
                         const Spacer(),
 
-                        /// SIGN UP
                         Center(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,

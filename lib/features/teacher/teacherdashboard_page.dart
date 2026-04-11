@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 
 import 'teacher_classes_page.dart';
 import 'teacher_settings_page.dart';
+import 'teacher_bottom_nav.dart';
 
 class TeacherDashboard extends StatefulWidget {
-  const TeacherDashboard({super.key});
+  final ValueChanged<int>? onTabRequested;
+
+  const TeacherDashboard({super.key, this.onTabRequested});
 
   @override
   State<TeacherDashboard> createState() => _TeacherDashboardState();
@@ -15,6 +18,7 @@ class TeacherDashboard extends StatefulWidget {
 
 class _TeacherDashboardState extends State<TeacherDashboard> {
   late DashboardData dashboard;
+  String? _displayName;
 
   @override
   void initState() {
@@ -22,6 +26,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
 
     final currentUser = FirebaseAuth.instance.currentUser;
     final teacherName = _getTeacherNameFromUser(currentUser);
+
+    _displayName = teacherName;
 
     dashboard = DashboardData(
       teacherName: teacherName,
@@ -62,13 +68,6 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     if (displayName != null && displayName.isNotEmpty) {
       return displayName;
     }
-
-    final email = user.email;
-    if (email != null && email.isNotEmpty) {
-      final prefix = email.split('@').first.trim();
-      if (prefix.isNotEmpty) return prefix;
-    }
-
     return 'Teacher';
   }
 
@@ -78,54 +77,45 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     final user = FirebaseAuth.instance.currentUser;
 
     Widget buildBody(String displayName) {
-      return Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  const SizedBox(height: 24),
-                  _buildGreeting(displayName),
-                  const SizedBox(height: 20),
-                  _buildStatsSection(),
-                  const SizedBox(height: 24),
-                  _buildCalendar(today),
-                  const SizedBox(height: 24),
-                  _buildActiveClassesHeader(context),
-                  const SizedBox(height: 12),
-                  _buildActiveClassesList(),
-                ],
-              ),
-            ),
-          ),
-          _buildBottomNav(),
-        ],
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 24),
+            _buildGreeting(displayName),
+            const SizedBox(height: 20),
+            _buildStatsSection(),
+            const SizedBox(height: 24),
+            _buildCalendar(today),
+            const SizedBox(height: 24),
+            _buildActiveClassesHeader(context),
+            const SizedBox(height: 12),
+            _buildActiveClassesList(),
+          ],
+        ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F2FA),
-      body: SafeArea(
-        child: user == null
-            ? buildBody('Teacher')
-            : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: UserService.userStream(user.uid),
-                builder: (context, snapshot) {
-                  final data = snapshot.data?.data();
-                  final firestoreName = (data?['displayName'] as String?)
-                      ?.trim();
-                  final displayName =
-                      (firestoreName != null && firestoreName.isNotEmpty)
-                      ? firestoreName
-                      : _getTeacherNameFromUser(user);
+    if (user == null) {
+      return buildBody(_displayName ?? 'Teacher');
+    }
 
-                  return buildBody(displayName);
-                },
-              ),
-      ),
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: UserService.userStream(user.uid),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+        final firestoreName = (data?['displayName'] as String?)?.trim();
+
+        if (firestoreName != null && firestoreName.isNotEmpty) {
+          _displayName = firestoreName;
+        } else if (_displayName == null) {
+          _displayName = _getTeacherNameFromUser(user);
+        }
+
+        return buildBody(_displayName ?? 'Teacher');
+      },
     );
   }
 
@@ -363,9 +353,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         ),
         InkWell(
           onTap: () {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const TeacherClassesPage()),
-            );
+            widget.onTabRequested?.call(1);
           },
           borderRadius: BorderRadius.circular(8),
           child: const Padding(
@@ -527,43 +515,11 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   }
 
   Widget _buildBottomNav() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _NavItem(
-            icon: Icons.dashboard_rounded,
-            label: 'Dashboard',
-            active: true,
-            onTap: () {},
-          ),
-          _NavItem(
-            icon: Icons.class_rounded,
-            label: 'Classes',
-            active: false,
-            onTap: () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const TeacherClassesPage()),
-              );
-            },
-          ),
-          _NavItem(
-            icon: Icons.settings_rounded,
-            label: 'Settings',
-            active: false,
-            onTap: () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const TeacherSettingsPage()),
-              );
-            },
-          ),
-        ],
-      ),
+    return TeacherBottomNavBar(
+      activeIndex: 0,
+      onItemSelected: (index) {
+        widget.onTabRequested?.call(index);
+      },
     );
   }
 }
@@ -600,46 +556,4 @@ class ActiveClassData {
     required this.students,
     required this.color,
   });
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const activeColor = Color(0xFF6F5AAA);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: active ? activeColor : Colors.grey),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                color: active ? activeColor : Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

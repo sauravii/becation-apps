@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'studentdashboard_page.dart';
-import 'student_settings_page.dart';
 
 class StudentClassesPage extends StatelessWidget {
-  const StudentClassesPage({super.key});
+  const StudentClassesPage({super.key, this.onTabRequested});
+
+  final ValueChanged<int>? onTabRequested;
 
   List<ActiveClassData> _buildDummyActiveClasses() {
     return [
@@ -36,39 +37,27 @@ class StudentClassesPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final activeClasses = _buildDummyActiveClasses();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F2FA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _Header(title: 'Classes'),
-                    const SizedBox(height: 24),
-                    if (activeClasses.isEmpty)
-                      _EmptyState()
-                    else
-                      Column(
-                        children: activeClasses
-                            .map(
-                              (item) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _ClassCard(item: item),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                  ],
-                ),
-              ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Header(title: 'Classes'),
+          const SizedBox(height: 24),
+          if (activeClasses.isEmpty)
+            _EmptyState()
+          else
+            Column(
+              children: activeClasses
+                  .map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ClassCard(item: item),
+                    ),
+                  )
+                  .toList(),
             ),
-            _BottomNav(activeIndex: 1),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -240,96 +229,12 @@ class _ClassCard extends StatelessWidget {
 
 class _BottomNav extends StatelessWidget {
   final int activeIndex;
+  final ValueChanged<int>? onTabRequested;
 
-  const _BottomNav({required this.activeIndex});
-
-  void _go(BuildContext context, int index) {
-    if (index == activeIndex) return;
-
-    final page = switch (index) {
-      0 => const StudentDashboard(),
-      1 => const StudentClassesPage(),
-      _ => const StudentSettingsPage(),
-    };
-
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => page));
-  }
+  const _BottomNav({required this.activeIndex, this.onTabRequested});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _NavItem(
-            icon: Icons.dashboard_rounded,
-            label: 'Dashboard',
-            active: activeIndex == 0,
-            onTap: () => _go(context, 0),
-          ),
-          _NavItem(
-            icon: Icons.class_rounded,
-            label: 'Classes',
-            active: activeIndex == 1,
-            onTap: () => _go(context, 1),
-          ),
-          _NavItem(
-            icon: Icons.settings_rounded,
-            label: 'Settings',
-            active: activeIndex == 2,
-            onTap: () => _go(context, 2),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const activeColor = Color(0xFF6F5AAA);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: active ? activeColor : Colors.grey),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                color: active ? activeColor : Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 }

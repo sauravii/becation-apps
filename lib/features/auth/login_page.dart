@@ -6,7 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:becation_apps/services/user_service.dart';
 import 'package:becation_apps/features/student/studentdashboard_page.dart';
-import 'package:becation_apps/features/teacher/teacherdashboard_page.dart';
+import 'package:becation_apps/features/teacher/teacher_root_page.dart';
+import 'package:becation_apps/features/student/student_root_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -77,11 +78,11 @@ class _LoginPageState extends State<LoginPage> {
 
     switch (role) {
       case 'teacher':
-        targetPage = const TeacherDashboard();
+        targetPage = TeacherRootPage();
         break;
       case 'student':
       default:
-        targetPage = const StudentDashboard();
+        targetPage = const StudentRootPage();
         break;
     }
 
@@ -428,8 +429,7 @@ class _LoginPageState extends State<LoginPage> {
                                     width: 20.h,
                                     child: const CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
                                         Colors.white,
                                       ),
                                     ),
@@ -476,9 +476,9 @@ class _LoginPageState extends State<LoginPage> {
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
                                           valueColor:
-                                              const AlwaysStoppedAnimation<Color>(
-                                            Color(0xFF875DFC),
-                                          ),
+                                              const AlwaysStoppedAnimation<
+                                                Color
+                                              >(Color(0xFF875DFC)),
                                         ),
                                       ),
                                     )

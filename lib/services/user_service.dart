@@ -12,8 +12,13 @@ class UserService {
   // [displayName] opsional — dipakai saat register email/password untuk menyimpan
   // nama yang diisi user. Kalau null, ambil dari user.displayName (Google Sign-In).
   // Throws on failure — callers harus handle error sendiri.
-  static Future<void> ensureUserDocument(User user, {String? displayName}) async {
-    debugPrint('[UserService] ensureUserDocument called for ${user.email} (${user.uid})');
+  static Future<void> ensureUserDocument(
+    User user, {
+    String? displayName,
+  }) async {
+    debugPrint(
+      '[UserService] ensureUserDocument called for ${user.email} (${user.uid})',
+    );
     final name = displayName ?? user.displayName ?? '';
     final doc = _usersRef.doc(user.uid);
     final snapshot = await doc.get();
@@ -36,6 +41,41 @@ class UserService {
       });
       debugPrint('[UserService] lastLogin updated!');
     }
+
+    // Sinkronkan juga displayName di FirebaseAuth user supaya greeting bisa langsung
+    // pakai nama ini tanpa perlu nunggu Firestore.
+    if (name.isNotEmpty && user.displayName != name) {
+      try {
+        await user.updateDisplayName(name);
+      } catch (e, st) {
+        debugPrint(
+          '[UserService] Failed to update FirebaseAuth.displayName: $e\n$st',
+        );
+      }
+    }
+  }
+
+  // Sinkronkan displayName di FirebaseAuth dari Firestore kalau belum terisi.
+  // Dipanggil misalnya saat splash / auto-login supaya dashboard langsung pakai nama.
+  static Future<void> syncAuthDisplayNameFromFirestore(User user) async {
+    try {
+      final snapshot = await _usersRef.doc(user.uid).get();
+      final data = snapshot.data();
+
+      if (data == null) return;
+
+      final firestoreName = (data['displayName'] as String?)?.trim();
+
+      if (firestoreName != null &&
+          firestoreName.isNotEmpty &&
+          user.displayName != firestoreName) {
+        await user.updateDisplayName(firestoreName);
+      }
+    } catch (e, st) {
+      debugPrint(
+        '[UserService] Failed to sync auth displayName from Firestore: $e\n$st',
+      );
+    }
   }
 
   // Cek apakah user sudah terdaftar di Firestore (punya doc di collection 'users').
@@ -51,9 +91,7 @@ class UserService {
   }
 
   // Stream realtime data user (auto update kalau ada perubahan di Firestore).
-  static Stream<DocumentSnapshot<Map<String, dynamic>>> userStream(
-    String uid,
-  ) {
+  static Stream<DocumentSnapshot<Map<String, dynamic>>> userStream(String uid) {
     return _usersRef.doc(uid).snapshots();
   }
 
@@ -71,8 +109,9 @@ class UserService {
   static Future<List<Map<String, dynamic>>> searchUsersByEmail(
     String email,
   ) async {
-    final snapshot =
-        await _usersRef.where('email', isEqualTo: email.trim()).get();
+    final snapshot = await _usersRef
+        .where('email', isEqualTo: email.trim())
+        .get();
     return snapshot.docs.map((doc) {
       final data = doc.data();
       data['uid'] = doc.id;

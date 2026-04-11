@@ -194,14 +194,6 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
 
       child: Row(
         children: [
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF1C1B20)),
-          ),
-          const SizedBox(width: 10),
-
           const Icon(Icons.class_rounded, color: Color(0xFF1C1B20), size: 24),
 
           const SizedBox(width: 12),

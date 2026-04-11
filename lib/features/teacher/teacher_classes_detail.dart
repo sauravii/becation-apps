@@ -120,16 +120,16 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
+              margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
               decoration: BoxDecoration(
                 color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const Padding(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(10),
               child: Text(
-                'Add Options',
+                'Create',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -139,6 +139,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
             ),
             ListTile(
               leading: Container(
+                padding: const EdgeInsets.only(left: 10, right: 10),
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
@@ -147,11 +148,13 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
                 ),
                 child: const Icon(Icons.topic, color: Color(0xFF6F5AAA)),
               ),
-              title: const Text('Add Topic'),
-              subtitle: const Text('Create a new topic for this class'),
+              title: const Text(
+                'Quiz',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Implement add topic functionality
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Add topic functionality coming soon!'),
@@ -169,20 +172,224 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
                 ),
                 child: const Icon(Icons.description, color: Color(0xFF6F5AAA)),
               ),
-              title: const Text('Add Material'),
-              subtitle: const Text('Add new material to existing topic'),
+              title: const Text(
+                'Material',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Implement add material functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Add material functionality coming soon!'),
-                  ),
-                );
+                _showAddMaterialDialog(context);
               },
             ),
             const SizedBox(height: 20),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddMaterialDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 400,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with close button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Add Material',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1C1B20),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Color(0xFF49454F)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Material Title Field
+              const Text(
+                'Material Title',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1C1B20),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Enter material title',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF79747E)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF6F5AAA)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Topic Selection
+              const Text(
+                'Topic',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1C1B20),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFF79747E)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Select Topic',
+                      style: TextStyle(color: Color(0xFF49454F), fontSize: 16),
+                    ),
+                    const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: Color(0xFF49454F),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // File Upload Section
+              const Text(
+                'File',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1C1B20),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFF79747E)),
+                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFFF7F2FA),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6F5AAA).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: const Icon(
+                        Icons.cloud_upload_outlined,
+                        color: Color(0xFF6F5AAA),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Click to upload or drag and drop',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF1C1B20),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'PDF, DOC, DOCX (max 5MB)',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF49454F)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: const BorderSide(color: Color(0xFF79747E)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF49454F),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Material added successfully!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6F5AAA),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Add Material',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -194,14 +401,6 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
 
       child: Row(
         children: [
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF1C1B20)),
-          ),
-          const SizedBox(width: 10),
-
           const Icon(Icons.class_rounded, color: Color(0xFF1C1B20), size: 24),
 
           const SizedBox(width: 12),
@@ -246,7 +445,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
 
           // Description text
           const Text(
-            'This is where you can manage your class content.',
+            'This is where you can hand out assignments.',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -256,7 +455,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'You can add topics, materials, and manage assignments',
+            'You can add assignments for the class, then organize it into topics',
             style: TextStyle(fontSize: 14, color: Colors.grey),
             textAlign: TextAlign.center,
           ),

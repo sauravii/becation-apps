@@ -2,6 +2,8 @@ import 'package:becation_apps/features/auth/login_page.dart';
 import 'package:becation_apps/features/auth/verify_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../components/forms/auth_text_field.dart';
+import '../../components/buttons/auth_button.dart';
 
 class ForgotpassPage extends StatefulWidget {
   const ForgotpassPage({super.key});
@@ -14,21 +16,6 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
   final emailController = TextEditingController();
 
   String? emailError;
-
-  Widget buildIcon(IconData icon) {
-    return Padding(
-      padding: EdgeInsets.only(right: 12.w),
-      child: Container(
-        width: 42.w,
-        height: 42.w,
-        decoration: BoxDecoration(
-          color: const Color(0xFF875DFC).withOpacity(0.15),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: const Color(0xFF875DFC), size: 22.sp),
-      ),
-    );
-  }
 
   void validateEmail() {
     setState(() {
@@ -45,19 +32,6 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
         );
       }
     });
-  }
-
-  Widget buildError(String? error) {
-    return SizedBox(
-      height: 20.h,
-      child: Padding(
-        padding: EdgeInsets.only(left: 54.w),
-        child: Text(
-          error ?? "",
-          style: TextStyle(color: Colors.red, fontSize: 12.sp),
-        ),
-      ),
-    );
   }
 
   @override
@@ -113,71 +87,17 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
 
                         SizedBox(height: 30.h),
 
-                        /// EMAIL LABEL
-                        Transform.translate(
-                          offset: Offset(0, 15.h),
-                          child: Padding(
-                            padding: EdgeInsets.only(left: 54.w),
-                            child: Text(
-                              "Email Address",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(height: 6.h),
-
-                        /// EMAIL FIELD
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                buildIcon(Icons.email),
-                                Expanded(
-                                  child: TextField(
-                                    controller: emailController,
-                                    decoration: InputDecoration(
-                                      border: const UnderlineInputBorder(),
-                                      contentPadding: EdgeInsets.symmetric(
-                                        vertical: 16.h,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            buildError(emailError),
-                          ],
+                        AuthTextField(
+                          controller: emailController,
+                          labelText: "Email Address",
+                          icon: Icons.email,
+                          errorText: emailError,
+                          keyboardType: TextInputType.emailAddress,
                         ),
 
                         SizedBox(height: 90.h),
 
-                        /// SEND CODE BUTTON
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50.h,
-                          child: ElevatedButton(
-                            onPressed: validateEmail,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF875DFC),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30.r),
-                              ),
-                            ),
-                            child: Text(
-                              "Send Code",
-                              style: TextStyle(fontSize: 16.sp),
-                            ),
-                          ),
-                        ),
+                        AuthButton(text: "Send Code", onPressed: validateEmail),
 
                         const Spacer(),
 

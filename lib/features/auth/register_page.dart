@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:becation_apps/services/user_service.dart';
 import 'package:becation_apps/features/home/home_page.dart';
+import '../../components/forms/auth_text_field.dart';
+import '../../components/buttons/auth_button.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -58,26 +60,30 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     });
 
-    if (nameError == null && emailError == null && passwordError == null && termsError == null) {
+    if (nameError == null &&
+        emailError == null &&
+        passwordError == null &&
+        termsError == null) {
       await _registerWithEmail();
     }
   }
 
   Future<void> _registerWithEmail() async {
     setState(() => isEmailLoading = true);
-    
+
     try {
-      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text,
-      );
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text,
+          );
 
       if (credential.user != null) {
         await UserService.ensureUserDocument(
           credential.user!,
           displayName: fullNameController.text.trim(),
         );
-        
+
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const HomePage()),
@@ -120,7 +126,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _signInWithGoogle() async {
     setState(() => isGoogleLoading = true);
-    
+
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
@@ -128,17 +134,20 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+
       if (userCredential.user != null) {
         await UserService.ensureUserDocument(userCredential.user!);
-        
+
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const HomePage()),
@@ -157,34 +166,6 @@ class _RegisterPageState extends State<RegisterPage> {
     } finally {
       setState(() => isGoogleLoading = false);
     }
-  }
-
-  Widget buildIcon(IconData icon) {
-    return Padding(
-      padding: EdgeInsets.only(right: 12.w),
-      child: Container(
-        width: 42.w,
-        height: 42.w,
-        decoration: BoxDecoration(
-          color: const Color(0xFF875DFC).withOpacity(0.15),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: const Color(0xFF875DFC), size: 22.sp),
-      ),
-    );
-  }
-
-  Widget buildError(String? error) {
-    return SizedBox(
-      height: 20.h,
-      child: Padding(
-        padding: EdgeInsets.only(left: 54.w),
-        child: Text(
-          error ?? "",
-          style: TextStyle(color: Colors.red, fontSize: 12.sp),
-        ),
-      ),
-    );
   }
 
   @override
@@ -229,117 +210,33 @@ class _RegisterPageState extends State<RegisterPage> {
 
               SizedBox(height: 30.h),
 
-              /// FULL NAME
-              Transform.translate(
-                offset: Offset(0, 15.h),
-                child: Padding(
-                  padding: EdgeInsets.only(left: 54.w),
-                  child: Text(
-                    "Full Name",
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+              AuthTextField(
+                controller: fullNameController,
+                labelText: "Full Name",
+                icon: Icons.person,
+                errorText: nameError,
               ),
 
-              Row(
-                children: [
-                  buildIcon(Icons.person),
-                  Expanded(
-                    child: TextField(
-                      controller: fullNameController,
-                      decoration: InputDecoration(
-                        border: const UnderlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
-                      ),
-                    ),
-                  ),
-                ],
+              AuthTextField(
+                controller: emailController,
+                labelText: "Email Address",
+                icon: Icons.email,
+                errorText: emailError,
+                keyboardType: TextInputType.emailAddress,
               ),
 
-              buildError(nameError),
-
-              /// EMAIL
-              Transform.translate(
-                offset: Offset(0, 15.h),
-                child: Padding(
-                  padding: EdgeInsets.only(left: 54.w),
-                  child: Text(
-                    "Email Address",
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+              AuthTextField(
+                controller: passwordController,
+                labelText: "Password",
+                icon: Icons.lock,
+                errorText: passwordError,
+                obscureText: obscurePassword,
+                onToggleObscure: () {
+                  setState(() {
+                    obscurePassword = !obscurePassword;
+                  });
+                },
               ),
-
-              Row(
-                children: [
-                  buildIcon(Icons.email),
-                  Expanded(
-                    child: TextField(
-                      controller: emailController,
-                      decoration: InputDecoration(
-                        border: const UnderlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              buildError(emailError),
-
-              /// PASSWORD
-              Transform.translate(
-                offset: Offset(0, 15.h),
-                child: Padding(
-                  padding: EdgeInsets.only(left: 54.w),
-                  child: Text(
-                    "Password",
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-
-              Row(
-                children: [
-                  buildIcon(Icons.lock),
-                  Expanded(
-                    child: TextField(
-                      controller: passwordController,
-                      obscureText: obscurePassword,
-                      decoration: InputDecoration(
-                        border: const UnderlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              obscurePassword = !obscurePassword;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              buildError(passwordError),
 
               SizedBox(height: 10.h),
 
@@ -387,40 +284,15 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   child: Text(
                     generalError!,
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 14.sp,
-                    ),
+                    style: TextStyle(color: Colors.red, fontSize: 14.sp),
                     textAlign: TextAlign.center,
                   ),
                 ),
 
-              /// SIGN UP BUTTON
-              SizedBox(
-                width: double.infinity,
-                height: 50.h,
-                child: ElevatedButton(
-                  onPressed: isEmailLoading ? null : validateRegister,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF875DFC),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30.r),
-                    ),
-                  ),
-                  child: isEmailLoading
-                      ? SizedBox(
-                          height: 20.h,
-                          width: 20.h,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Text(
-                          "Sign Up",
-                          style: TextStyle(fontSize: 16.sp, color: Colors.white),
-                        ),
-                ),
+              AuthButton(
+                text: "Sign Up",
+                onPressed: validateRegister,
+                isLoading: isEmailLoading,
               ),
 
               const Spacer(),
@@ -457,7 +329,9 @@ class _RegisterPageState extends State<RegisterPage> {
                               width: 20.h,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF875DFC)),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  const Color(0xFF875DFC),
+                                ),
                               ),
                             ),
                           )

@@ -2,37 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'teacher_material_detail.dart';
 import '../../services/user_service.dart';
-
-// Data Models
-class MaterialItem {
-  final String id;
-  final String title;
-  final String timestamp;
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  MaterialItem({
-    required this.id,
-    required this.title,
-    required this.timestamp,
-    this.icon = Icons.description_outlined,
-    this.onTap,
-  });
-}
-
-class TopicItem {
-  final String id;
-  final String title;
-  final List<MaterialItem> materials;
-  final VoidCallback? onMoreTap;
-
-  TopicItem({
-    required this.id,
-    required this.title,
-    required this.materials,
-    this.onMoreTap,
-  });
-}
+import '../../components/cards/topic_section.dart';
+import '../../components/cards/material_card.dart';
+import '../../components/navigation/nav_item.dart';
 
 class TeacherClassesDetail extends StatefulWidget {
   final String classTitle;
@@ -474,11 +446,35 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
             id: '1',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TeacherMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 1',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
           MaterialItem(
             id: '2',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TeacherMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 1',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -490,11 +486,35 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
             id: '3',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TeacherMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 2',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
           MaterialItem(
             id: '4',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TeacherMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 2',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -506,11 +526,35 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
             id: '5',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TeacherMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 3',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
           MaterialItem(
             id: '6',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TeacherMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 3',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -546,7 +590,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _NavItem(
+          NavItem(
             icon: Icons.class_rounded,
             label: 'Class',
             active: _selectedIndex == 0,
@@ -556,7 +600,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
               });
             },
           ),
-          _NavItem(
+          NavItem(
             icon: Icons.assignment_rounded,
             label: 'Classwork',
             active: _selectedIndex == 1,
@@ -566,7 +610,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
               });
             },
           ),
-          _NavItem(
+          NavItem(
             icon: Icons.groups_rounded,
             label: 'People',
             active: _selectedIndex == 2,
@@ -577,202 +621,6 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
             },
           ),
         ],
-      ),
-    );
-  }
-}
-
-// Reusable Components
-class TopicSection extends StatelessWidget {
-  final TopicItem topic;
-
-  const TopicSection({super.key, required this.topic});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TopicHeader(title: topic.title, onMoreTap: topic.onMoreTap),
-        const Divider(color: Color(0xFF49454E), thickness: 1, height: 20),
-        const SizedBox(height: 10),
-        ...topic.materials.map(
-          (material) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: MaterialCard(
-              material: material,
-              topicTitle: topic.title,
-              topicColor: const Color(0xFF6F5AAA),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-}
-
-class TopicHeader extends StatelessWidget {
-  final String title;
-  final VoidCallback? onMoreTap;
-
-  const TopicHeader({super.key, required this.title, this.onMoreTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1C1B20),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Color(0xFF1C1B20)),
-            onPressed: onMoreTap,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class MaterialCard extends StatelessWidget {
-  final MaterialItem material;
-  final String topicTitle;
-  final Color topicColor;
-
-  const MaterialCard({
-    super.key,
-    required this.material,
-    required this.topicTitle,
-    required this.topicColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => TeacherMaterialDetail(
-                materialTitle: material.title,
-                materialTimestamp: material.timestamp,
-                topicTitle: topicTitle,
-                topicColor: topicColor,
-              ),
-            ),
-          );
-        },
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 10),
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE7DFF8),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(12),
-              topRight: Radius.circular(12),
-            ),
-            border: Border(
-              bottom: BorderSide(color: Color(0xFF63568F), width: 1),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF615B71),
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: Icon(material.icon, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      material.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1C1B20),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      material.timestamp,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.more_vert, color: Color(0xFF1C1B20)),
-                onPressed: () {},
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const activeColor = Color(0xFF6F5AAA);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: active ? activeColor : Colors.grey, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                color: active ? activeColor : Colors.grey,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

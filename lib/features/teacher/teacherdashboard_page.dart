@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'teacher_classes_page.dart';
 import 'teacher_settings_page.dart';
 import 'teacher_classes_detail.dart';
+import '../../components/cards/stat_card.dart';
+import '../../components/cards/dashboard_class_card.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -171,73 +173,20 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   Widget _buildStatsSection() {
     return Row(
       children: [
-        _buildStatCard(
+        StatCard(
           title: dashboard.totalClasses?.toString() ?? '-',
           subtitle: 'Total Classes',
           icon: Icons.menu_book_rounded,
           filled: true,
         ),
         const SizedBox(width: 12),
-        _buildStatCard(
+        StatCard(
           title: dashboard.totalStudents?.toString() ?? '-',
           subtitle: 'Total Students',
           icon: Icons.people_rounded,
           filled: false,
         ),
       ],
-    );
-  }
-
-  Widget _buildStatCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool filled,
-  }) {
-    return Expanded(
-      child: Container(
-        height: 110,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: filled ? const Color(0xFF6F5AAA) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFF6F5AAA), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              icon,
-              color: filled ? Colors.white : const Color(0xFF6F5AAA),
-              size: 22,
-            ),
-            const Spacer(),
-            Text(
-              title,
-              style: TextStyle(
-                color: filled ? Colors.white : const Color(0xFF1F1F1F),
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: filled ? Colors.white70 : Colors.grey[700],
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -421,124 +370,26 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           .map(
             (item) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _buildClassCard(item),
+              child: DashboardClassCard(
+                title: item.title,
+                subject: item.subject,
+                description: item.description,
+                color: item.color,
+                students: item.students,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TeacherClassesDetail(
+                        classTitle: item.title,
+                        classColor: item.color,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           )
           .toList(),
-    );
-  }
-
-  Widget _buildClassCard(ActiveClassData item) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => TeacherClassesDetail(
-                classTitle: item.title,
-                classColor: item.color,
-              ),
-            ),
-          );
-        },
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 5,
-                height: 110,
-                decoration: BoxDecoration(
-                  color: item.color,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: item.color,
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Text(
-                        item.subject,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      item.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: item.color,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      item.description,
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.groups_2_outlined,
-                          size: 18,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${item.students} Students',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.more_vert),
-                splashRadius: 20,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

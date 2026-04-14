@@ -7,6 +7,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:becation_apps/services/user_service.dart';
 import 'package:becation_apps/features/student/studentdashboard_page.dart';
 import 'package:becation_apps/features/teacher/teacherdashboard_page.dart';
+import '../../components/forms/auth_text_field.dart';
+import '../../components/buttons/auth_button.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -188,21 +190,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Widget buildIcon(IconData icon) {
-    return Padding(
-      padding: EdgeInsets.only(right: 12.w),
-      child: Container(
-        width: 42.w,
-        height: 42.w,
-        decoration: BoxDecoration(
-          color: const Color(0xFF875DFC).withOpacity(0.15),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: const Color(0xFF875DFC), size: 22.sp),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -245,125 +232,27 @@ class _LoginPageState extends State<LoginPage> {
 
                         SizedBox(height: 30.h),
 
-                        Transform.translate(
-                          offset: Offset(0, 15.h),
-                          child: Padding(
-                            padding: EdgeInsets.only(left: 54.w),
-                            child: Text(
-                              "Email Address",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
+                        AuthTextField(
+                          controller: emailController,
+                          labelText: "Email Address",
+                          icon: Icons.email,
+                          errorText: emailError,
+                          keyboardType: TextInputType.emailAddress,
                         ),
 
-                        SizedBox(height: 6.h),
+                        SizedBox(height: 20.h),
 
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                buildIcon(Icons.email),
-                                Expanded(
-                                  child: TextField(
-                                    controller: emailController,
-                                    keyboardType: TextInputType.emailAddress,
-                                    decoration: InputDecoration(
-                                      border: const UnderlineInputBorder(),
-                                      contentPadding: EdgeInsets.symmetric(
-                                        vertical: 16.h,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(
-                              height: 20.h,
-                              child: Padding(
-                                padding: EdgeInsets.only(left: 54.w),
-                                child: Text(
-                                  emailError ?? "",
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontSize: 12.sp,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        Transform.translate(
-                          offset: Offset(0, 15.h),
-                          child: Padding(
-                            padding: EdgeInsets.only(left: 54.w),
-                            child: Text(
-                              "Password",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(height: 6.h),
-
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                buildIcon(Icons.lock),
-                                Expanded(
-                                  child: TextField(
-                                    controller: passwordController,
-                                    obscureText: obscurePassword,
-                                    decoration: InputDecoration(
-                                      border: const UnderlineInputBorder(),
-                                      contentPadding: EdgeInsets.symmetric(
-                                        vertical: 16.h,
-                                      ),
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          obscurePassword
-                                              ? Icons.visibility_off
-                                              : Icons.visibility,
-                                          size: 22.sp,
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            obscurePassword = !obscurePassword;
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(
-                              height: 20.h,
-                              child: Padding(
-                                padding: EdgeInsets.only(left: 54.w),
-                                child: Text(
-                                  passwordError ?? "",
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontSize: 12.sp,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        AuthTextField(
+                          controller: passwordController,
+                          labelText: "Password",
+                          icon: Icons.lock,
+                          errorText: passwordError,
+                          obscureText: obscurePassword,
+                          onToggleObscure: () {
+                            setState(() {
+                              obscurePassword = !obscurePassword;
+                            });
+                          },
                         ),
 
                         SizedBox(height: 20.h),
@@ -410,35 +299,10 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
 
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50.h,
-                          child: ElevatedButton(
-                            onPressed: isEmailLoading ? null : validateLogin,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF875DFC),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30.r),
-                              ),
-                            ),
-                            child: isEmailLoading
-                                ? SizedBox(
-                                    height: 20.h,
-                                    width: 20.h,
-                                    child: const CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : Text(
-                                    "Log In",
-                                    style: TextStyle(fontSize: 16.sp),
-                                  ),
-                          ),
+                        AuthButton(
+                          text: "Log In",
+                          onPressed: validateLogin,
+                          isLoading: isEmailLoading,
                         ),
 
                         SizedBox(height: 30.h),
@@ -476,9 +340,9 @@ class _LoginPageState extends State<LoginPage> {
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
                                           valueColor:
-                                              const AlwaysStoppedAnimation<Color>(
-                                            Color(0xFF875DFC),
-                                          ),
+                                              const AlwaysStoppedAnimation<
+                                                Color
+                                              >(Color(0xFF875DFC)),
                                         ),
                                       ),
                                     )

@@ -3,14 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import 'student_classes_page.dart';
 import 'student_classes_detail.dart';
-import 'student_settings_page.dart';
 import '../../components/cards/stat_card.dart';
 import '../../components/cards/dashboard_class_card.dart';
 
 class StudentDashboard extends StatefulWidget {
-  const StudentDashboard({super.key});
+  const StudentDashboard({super.key, this.onTabRequested});
+
+  final ValueChanged<int>? onTabRequested;
 
   @override
   State<StudentDashboard> createState() => _StudentDashboardState();
@@ -18,13 +18,18 @@ class StudentDashboard extends StatefulWidget {
 
 class _StudentDashboardState extends State<StudentDashboard> {
   late DashboardData dashboard;
+  String? _displayName;
 
   @override
   void initState() {
     super.initState();
 
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final studentName = _getStudentNameFromUser(currentUser);
+    _displayName = studentName;
+
     dashboard = DashboardData(
-      teacherName: 'Student',
+      studentName: studentName,
       totalClasses: null,
       totalQuizzes: null,
       todayClasses: 2,
@@ -61,58 +66,57 @@ class _StudentDashboardState extends State<StudentDashboard> {
     final user = FirebaseAuth.instance.currentUser;
 
     Widget buildBody(String displayName) {
-      return Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  const SizedBox(height: 24),
-                  _buildGreeting(displayName),
-                  const SizedBox(height: 20),
-                  _buildStatsSection(),
-                  const SizedBox(height: 24),
-                  _buildCalendar(today),
-                  const SizedBox(height: 24),
-                  _buildActiveClassesHeader(context),
-                  const SizedBox(height: 12),
-                  _buildActiveClassesList(),
-                ],
-              ),
-            ),
-          ),
-          _buildBottomNav(),
-        ],
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 24),
+            _buildGreeting(displayName),
+            const SizedBox(height: 20),
+            _buildStatsSection(),
+            const SizedBox(height: 24),
+            _buildCalendar(today),
+            const SizedBox(height: 24),
+            _buildActiveClassesHeader(),
+            const SizedBox(height: 12),
+            _buildActiveClassesList(),
+          ],
+        ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F2FA),
-      body: SafeArea(
-        child: user == null
-            ? buildBody('Student')
-            : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: UserService.userStream(user.uid),
-                builder: (context, snapshot) {
-                  final data = snapshot.data?.data();
-                  final firestoreName = (data?['displayName'] as String?)
-                      ?.trim();
+    if (user == null) {
+      return buildBody(_displayName ?? 'Student');
+    }
 
-                  final displayName =
-                      (firestoreName != null && firestoreName.isNotEmpty)
-                      ? firestoreName
-                      : (user.displayName?.trim().isNotEmpty == true
-                            ? user.displayName!.trim()
-                            : (user.email ?? 'Student'));
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: UserService.userStream(user.uid),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+        final firestoreName = (data?['displayName'] as String?)?.trim();
 
-                  return buildBody(displayName);
-                },
-              ),
-      ),
+        if (firestoreName != null && firestoreName.isNotEmpty) {
+          _displayName = firestoreName;
+        } else if (_displayName == null) {
+          _displayName = _getStudentNameFromUser(user);
+        }
+
+        return buildBody(_displayName ?? 'Student');
+      },
     );
+  }
+
+  String _getStudentNameFromUser(User? user) {
+    if (user == null) return 'Student';
+
+    final displayName = user.displayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+
+    return 'Student';
   }
 
   Widget _buildHeader() {
@@ -286,7 +290,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     );
   }
 
-  Widget _buildActiveClassesHeader(BuildContext context) {
+  Widget _buildActiveClassesHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -296,9 +300,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
         ),
         InkWell(
           onTap: () {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const StudentClassesPage()),
-            );
+            widget.onTabRequested?.call(1);
           },
           borderRadius: BorderRadius.circular(8),
           child: const Padding(
@@ -375,51 +377,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
           .toList(),
     );
   }
-
-  Widget _buildBottomNav() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _NavItem(
-            icon: Icons.dashboard_rounded,
-            label: 'Dashboard',
-            active: true,
-            onTap: () {},
-          ),
-          _NavItem(
-            icon: Icons.class_rounded,
-            label: 'Classes',
-            active: false,
-            onTap: () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const StudentClassesPage()),
-              );
-            },
-          ),
-          _NavItem(
-            icon: Icons.settings_rounded,
-            label: 'Settings',
-            active: false,
-            onTap: () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const StudentSettingsPage()),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class DashboardData {
-  final String teacherName;
+  final String studentName;
   final int? totalClasses;
   final int? totalQuizzes;
   final int todayClasses;
@@ -427,7 +388,7 @@ class DashboardData {
   final List<ActiveClassData> activeClasses;
 
   DashboardData({
-    required this.teacherName,
+    required this.studentName,
     required this.totalClasses,
     required this.totalQuizzes,
     required this.todayClasses,
@@ -450,46 +411,4 @@ class ActiveClassData {
     required this.students,
     required this.color,
   });
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const activeColor = Color(0xFF6F5AAA);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: active ? activeColor : Colors.grey),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                color: active ? activeColor : Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

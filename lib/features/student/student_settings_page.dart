@@ -4,11 +4,10 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../auth/login_page.dart';
 
-import 'student_classes_page.dart';
-import 'studentdashboard_page.dart';
-
 class StudentSettingsPage extends StatelessWidget {
-  const StudentSettingsPage({super.key});
+  const StudentSettingsPage({super.key, this.onTabRequested});
+
+  final ValueChanged<int>? onTabRequested;
 
   Future<void> _logout(BuildContext context) async {
     try {
@@ -32,133 +31,75 @@ class StudentSettingsPage extends StatelessWidget {
     }
   }
 
-  void _go(BuildContext context, int index) {
-    final page = switch (index) {
-      0 => const StudentDashboard(),
-      1 => const StudentClassesPage(),
-      _ => const StudentSettingsPage(),
-    };
-
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => page));
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F2FA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _Header(title: 'Settings'),
-                    const SizedBox(height: 24),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Account',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _logout(context),
-                              icon: Icon(
-                                Icons.logout_rounded,
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                              label: Text(
-                                'Logout',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: const Text(
-                        'Settings belum tersedia.',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  ],
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _Header(title: 'Settings'),
+          const SizedBox(height: 24),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Account',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                 ),
-              ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _logout(context),
+                    icon: Icon(
+                      Icons.logout_rounded,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(
+                      'Logout',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Colors.grey.shade200)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _NavItem(
-                    icon: Icons.dashboard_rounded,
-                    label: 'Dashboard',
-                    active: false,
-                    onTap: () => _go(context, 0),
-                  ),
-                  _NavItem(
-                    icon: Icons.class_rounded,
-                    label: 'Classes',
-                    active: false,
-                    onTap: () => _go(context, 1),
-                  ),
-                  _NavItem(
-                    icon: Icons.settings_rounded,
-                    label: 'Settings',
-                    active: true,
-                    onTap: () {},
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.grey.shade200),
             ),
-          ],
-        ),
+            child: const Text(
+              'Settings belum tersedia.',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+        ],
       ),
     );
   }

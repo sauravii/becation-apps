@@ -1,12 +1,12 @@
-import 'package:becation_apps/features/auth/forgot_page.dart';
+import 'package:becation_apps/services/user_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:becation_apps/features/auth/register_page.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'forgot_page.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:becation_apps/services/user_service.dart';
-import 'package:becation_apps/features/student/studentdashboard_page.dart';
-import 'package:becation_apps/features/teacher/teacherdashboard_page.dart';
+import 'package:becation_apps/features/teacher/teacher_root_page.dart';
+import 'package:becation_apps/features/student/student_root_page.dart';
 import '../../components/forms/auth_text_field.dart';
 import '../../components/buttons/auth_button.dart';
 
@@ -79,11 +79,11 @@ class _LoginPageState extends State<LoginPage> {
 
     switch (role) {
       case 'teacher':
-        targetPage = const TeacherDashboard();
+        targetPage = const TeacherRootPage();
         break;
       case 'student':
       default:
-        targetPage = const StudentDashboard();
+        targetPage = const StudentRootPage();
         break;
     }
 

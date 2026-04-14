@@ -4,6 +4,7 @@ import '../../services/user_service.dart';
 import '../../components/cards/material_card.dart';
 import '../../components/cards/topic_section.dart';
 import '../../components/navigation/nav_item.dart';
+import 'student_material_detail.dart';
 
 class StudentClassesDetail extends StatefulWidget {
   final String classTitle;
@@ -238,11 +239,35 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
             id: '1',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => StudentMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 1',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
           MaterialItem(
             id: '2',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => StudentMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 1',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -254,27 +279,75 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
             id: '3',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => StudentMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 2',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
           MaterialItem(
             id: '4',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => StudentMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 2',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
       TopicItem(
-        id: '2',
+        id: '3',
         title: 'Topic 3',
         materials: [
           MaterialItem(
-            id: '3',
+            id: '5',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => StudentMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 3',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
           MaterialItem(
-            id: '4',
+            id: '6',
             title: 'New material: Material Name',
             timestamp: '6:38 PM',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => StudentMaterialDetail(
+                    materialTitle: 'New material: Material Name',
+                    materialTimestamp: '6:38 PM',
+                    topicTitle: 'Topic 3',
+                    topicColor: const Color(0xFF6F5AAA),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),

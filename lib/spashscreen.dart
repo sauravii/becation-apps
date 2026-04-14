@@ -3,8 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:becation_apps/features/auth/login_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:becation_apps/features/student/studentdashboard_page.dart';
-import 'package:becation_apps/features/teacher/teacherdashboard_page.dart';
+import 'package:becation_apps/features/teacher/teacher_root_page.dart';
 import 'package:becation_apps/services/user_service.dart';
+import 'package:becation_apps/features/student/student_root_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -41,15 +42,19 @@ class _SplashScreenState extends State<SplashScreen>
     if (user == null) {
       targetPage = const LoginPage();
     } else {
+      // Pastikan FirebaseAuth.displayName sudah sinkron dengan Firestore
+      // supaya dashboard langsung pakai nama, bukan fallback 'Student'.
+      await UserService.syncAuthDisplayNameFromFirestore(user);
+
       final role = await UserService.getUserRole(user.uid);
 
       switch (role) {
         case 'teacher':
-          targetPage = const TeacherDashboard();
+          targetPage = TeacherRootPage();
           break;
         case 'student':
         default:
-          targetPage = const StudentDashboard();
+          targetPage = const StudentRootPage();
           break;
       }
     }

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-class StudentMaterialDetail extends StatefulWidget {
+class TeacherMaterialDetail extends StatefulWidget {
   final String materialTitle;
   final String materialTimestamp;
   final String topicTitle;
   final Color topicColor;
 
-  const StudentMaterialDetail({
+  const TeacherMaterialDetail({
     super.key,
     required this.materialTitle,
     required this.materialTimestamp,
@@ -15,10 +15,10 @@ class StudentMaterialDetail extends StatefulWidget {
   });
 
   @override
-  State<StudentMaterialDetail> createState() => _StudentMaterialDetailState();
+  State<TeacherMaterialDetail> createState() => _TeacherMaterialDetailState();
 }
 
-class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
+class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,37 +151,6 @@ class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
               fontSize: 16,
               color: Color(0xFF1C1B20),
               height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInstructionItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: widget.topicColor,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.check, color: Colors.white, size: 12),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF1C1B20),
-                height: 1.4,
-              ),
             ),
           ),
         ],

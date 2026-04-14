@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../student/student_material_detail.dart';
+import 'teacher_material_detail.dart';
 import '../../services/user_service.dart';
 
 // Data Models
@@ -663,7 +663,7 @@ class MaterialCard extends StatelessWidget {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => StudentMaterialDetail(
+              builder: (_) => TeacherMaterialDetail(
                 materialTitle: material.title,
                 materialTimestamp: material.timestamp,
                 topicTitle: topicTitle,

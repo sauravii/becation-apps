@@ -1,627 +1,245 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'teacher_material_detail.dart';
-import '../../services/user_service.dart';
-import '../../components/cards/topic_section.dart';
-import '../../components/cards/material_card.dart';
-import '../../components/navigation/nav_item.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
-class TeacherClassesDetail extends StatefulWidget {
-  final String classTitle;
-  final Color classColor;
-
-  const TeacherClassesDetail({
-    super.key,
-    required this.classTitle,
-    required this.classColor,
-  });
+class TeacherClassDetail extends StatefulWidget {
+  const TeacherClassDetail({Key? key}) : super(key: key);
 
   @override
-  State<TeacherClassesDetail> createState() => _TeacherClassesDetailState();
+  State<TeacherClassDetail> createState() => _TeacherClassDetailState();
 }
 
-class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
-  int _selectedIndex = 1;
-  String _userRole = 'teacher';
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchUserRole();
-  }
-
-  Future<void> _fetchUserRole() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final role = await UserService.getUserRole(user.uid);
-      setState(() {
-        _userRole = role;
-        _isLoading = false;
-      });
-    }
-  }
+class _TeacherClassDetailState extends State<TeacherClassDetail> {
+  
+  bool hasMaterials = false;
+  int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F2FA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(child: _buildContent()),
-            if (_userRole == 'teacher' && !_isLoading)
-              Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 20),
-                      child: FloatingActionButton(
-                        onPressed: () {
-                          _showAddOptions(context);
-                        },
-                        backgroundColor: const Color(0xFF6F5AAA),
-                        child: const Icon(Icons.add, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            _buildBottomNav(),
-          ],
+      backgroundColor: const Color(0xFFFDFDFD),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(LucideIcons.arrowLeft, color: Colors.black87),
+          onPressed: () {
+            
+            Navigator.pop(context);
+          },
         ),
       ),
-    );
-  }
-
-  void _showAddOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(10),
-              child: Text(
-                'Create',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1C1B20),
-                ),
-              ),
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.only(left: 10, right: 10),
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6F5AAA).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.topic, color: Color(0xFF6F5AAA)),
-              ),
-              title: const Text(
-                'Quiz',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Add topic functionality coming soon!'),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6F5AAA).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.description, color: Color(0xFF6F5AAA)),
-              ),
-              title: const Text(
-                'Material',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-
-              onTap: () {
-                Navigator.pop(context);
-                _showAddMaterialDialog(context);
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddMaterialDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: 400,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header with close button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Add Material',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1C1B20),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: Color(0xFF49454F)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Material Title Field
-              const Text(
-                'Material Title',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1C1B20),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                decoration: InputDecoration(
-                  hintText: 'Enter material title',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF79747E)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF6F5AAA)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Topic Selection
-              const Text(
-                'Topic',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1C1B20),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF79747E)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Select Topic',
-                      style: TextStyle(color: Color(0xFF49454F), fontSize: 16),
-                    ),
-                    const Icon(
-                      Icons.keyboard_arrow_down,
-                      color: Color(0xFF49454F),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // File Upload Section
-              const Text(
-                'File',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1C1B20),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF79747E)),
-                  borderRadius: BorderRadius.circular(8),
-                  color: const Color(0xFFF7F2FA),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6F5AAA).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: const Icon(
-                        Icons.cloud_upload_outlined,
-                        color: Color(0xFF6F5AAA),
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Click to upload or drag and drop',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1C1B20),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'PDF, DOC, DOCX (max 5MB)',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF49454F)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: const BorderSide(color: Color(0xFF79747E)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          color: Color(0xFF49454F),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Material added successfully!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6F5AAA),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Add Material',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.only(left: 20, top: 20, right: 20),
-
-      child: Row(
+      body: Column(
         children: [
-          const Icon(Icons.class_rounded, color: Color(0xFF1C1B20), size: 24),
-
-          const SizedBox(width: 12),
+         
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Column(
+              children: [
+              
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEBE7FA),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 100,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF6D5E9E),
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            bottomLeft: Radius.circular(12),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6D5E9E),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  'Subject',
+                                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Class Title',
+                                style: TextStyle(color: Color(0xFF453676), fontSize: 22, fontWeight: FontWeight.bold),
+                              ),
+                              const Text(
+                                'Class Description',
+                                style: TextStyle(color: Color(0xFF453676), fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+              
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6D5E9E),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(LucideIcons.fileText, size: 16),
+                        label: const Text('Create quiz', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {},
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF6D5E9E),
+                          side: const BorderSide(color: Color(0xFF6D5E9E)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(LucideIcons.filePlus, size: 16),
+                        label: const Text('Create material', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
 
           Expanded(
-            child: Text(
-              widget.classTitle,
-              style: const TextStyle(
-                color: Color(0xFF1C1B20),
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            child: hasMaterials ? _buildMaterialList() : _buildEmptyState(),
+          ),
+        ],
+      ),
+      
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFDFDFD),
+          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        ),
+        child: BottomNavigationBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF6D5E9E),
+          unselectedItemColor: Colors.grey.shade500,
+          selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+          unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+          onTap: (index) => setState(() => _selectedIndex = index),
+          items: [
+            BottomNavigationBarItem(
+              icon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _selectedIndex == 0 ? const Color(0xFFEBE7FA) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(LucideIcons.messageCircle),
               ),
+              label: 'Class',
+            ),
+            const BottomNavigationBarItem(
+              icon: Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Icon(LucideIcons.clipboardList)),
+              label: 'Classwork',
+            ),
+            const BottomNavigationBarItem(
+              icon: Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Icon(LucideIcons.users)),
+              label: 'People',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // WIDGET 1: TAMPILAN MATERI KOSONG
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.bookOpen, size: 80, color: Colors.grey.shade300),
+            const SizedBox(height: 24),
+            const Text(
+              'This is where quiz and materials will be shared',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black87, fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Use the classwork page to share materials or create quizzes for your students',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // WIDGET 2: TAMPILAN MATERI
+  Widget _buildMaterialList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+      itemCount: 3, 
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEBE7FA),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Color(0xFF6D5E9E),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(LucideIcons.bookBookmark, color: Colors.white, size: 20),
+            ),
+            title: const Text(
+              'New material: Material Name',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
+            ),
+            subtitle: const Text(
+              '6:38 PM',
+              style: TextStyle(fontSize: 11, color: Colors.black54),
+            ),
+            trailing: IconButton(
+              icon: const Icon(LucideIcons.moreVertical, color: Colors.black54, size: 20),
+              onPressed: () {
+              },
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContent() {
-    switch (_selectedIndex) {
-      case 0:
-        return _buildClassTab();
-      case 1:
-        return _buildClassworkTab();
-      case 2:
-        return _buildPeopleTab();
-      default:
-        return _buildClassTab();
-    }
-  }
-
-  Widget _buildClassTab() {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Illustration
-          Image.asset('lib/assets/img_animasi_class.png'),
-          const SizedBox(height: 40),
-
-          // Description text
-          const Text(
-            'This is where you can hand out assignments.',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF1F1F1F),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'You can add assignments for the class, then organize it into topics',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildClassworkTab() {
-    final topics = [
-      TopicItem(
-        id: '1',
-        title: 'Topic 1',
-        materials: [
-          MaterialItem(
-            id: '1',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 1',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-          MaterialItem(
-            id: '2',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 1',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      TopicItem(
-        id: '2',
-        title: 'Topic 2',
-        materials: [
-          MaterialItem(
-            id: '3',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 2',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-          MaterialItem(
-            id: '4',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 2',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      TopicItem(
-        id: '3',
-        title: 'Topic 3',
-        materials: [
-          MaterialItem(
-            id: '5',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 3',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-          MaterialItem(
-            id: '6',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 3',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    ];
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: topics
-            .map<Widget>((topic) => TopicSection(topic: topic))
-            .toList(),
-      ),
-    );
-  }
-
-  Widget _buildPeopleTab() {
-    return const Center(
-      child: Text(
-        'Manage class members',
-        style: TextStyle(fontSize: 16, color: Colors.grey),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          NavItem(
-            icon: Icons.class_rounded,
-            label: 'Class',
-            active: _selectedIndex == 0,
-            onTap: () {
-              setState(() {
-                _selectedIndex = 0;
-              });
-            },
-          ),
-          NavItem(
-            icon: Icons.assignment_rounded,
-            label: 'Classwork',
-            active: _selectedIndex == 1,
-            onTap: () {
-              setState(() {
-                _selectedIndex = 1;
-              });
-            },
-          ),
-          NavItem(
-            icon: Icons.groups_rounded,
-            label: 'People',
-            active: _selectedIndex == 2,
-            onTap: () {
-              setState(() {
-                _selectedIndex = 2;
-              });
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

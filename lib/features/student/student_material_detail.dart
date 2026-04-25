@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import '../../models/material_model.dart';
+import '../../models/attachment_model.dart';
+import '../../services/material_service.dart';
+import '../../services/attachment_service.dart';
 import '../../components/cards/material_info_card.dart';
 import '../../components/cards/attachment_section.dart';
 import '../../components/cards/attachment_item.dart';
 
 class StudentMaterialDetail extends StatefulWidget {
+  final String classId;
+  final String materialId;
   final String materialTitle;
   final String materialTimestamp;
   final String topicTitle;
@@ -11,6 +17,8 @@ class StudentMaterialDetail extends StatefulWidget {
 
   const StudentMaterialDetail({
     super.key,
+    required this.classId,
+    required this.materialId,
     required this.materialTitle,
     required this.materialTimestamp,
     required this.topicTitle,
@@ -22,6 +30,44 @@ class StudentMaterialDetail extends StatefulWidget {
 }
 
 class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
+  MaterialModel? _material;
+  bool _isLoading = true;
+  late final Stream<List<AttachmentModel>> _attachmentsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMaterial();
+    _attachmentsStream = AttachmentService.attachmentsStream(
+        widget.classId, widget.materialId);
+  }
+
+  Future<void> _loadMaterial() async {
+    final material = await MaterialService.getMaterial(
+        widget.classId, widget.materialId);
+    if (mounted) {
+      setState(() {
+        _material = material;
+        _isLoading = false;
+      });
+    }
+  }
+
+  IconData _getIconForType(String type) {
+    switch (type) {
+      case 'file':
+      case 'pdf':
+      case 'doc':
+      case 'presentation':
+        return Icons.insert_drive_file;
+      case 'image':
+        return Icons.image;
+      case 'link':
+      default:
+        return Icons.link;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,43 +117,45 @@ class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
   }
 
   Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final description = _material?.description ?? '';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Material Info Card
           MaterialInfoCard(
             materialTitle: widget.materialTitle,
             materialTimestamp: widget.materialTimestamp,
-            description:
-                'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+            description: description.isNotEmpty ? description : null,
           ),
           const SizedBox(height: 30),
 
-          // Attachments Section
-          AttachmentSection(
-            attachments: [
-              AttachmentItem(
-                title: 'PDF Document',
-                subtitle: '2.3 MB',
-                icon: Icons.picture_as_pdf,
-                iconColor: widget.topicColor,
-              ),
-              AttachmentItem(
-                title: 'Presentation',
-                subtitle: '5.1 MB',
-                icon: Icons.slideshow,
-                iconColor: widget.topicColor,
-              ),
-              AttachmentItem(
-                title: 'Reference Link',
-                subtitle: 'Web Link',
-                icon: Icons.link,
-                iconColor: widget.topicColor,
-              ),
-            ],
-            topicColor: widget.topicColor,
+          // Attachments dari Firestore
+          StreamBuilder<List<AttachmentModel>>(
+            stream: _attachmentsStream,
+            builder: (context, snapshot) {
+              final attachments = snapshot.data ?? [];
+
+              return AttachmentSection(
+                attachments: attachments
+                    .map((a) => AttachmentItem(
+                          title: a.title,
+                          subtitle: a.formattedSubtitle,
+                          icon: _getIconForType(a.type),
+                          iconColor: widget.topicColor,
+                          url: a.url,
+                          type: a.type,
+                          fileExtension: a.fileExtension,
+                        ))
+                    .toList(),
+                topicColor: widget.topicColor,
+              );
+            },
           ),
         ],
       ),

@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'teacher_material_detail.dart';
+import 'teacher_classes_dialogs.dart';
+import '../../models/class_model.dart';
+import '../../models/member_model.dart';
+import '../../models/topic_model.dart';
+import '../../models/material_model.dart';
 import '../../services/user_service.dart';
+import '../../services/class_service.dart';
+import '../../services/topic_service.dart';
+import '../../services/material_service.dart';
 import '../../components/cards/topic_section.dart';
 import '../../components/cards/material_card.dart';
 import '../../components/navigation/nav_item.dart';
 
 class TeacherClassesDetail extends StatefulWidget {
+  final String classId;
   final String classTitle;
   final Color classColor;
 
   const TeacherClassesDetail({
     super.key,
+    required this.classId,
     required this.classTitle,
     required this.classColor,
   });
@@ -21,24 +32,32 @@ class TeacherClassesDetail extends StatefulWidget {
 }
 
 class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
-  int _selectedIndex = 1;
+  int _selectedIndex = 0;
   String _userRole = 'teacher';
   bool _isLoading = true;
+  // Select mode untuk People tab — pilih student untuk di-remove.
+  bool _isSelectMode = false;
+  final Set<String> _selectedStudentUids = {};
+
+  late final Stream<List<TopicModel>> _topicsStream;
 
   @override
   void initState() {
     super.initState();
     _fetchUserRole();
+    _topicsStream = TopicService.topicsStream(widget.classId);
   }
 
   Future<void> _fetchUserRole() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final role = await UserService.getUserRole(user.uid);
-      setState(() {
-        _userRole = role;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _userRole = role;
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -51,7 +70,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
           children: [
             _buildHeader(),
             Expanded(child: _buildContent()),
-            if (_userRole == 'teacher' && !_isLoading)
+            if (_userRole == 'teacher' && !_isLoading && _selectedIndex != 2)
               Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: Row(
@@ -61,7 +80,8 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
                       padding: const EdgeInsets.only(right: 20),
                       child: FloatingActionButton(
                         onPressed: () {
-                          _showAddOptions(context);
+                          showAddOptionsSheet(context,
+                              classId: widget.classId);
                         },
                         backgroundColor: const Color(0xFF6F5AAA),
                         child: const Icon(Icons.add, color: Colors.white),
@@ -77,306 +97,18 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
     );
   }
 
-  void _showAddOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(10),
-              child: Text(
-                'Create',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1C1B20),
-                ),
-              ),
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.only(left: 10, right: 10),
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6F5AAA).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.topic, color: Color(0xFF6F5AAA)),
-              ),
-              title: const Text(
-                'Quiz',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Add topic functionality coming soon!'),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6F5AAA).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.description, color: Color(0xFF6F5AAA)),
-              ),
-              title: const Text(
-                'Material',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-
-              onTap: () {
-                Navigator.pop(context);
-                _showAddMaterialDialog(context);
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddMaterialDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: 400,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header with close button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Add Material',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1C1B20),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: Color(0xFF49454F)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Material Title Field
-              const Text(
-                'Material Title',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1C1B20),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                decoration: InputDecoration(
-                  hintText: 'Enter material title',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF79747E)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF6F5AAA)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Topic Selection
-              const Text(
-                'Topic',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1C1B20),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF79747E)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Select Topic',
-                      style: TextStyle(color: Color(0xFF49454F), fontSize: 16),
-                    ),
-                    const Icon(
-                      Icons.keyboard_arrow_down,
-                      color: Color(0xFF49454F),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // File Upload Section
-              const Text(
-                'File',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1C1B20),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF79747E)),
-                  borderRadius: BorderRadius.circular(8),
-                  color: const Color(0xFFF7F2FA),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6F5AAA).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: const Icon(
-                        Icons.cloud_upload_outlined,
-                        color: Color(0xFF6F5AAA),
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Click to upload or drag and drop',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1C1B20),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'PDF, DOC, DOCX (max 5MB)',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF49454F)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: const BorderSide(color: Color(0xFF79747E)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          color: Color(0xFF49454F),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Material added successfully!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6F5AAA),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Add Material',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.only(left: 20, top: 20, right: 20),
-
       child: Row(
         children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF1C1B20)),
+          ),
+          const SizedBox(width: 4),
           const Icon(Icons.class_rounded, color: Color(0xFF1C1B20), size: 24),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Text(
               widget.classTitle,
@@ -406,176 +138,476 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
   }
 
   Widget _buildClassTab() {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Illustration
-          Image.asset('lib/assets/img_animasi_class.png'),
-          const SizedBox(height: 40),
+    return StreamBuilder<ClassModel?>(
+      stream: ClassService.classStream(widget.classId),
+      builder: (context, snapshot) {
+        final classData = snapshot.data;
+        final classCode = classData?.classCode ?? '...';
 
-          // Description text
-          const Text(
-            'This is where you can hand out assignments.',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF1F1F1F),
-            ),
-            textAlign: TextAlign.center,
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Class Code Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Class Code',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      classCode,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF6F5AAA),
+                        letterSpacing: 4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: classCode));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Class code copied!'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy, size: 16),
+                      label: const Text('Copy Code'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF6F5AAA),
+                        side: const BorderSide(color: Color(0xFF6F5AAA)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Quizzes Section
+              _buildSectionHeader('Quizzes'),
+              const Divider(
+                  color: Color(0xFF49454E), thickness: 1, height: 20),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE7DFF8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Text(
+                    'No quizzes yet',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Materials Section
+              _buildSectionHeader('Materials'),
+              const Divider(
+                  color: Color(0xFF49454E), thickness: 1, height: 20),
+              const SizedBox(height: 10),
+              _buildAllMaterialsList(),
+            ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'You can add assignments for the class, then organize it into topics',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF1C1B20),
+        ),
       ),
+    );
+  }
+
+  Widget _buildAllMaterialsList() {
+    return StreamBuilder<List<MaterialModel>>(
+      stream: MaterialService.materialsStream(widget.classId),
+      builder: (context, snapshot) {
+        final materials = snapshot.data ?? [];
+
+        if (materials.isEmpty) {
+          return Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7DFF8),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: Text(
+                'No materials yet',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: materials
+              .map((m) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: MaterialCard(
+                      material: MaterialItem(
+                        id: m.id,
+                        title: m.title,
+                        timestamp: m.formattedTime,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => TeacherMaterialDetail(
+                                classId: widget.classId,
+                                materialId: m.id,
+                                materialTitle: m.title,
+                                materialTimestamp: m.formattedTime,
+                                topicTitle: m.topicTitle,
+                                topicColor: widget.classColor,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      topicTitle: m.topicTitle,
+                      topicColor: widget.classColor,
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 
   Widget _buildClassworkTab() {
-    final topics = [
-      TopicItem(
-        id: '1',
-        title: 'Topic 1',
-        materials: [
-          MaterialItem(
-            id: '1',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 1',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-          MaterialItem(
-            id: '2',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 1',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      TopicItem(
-        id: '2',
-        title: 'Topic 2',
-        materials: [
-          MaterialItem(
-            id: '3',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 2',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-          MaterialItem(
-            id: '4',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 2',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      TopicItem(
-        id: '3',
-        title: 'Topic 3',
-        materials: [
-          MaterialItem(
-            id: '5',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 3',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-          MaterialItem(
-            id: '6',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TeacherMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 3',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    ];
+    return StreamBuilder<List<TopicModel>>(
+      stream: _topicsStream,
+      builder: (context, topicSnapshot) {
+        if (topicSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: topics
-            .map<Widget>((topic) => TopicSection(topic: topic))
-            .toList(),
-      ),
+        final topics = topicSnapshot.data ?? [];
+
+        if (topics.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.topic_outlined, size: 48, color: Colors.grey),
+                SizedBox(height: 12),
+                Text(
+                  'No topics yet',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                    fontSize: 16,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Tap + to create your first topic.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: topics.map<Widget>((topic) {
+              return StreamBuilder<List<MaterialModel>>(
+                stream: MaterialService.materialsStream(
+                  widget.classId,
+                  topicId: topic.id,
+                ),
+                builder: (context, materialSnapshot) {
+                  final materials = materialSnapshot.data ?? [];
+
+                  final topicItem = TopicItem(
+                    id: topic.id,
+                    title: topic.title,
+                    onEdit: () => showEditTopicDialog(context,
+                        classId: widget.classId, topic: topic),
+                    onDelete: () => showDeleteTopicDialog(context,
+                        classId: widget.classId,
+                        topic: topic,
+                        materialCount: materials.length),
+                    materials: materials
+                        .map((m) => MaterialItem(
+                              id: m.id,
+                              title: m.title,
+                              timestamp: m.formattedTime,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => TeacherMaterialDetail(
+                                      classId: widget.classId,
+                                      materialId: m.id,
+                                      materialTitle: m.title,
+                                      materialTimestamp: m.formattedTime,
+                                      topicTitle: topic.title,
+                                      topicColor: widget.classColor,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ))
+                        .toList(),
+                  );
+
+                  return TopicSection(topic: topicItem);
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildPeopleTab() {
-    return const Center(
-      child: Text(
-        'Manage class members',
-        style: TextStyle(fontSize: 16, color: Colors.grey),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: ClassService.classMembersStream(widget.classId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final membersData = snapshot.data ?? [];
+        final members =
+            membersData.map((m) => MemberModel.fromMap(m)).toList();
+
+        members.sort((a, b) {
+          if (a.isTeacher && !b.isTeacher) return -1;
+          if (!a.isTeacher && b.isTeacher) return 1;
+          return a.displayName.compareTo(b.displayName);
+        });
+
+        if (members.isEmpty) {
+          return const Center(
+            child: Text(
+              'No members yet',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          );
+        }
+
+        final teachers = members.where((m) => m.isTeacher).toList();
+        final students = members.where((m) => !m.isTeacher).toList();
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Teacher (${teachers.length})',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF6F5AAA),
+                ),
+              ),
+              const Divider(color: Color(0xFF6F5AAA)),
+              ...teachers.map((m) => _buildMemberTile(m)),
+
+              const SizedBox(height: 20),
+
+              // Students section header + tombol pensil / aksi select mode
+              Row(
+                children: [
+                  Text(
+                    'Students (${students.length})',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF6F5AAA),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_isSelectMode) ...[
+                    if (_selectedStudentUids.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          final selected = students
+                              .where((s) =>
+                                  _selectedStudentUids.contains(s.uid))
+                              .toList();
+                          showRemoveStudentsDialog(
+                            context,
+                            classId: widget.classId,
+                            selectedUids:
+                                selected.map((s) => s.uid).toList(),
+                            selectedNames: selected
+                                .map((s) => s.displayName.isNotEmpty
+                                    ? s.displayName
+                                    : s.email)
+                                .toList(),
+                            onSuccess: () {
+                              setState(() {
+                                _selectedStudentUids.clear();
+                                _isSelectMode = false;
+                              });
+                            },
+                          );
+                        },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade100,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            Icons.delete,
+                            color: Colors.red.shade700,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isSelectMode = false;
+                          _selectedStudentUids.clear();
+                        });
+                      },
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          Icons.check,
+                          color: Colors.green.shade700,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ] else if (students.isNotEmpty) ...[
+                    GestureDetector(
+                      onTap: () {
+                        setState(() => _isSelectMode = true);
+                      },
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6F5AAA).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          color: Color(0xFF6F5AAA),
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const Divider(color: Color(0xFF6F5AAA)),
+              if (students.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'No students yet',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              else
+                ...students.map((m) => _buildMemberTile(m)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMemberTile(MemberModel member) {
+    final isSelected = _selectedStudentUids.contains(member.uid);
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      onTap: (_isSelectMode && !member.isTeacher)
+          ? () {
+              setState(() {
+                if (isSelected) {
+                  _selectedStudentUids.remove(member.uid);
+                } else {
+                  _selectedStudentUids.add(member.uid);
+                }
+              });
+            }
+          : null,
+      leading: _isSelectMode && !member.isTeacher
+          ? CircleAvatar(
+              backgroundColor: isSelected
+                  ? const Color(0xFF6F5AAA)
+                  : const Color(0xFFE9DFF0),
+              child: Icon(
+                isSelected ? Icons.check : Icons.person,
+                color: isSelected ? Colors.white : const Color(0xFF6F5AAA),
+                size: 20,
+              ),
+            )
+          : CircleAvatar(
+              backgroundColor: member.isTeacher
+                  ? const Color(0xFF6F5AAA)
+                  : const Color(0xFFE9DFF0),
+              child: Icon(
+                member.isTeacher ? Icons.school : Icons.person,
+                color:
+                    member.isTeacher ? Colors.white : const Color(0xFF6F5AAA),
+                size: 20,
+              ),
+            ),
+      title: Text(
+        member.displayName.isNotEmpty ? member.displayName : 'No name',
+        style: const TextStyle(fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        member.email,
+        style: const TextStyle(fontSize: 12, color: Colors.grey),
       ),
     );
   }
@@ -597,6 +629,8 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
             onTap: () {
               setState(() {
                 _selectedIndex = 0;
+                _isSelectMode = false;
+                _selectedStudentUids.clear();
               });
             },
           ),
@@ -607,6 +641,8 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
             onTap: () {
               setState(() {
                 _selectedIndex = 1;
+                _isSelectMode = false;
+                _selectedStudentUids.clear();
               });
             },
           ),

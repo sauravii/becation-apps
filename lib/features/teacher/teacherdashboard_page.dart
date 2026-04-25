@@ -3,10 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../models/class_model.dart';
+import '../../services/class_service.dart';
 import 'teacher_classes_detail.dart';
 import '../../components/cards/stat_card.dart';
 import '../../components/cards/dashboard_class_card.dart';
-import 'teacher_bottom_nav.dart';
 
 class TeacherDashboard extends StatefulWidget {
   final ValueChanged<int>? onTabRequested;
@@ -18,48 +19,19 @@ class TeacherDashboard extends StatefulWidget {
 }
 
 class _TeacherDashboardState extends State<TeacherDashboard> {
-  late DashboardData dashboard;
   String? _displayName;
+  late final Stream<List<ClassModel>> _classesStream;
 
   @override
   void initState() {
     super.initState();
 
     final currentUser = FirebaseAuth.instance.currentUser;
-    final teacherName = _getTeacherNameFromUser(currentUser);
+    _displayName = _getTeacherNameFromUser(currentUser);
 
-    _displayName = teacherName;
-
-    dashboard = DashboardData(
-      teacherName: teacherName,
-      totalClasses: null,
-      totalStudents: null,
-      todayClasses: 2,
-      todayStudents: 90,
-      activeClasses: [
-        ActiveClassData(
-          subject: 'Mathematics',
-          title: 'Grade 10 - Algebra Basics',
-          description: 'Introduction to equations and variables',
-          students: 32,
-          color: const Color(0xFF6F5AAA),
-        ),
-        ActiveClassData(
-          subject: 'Science',
-          title: 'Biology - Cell Structure',
-          description: 'Understanding animal and plant cells',
-          students: 28,
-          color: const Color(0xFF3A86FF),
-        ),
-        ActiveClassData(
-          subject: 'English',
-          title: 'Narrative Text',
-          description: 'Reading and writing narrative paragraphs',
-          students: 30,
-          color: const Color(0xFFFF7B54),
-        ),
-      ],
-    );
+    _classesStream = currentUser != null
+        ? ClassService.teacherClassesStream(currentUser.uid)
+        : const Stream.empty();
   }
 
   String _getTeacherNameFromUser(User? user) {
@@ -77,7 +49,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     final today = DateTime.now();
     final user = FirebaseAuth.instance.currentUser;
 
-    Widget buildBody(String displayName) {
+    Widget buildBody(String displayName, List<ClassModel> classes) {
       return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -85,28 +57,28 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           children: [
             _buildHeader(),
             const SizedBox(height: 24),
-            _buildGreeting(displayName),
+            _buildGreeting(displayName, classes.length),
             const SizedBox(height: 20),
-            _buildStatsSection(),
+            _buildStatsSection(classes),
             const SizedBox(height: 24),
             _buildCalendar(today),
             const SizedBox(height: 24),
             _buildActiveClassesHeader(context),
             const SizedBox(height: 12),
-            _buildActiveClassesList(),
+            _buildActiveClassesList(classes),
           ],
         ),
       );
     }
 
     if (user == null) {
-      return buildBody(_displayName ?? 'Teacher');
+      return buildBody(_displayName ?? 'Teacher', []);
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: UserService.userStream(user.uid),
-      builder: (context, snapshot) {
-        final data = snapshot.data?.data();
+      builder: (context, userSnapshot) {
+        final data = userSnapshot.data?.data();
         final firestoreName = (data?['displayName'] as String?)?.trim();
 
         if (firestoreName != null && firestoreName.isNotEmpty) {
@@ -115,7 +87,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           _displayName = _getTeacherNameFromUser(user);
         }
 
-        return buildBody(_displayName ?? 'Teacher');
+        return StreamBuilder<List<ClassModel>>(
+          stream: _classesStream,
+          builder: (context, classesSnapshot) {
+            final classes = classesSnapshot.data ?? [];
+            return buildBody(_displayName ?? 'Teacher', classes);
+          },
+        );
       },
     );
   }
@@ -137,7 +115,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     );
   }
 
-  Widget _buildGreeting(String displayName) {
+  Widget _buildGreeting(String displayName, int classCount) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -151,25 +129,30 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         ),
         const SizedBox(height: 6),
         Text(
-          'You have ${dashboard.todayClasses} classes and ${dashboard.todayStudents} students today.',
+          'You have $classCount classes today.',
           style: const TextStyle(color: Colors.grey, fontSize: 14),
         ),
       ],
     );
   }
 
-  Widget _buildStatsSection() {
+  Widget _buildStatsSection(List<ClassModel> classes) {
+    final totalStudents = classes.fold<int>(
+      0,
+      (total, c) => total + c.studentCount,
+    );
+
     return Row(
       children: [
         StatCard(
-          title: dashboard.totalClasses?.toString() ?? '-',
+          title: classes.length.toString(),
           subtitle: 'Total Classes',
           icon: Icons.menu_book_rounded,
           filled: true,
         ),
         const SizedBox(width: 12),
         StatCard(
-          title: dashboard.totalStudents?.toString() ?? '-',
+          title: totalStudents.toString(),
           subtitle: 'Total Students',
           icon: Icons.people_rounded,
           filled: false,
@@ -319,8 +302,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     );
   }
 
-  Widget _buildActiveClassesList() {
-    if (dashboard.activeClasses.isEmpty) {
+  Widget _buildActiveClassesList(List<ClassModel> classes) {
+    if (classes.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -342,7 +325,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
             ),
             SizedBox(height: 6),
             Text(
-              'Your active classes will appear here.',
+              'Create your first class to get started.',
               style: TextStyle(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
@@ -352,7 +335,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     }
 
     return Column(
-      children: dashboard.activeClasses
+      children: classes
           .map(
             (item) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -361,11 +344,12 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                 subject: item.subject,
                 description: item.description,
                 color: item.color,
-                students: item.students,
+                students: item.studentCount,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => TeacherClassesDetail(
+                        classId: item.id,
                         classTitle: item.title,
                         classColor: item.color,
                       ),
@@ -378,47 +362,4 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           .toList(),
     );
   }
-
-  Widget _buildBottomNav() {
-    return TeacherBottomNavBar(
-      activeIndex: 0,
-      onItemSelected: (index) {
-        widget.onTabRequested?.call(index);
-      },
-    );
-  }
-}
-
-class DashboardData {
-  final String teacherName;
-  final int? totalClasses;
-  final int? totalStudents;
-  final int todayClasses;
-  final int todayStudents;
-  final List<ActiveClassData> activeClasses;
-
-  DashboardData({
-    required this.teacherName,
-    required this.totalClasses,
-    required this.totalStudents,
-    required this.todayClasses,
-    required this.todayStudents,
-    required this.activeClasses,
-  });
-}
-
-class ActiveClassData {
-  final String subject;
-  final String title;
-  final String description;
-  final int students;
-  final Color color;
-
-  ActiveClassData({
-    required this.subject,
-    required this.title,
-    required this.description,
-    required this.students,
-    required this.color,
-  });
 }

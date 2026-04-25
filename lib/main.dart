@@ -28,6 +28,13 @@ class MyApp extends StatelessWidget {
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
           ),
+          // Tap di area kosong mana pun akan menutup keyboard.
+          builder: (context, child) {
+            return GestureDetector(
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: child,
+            );
+          },
           home: const SplashScreen(),
         );
       },

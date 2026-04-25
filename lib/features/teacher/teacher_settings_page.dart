@@ -4,9 +4,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../auth/login_page.dart';
 
-import 'teacher_classes_page.dart';
-import 'teacherdashboard_page.dart';
-
 class TeacherSettingsPage extends StatelessWidget {
   final ValueChanged<int>? onTabRequested;
 

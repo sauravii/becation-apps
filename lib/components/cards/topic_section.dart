@@ -5,13 +5,17 @@ class TopicItem {
   final String id;
   final String title;
   final List<MaterialItem> materials;
-  final VoidCallback? onMoreTap;
+  // Callback saat user pilih "Edit" dari menu titik tiga.
+  final VoidCallback? onEdit;
+  // Callback saat user pilih "Delete" dari menu titik tiga.
+  final VoidCallback? onDelete;
 
   TopicItem({
     required this.id,
     required this.title,
     required this.materials,
-    this.onMoreTap,
+    this.onEdit,
+    this.onDelete,
   });
 }
 
@@ -25,7 +29,11 @@ class TopicSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TopicHeader(title: topic.title, onMoreTap: topic.onMoreTap),
+        TopicHeader(
+        title: topic.title,
+        onEdit: topic.onEdit,
+        onDelete: topic.onDelete,
+      ),
         const Divider(color: Color(0xFF49454E), thickness: 1, height: 20),
         const SizedBox(height: 10),
         ...topic.materials.map(
@@ -46,9 +54,17 @@ class TopicSection extends StatelessWidget {
 
 class TopicHeader extends StatelessWidget {
   final String title;
-  final VoidCallback? onMoreTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const TopicHeader({super.key, required this.title, this.onMoreTap});
+  const TopicHeader({
+    super.key,
+    required this.title,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  bool get _hasMenu => onEdit != null || onDelete != null;
 
   @override
   Widget build(BuildContext context) {
@@ -57,18 +73,54 @@ class TopicHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1C1B20),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1C1B20),
+              ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Color(0xFF1C1B20)),
-            onPressed: onMoreTap,
-          ),
+          if (_hasMenu)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Color(0xFF1C1B20)),
+              onSelected: (value) {
+                switch (value) {
+                  case 'edit':
+                    onEdit?.call();
+                    break;
+                  case 'delete':
+                    onDelete?.call();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                if (onEdit != null)
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 20, color: Color(0xFF1C1B20)),
+                        SizedBox(width: 12),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                if (onDelete != null)
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 20, color: Colors.red),
+                        SizedBox(width: 12),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
         ],
       ),
     );

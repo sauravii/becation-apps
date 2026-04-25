@@ -1,43 +1,36 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-import 'teacherdashboard_page.dart';
-import 'teacher_settings_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../models/class_model.dart';
+import '../../services/class_service.dart';
 import 'teacher_classes_detail.dart';
 
-class TeacherClassesPage extends StatelessWidget {
+class TeacherClassesPage extends StatefulWidget {
   final ValueChanged<int>? onTabRequested;
 
   const TeacherClassesPage({super.key, this.onTabRequested});
 
-  List<ActiveClassData> _buildDummyActiveClasses() {
-    return [
-      ActiveClassData(
-        subject: "Mathematics",
-        title: "Grade 10 - Algebra Basics",
-        description: "Introduction to equations and variables",
-        students: 32,
-        color: const Color(0xFF6F5AAA),
-      ),
-      ActiveClassData(
-        subject: "Science",
-        title: "Biology - Cell Structure",
-        description: "Understanding animal and plant cells",
-        students: 28,
-        color: const Color(0xFF3A86FF),
-      ),
-      ActiveClassData(
-        subject: "English",
-        title: "Narrative Text",
-        description: "Reading and writing narrative paragraphs",
-        students: 30,
-        color: const Color(0xFFFF7B54),
-      ),
-    ];
+  @override
+  State<TeacherClassesPage> createState() => _TeacherClassesPageState();
+}
+
+class _TeacherClassesPageState extends State<TeacherClassesPage> {
+  late final Stream<List<ClassModel>> _classesStream;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    _classesStream = user != null
+        ? ClassService.teacherClassesStream(user.uid)
+        : const Stream.empty();
   }
 
   @override
   Widget build(BuildContext context) {
-    final activeClasses = _buildDummyActiveClasses();
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Stack(
@@ -45,28 +38,39 @@ class TeacherClassesPage extends StatelessWidget {
         Column(
           children: [
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _Header(title: 'Classes'),
-                    const SizedBox(height: 24),
-                    if (activeClasses.isEmpty)
-                      _EmptyState()
-                    else
-                      Column(
-                        children: activeClasses
-                            .map(
-                              (item) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _ClassCard(item: item),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                  ],
-                ),
+              child: StreamBuilder<List<ClassModel>>(
+                stream: _classesStream,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final classes = snapshot.data ?? [];
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _Header(title: 'Classes'),
+                        const SizedBox(height: 24),
+                        if (classes.isEmpty)
+                          _EmptyState()
+                        else
+                          Column(
+                            children: classes
+                                .map(
+                                  (item) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _ClassCard(item: item),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -78,11 +82,312 @@ class TeacherClassesPage extends StatelessWidget {
             heroTag: 'teacher_classes_add',
             backgroundColor: const Color(0xFF6F5AAA),
             foregroundColor: Colors.white,
-            onPressed: () {},
+            onPressed: () => _showCreateClassDialog(context),
             child: const Icon(Icons.add),
           ),
         ),
       ],
+    );
+  }
+
+  void _showCreateClassDialog(BuildContext context) {
+    final titleController = TextEditingController();
+    final subjectController = TextEditingController();
+    final descriptionController = TextEditingController();
+    int selectedColor = 0xFF6F5AAA;
+    bool isLoading = false;
+
+    const colorOptions = [
+      0xFF6F5AAA,
+      0xFF3A86FF,
+      0xFFFF7B54,
+      0xFF2ECC71,
+      0xFFE74C3C,
+      0xFFF39C12,
+    ];
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: SingleChildScrollView(
+            child: Container(
+              width: 400,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Create Class',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1C1B20),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      icon:
+                          const Icon(Icons.close, color: Color(0xFF49454F)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Subject
+                const Text(
+                  'Subject',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1C1B20),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: subjectController,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Mathematics',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF79747E)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF6F5AAA)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                const Text(
+                  'Class Title',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1C1B20),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Grade 10 - Algebra Basics',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF79747E)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF6F5AAA)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Description
+                const Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1C1B20),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: descriptionController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'Brief description of the class',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF79747E)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF6F5AAA)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Color picker
+                const Text(
+                  'Color',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1C1B20),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: colorOptions.map((colorVal) {
+                    final isSelected = selectedColor == colorVal;
+                    return GestureDetector(
+                      onTap: () {
+                        setDialogState(() => selectedColor = colorVal);
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: Color(colorVal),
+                          shape: BoxShape.circle,
+                          border: isSelected
+                              ? Border.all(color: Colors.black, width: 2.5)
+                              : null,
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check,
+                                color: Colors.white, size: 18)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+
+                // Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: isLoading
+                            ? null
+                            : () => Navigator.pop(dialogContext),
+                        style: OutlinedButton.styleFrom(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(
+                              color: Color(0xFF79747E)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Color(0xFF49454F),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isLoading
+                            ? null
+                            : () async {
+                                final title =
+                                    titleController.text.trim();
+                                final subject =
+                                    subjectController.text.trim();
+                                final description =
+                                    descriptionController.text.trim();
+
+                                if (subject.isEmpty || title.isEmpty) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Subject and title are required'),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                setDialogState(
+                                    () => isLoading = true);
+
+                                try {
+                                  await ClassService.createClass(
+                                    title: title,
+                                    subject: subject,
+                                    description: description,
+                                    colorValue: selectedColor,
+                                  );
+
+                                  if (dialogContext.mounted) {
+                                    Navigator.pop(dialogContext);
+                                  }
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Class created successfully!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  setDialogState(
+                                      () => isLoading = false);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            'Failed to create class: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6F5AAA),
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Create Class',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -135,7 +440,7 @@ class _EmptyState extends StatelessWidget {
           ),
           SizedBox(height: 6),
           Text(
-            "Your active classes will appear here.",
+            "Tap + to create your first class.",
             style: TextStyle(color: Colors.grey),
             textAlign: TextAlign.center,
           ),
@@ -146,9 +451,250 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ClassCard extends StatelessWidget {
-  final ActiveClassData item;
+  final ClassModel item;
 
   const _ClassCard({required this.item});
+
+  // Dialog edit class (judul, subject, deskripsi).
+  void _showEditClassDialog(BuildContext context) {
+    final titleController = TextEditingController(text: item.title);
+    final subjectController = TextEditingController(text: item.subject);
+    final descController = TextEditingController(text: item.description);
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Class'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: subjectController,
+                  decoration: InputDecoration(
+                    labelText: 'Subject',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Class Title',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final title = titleController.text.trim();
+                      final subject = subjectController.text.trim();
+                      if (title.isEmpty || subject.isEmpty) return;
+
+                      setDialogState(() => isLoading = true);
+
+                      try {
+                        await ClassService.updateClass(
+                          classId: item.id,
+                          title: title,
+                          subject: subject,
+                          description: descController.text.trim(),
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                      } catch (e) {
+                        setDialogState(() => isLoading = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to update: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF6F5AAA),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Copy class code ke clipboard.
+  void _copyClassCode(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: item.classCode));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Class code "${item.classCode}" copied!'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Dialog hapus class dengan countdown 5 detik.
+  void _showDeleteClassDialog(BuildContext context) {
+    int countdown = 5;
+    Timer? timer;
+    bool isDeleting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          timer ??= Timer.periodic(const Duration(seconds: 1), (t) {
+            if (countdown > 0) {
+              setDialogState(() => countdown--);
+            } else {
+              t.cancel();
+            }
+          });
+
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                SizedBox(width: 10),
+                Text('Delete Class'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Color(0xFF1C1B20),
+                      height: 1.5,
+                    ),
+                    children: [
+                      const TextSpan(text: 'You are about to delete '),
+                      TextSpan(
+                        text: '"${item.title}"',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const TextSpan(text: '. This action cannot be undone.'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Everything inside will be permanently deleted, including topics, materials, attachments, and all member data.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isDeleting
+                    ? null
+                    : () {
+                        timer?.cancel();
+                        Navigator.pop(dialogContext);
+                      },
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: (countdown > 0 || isDeleting)
+                    ? null
+                    : () async {
+                        setDialogState(() => isDeleting = true);
+
+                        try {
+                          await ClassService.deleteClassWithContents(item.id);
+
+                          timer?.cancel();
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Class deleted'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          setDialogState(() => isDeleting = false);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to delete: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                style: FilledButton.styleFrom(
+                  backgroundColor: countdown > 0 ? Colors.grey : Colors.red,
+                ),
+                child: isDeleting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(countdown > 0 ? 'Delete ($countdown)' : 'Delete'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).then((_) => timer?.cancel());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +705,7 @@ class _ClassCard extends StatelessWidget {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => TeacherClassesDetail(
+                classId: item.id,
                 classTitle: item.title,
                 classColor: item.color,
               ),
@@ -241,7 +788,7 @@ class _ClassCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          "${item.students} Students",
+                          "${item.studentCount} Students",
                           style: const TextStyle(
                             fontWeight: FontWeight.w500,
                             color: Colors.black87,
@@ -253,10 +800,54 @@ class _ClassCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton(
-                onPressed: () {},
+              PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),
                 splashRadius: 20,
+                onSelected: (value) {
+                  switch (value) {
+                    case 'edit':
+                      _showEditClassDialog(context);
+                      break;
+                    case 'copy_code':
+                      _copyClassCode(context);
+                      break;
+                    case 'delete':
+                      _showDeleteClassDialog(context);
+                      break;
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 20, color: Color(0xFF1C1B20)),
+                        SizedBox(width: 12),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'copy_code',
+                    child: Row(
+                      children: [
+                        Icon(Icons.copy, size: 20, color: Color(0xFF1C1B20)),
+                        SizedBox(width: 12),
+                        Text('Copy Class Code'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 20, color: Colors.red),
+                        SizedBox(width: 12),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

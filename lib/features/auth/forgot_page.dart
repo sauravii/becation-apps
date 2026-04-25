@@ -1,5 +1,11 @@
-import 'package:becation_apps/features/auth/login_page.dart';
-import 'package:becation_apps/features/auth/verify_page.dart';
+// Halaman forgot password menggunakan link-based reset bawaan Firebase Auth.
+// Kirim link reset ke email user, lalu tampilkan pesan sukses.
+//
+// NOTE: Jika ingin migrasi ke OTP-based reset password di sprint berikutnya,
+// lihat verify_page.dart yang sudah disiapkan UI-nya (butuh backend:
+// Cloud Functions + email service seperti SendGrid/Mailgun).
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../components/forms/auth_text_field.dart';
@@ -16,22 +22,76 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
   final emailController = TextEditingController();
 
   String? emailError;
+  String? generalMessage;
+  bool isSuccess = false;
+  bool isLoading = false;
 
-  void validateEmail() {
+  @override
+  void dispose() {
+    emailController.dispose();
+    super.dispose();
+  }
+
+  // Validasi email lalu kirim link reset password via Firebase Auth.
+  Future<void> _sendResetLink() async {
+    final email = emailController.text.trim();
+
     setState(() {
       emailError = null;
+      generalMessage = null;
+      isSuccess = false;
 
-      if (emailController.text.trim().isEmpty) {
+      if (email.isEmpty) {
         emailError = "Email is required.";
-      } else if (!emailController.text.contains("@")) {
+      } else if (!email.contains("@")) {
         emailError = "Please enter a valid email address.";
-      } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const VerifyPage()),
-        );
       }
     });
+
+    if (emailError != null) return;
+
+    setState(() => isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        setState(() {
+          isSuccess = true;
+          generalMessage =
+              'Password reset link has been sent to your email. Please check your inbox or spam folder.';
+        });
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        setState(() {
+          isSuccess = false;
+          switch (e.code) {
+            case 'user-not-found':
+              generalMessage = 'No account found for this email.';
+              break;
+            case 'invalid-email':
+              generalMessage = 'Invalid email address.';
+              break;
+            case 'too-many-requests':
+              generalMessage = 'Too many requests. Please try again later.';
+              break;
+            default:
+              generalMessage = 'Failed to send reset link. Please try again.';
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          isSuccess = false;
+          generalMessage = 'An unexpected error occurred. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
   }
 
   @override
@@ -75,11 +135,12 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
                               ),
                               SizedBox(height: 6.h),
                               Text(
-                                "Let's help you with that!",
+                                "Enter your email and we'll send you a reset link.",
                                 style: TextStyle(
                                   color: Colors.grey,
                                   fontSize: 14.sp,
                                 ),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
@@ -95,9 +156,42 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
                           keyboardType: TextInputType.emailAddress,
                         ),
 
-                        SizedBox(height: 90.h),
+                        SizedBox(height: 16.h),
 
-                        AuthButton(text: "Send Code", onPressed: validateEmail),
+                        /// SUCCESS / ERROR MESSAGE
+                        if (generalMessage != null)
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(12.w),
+                            margin: EdgeInsets.only(bottom: 16.h),
+                            decoration: BoxDecoration(
+                              color: isSuccess
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8.r),
+                              border: Border.all(
+                                color: isSuccess
+                                    ? Colors.green.withOpacity(0.3)
+                                    : Colors.red.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Text(
+                              generalMessage!,
+                              style: TextStyle(
+                                color: isSuccess ? Colors.green : Colors.red,
+                                fontSize: 14.sp,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+
+                        SizedBox(height: 20.h),
+
+                        AuthButton(
+                          text: "Send Reset Link",
+                          onPressed: _sendResetLink,
+                          isLoading: isLoading,
+                        ),
 
                         const Spacer(),
 
@@ -107,17 +201,12 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                "Already have an account? ",
+                                "Remember your password? ",
                                 style: TextStyle(fontSize: 14.sp),
                               ),
                               TextButton(
                                 onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const LoginPage(),
-                                    ),
-                                  );
+                                  Navigator.pop(context);
                                 },
                                 child: Text(
                                   "Log In",

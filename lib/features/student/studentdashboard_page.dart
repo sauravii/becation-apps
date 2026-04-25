@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../models/class_model.dart';
+import '../../services/class_service.dart';
 import 'student_classes_detail.dart';
 import '../../components/cards/stat_card.dart';
 import '../../components/cards/dashboard_class_card.dart';
@@ -17,47 +19,19 @@ class StudentDashboard extends StatefulWidget {
 }
 
 class _StudentDashboardState extends State<StudentDashboard> {
-  late DashboardData dashboard;
   String? _displayName;
+  late final Stream<List<ClassModel>> _classesStream;
 
   @override
   void initState() {
     super.initState();
 
     final currentUser = FirebaseAuth.instance.currentUser;
-    final studentName = _getStudentNameFromUser(currentUser);
-    _displayName = studentName;
+    _displayName = _getStudentNameFromUser(currentUser);
 
-    dashboard = DashboardData(
-      studentName: studentName,
-      totalClasses: null,
-      totalQuizzes: null,
-      todayClasses: 2,
-      todayQuizzes: 3,
-      activeClasses: [
-        ActiveClassData(
-          subject: 'Mathematics',
-          title: 'Grade 10 - Algebra Basics',
-          description: 'Introduction to equations and variables',
-          students: 32,
-          color: const Color(0xFF6F5AAA),
-        ),
-        ActiveClassData(
-          subject: 'Science',
-          title: 'Biology - Cell Structure',
-          description: 'Understanding animal and plant cells',
-          students: 28,
-          color: const Color(0xFF3A86FF),
-        ),
-        ActiveClassData(
-          subject: 'English',
-          title: 'Narrative Text',
-          description: 'Reading and writing narrative paragraphs',
-          students: 30,
-          color: const Color(0xFFFF7B54),
-        ),
-      ],
-    );
+    _classesStream = currentUser != null
+        ? ClassService.studentClassesStream(currentUser.uid)
+        : const Stream.empty();
   }
 
   @override
@@ -65,7 +39,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     final today = DateTime.now();
     final user = FirebaseAuth.instance.currentUser;
 
-    Widget buildBody(String displayName) {
+    Widget buildBody(String displayName, List<ClassModel> classes) {
       return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -73,28 +47,28 @@ class _StudentDashboardState extends State<StudentDashboard> {
           children: [
             _buildHeader(),
             const SizedBox(height: 24),
-            _buildGreeting(displayName),
+            _buildGreeting(displayName, classes.length),
             const SizedBox(height: 20),
-            _buildStatsSection(),
+            _buildStatsSection(classes),
             const SizedBox(height: 24),
             _buildCalendar(today),
             const SizedBox(height: 24),
             _buildActiveClassesHeader(),
             const SizedBox(height: 12),
-            _buildActiveClassesList(),
+            _buildActiveClassesList(classes),
           ],
         ),
       );
     }
 
     if (user == null) {
-      return buildBody(_displayName ?? 'Student');
+      return buildBody(_displayName ?? 'Student', []);
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: UserService.userStream(user.uid),
-      builder: (context, snapshot) {
-        final data = snapshot.data?.data();
+      builder: (context, userSnapshot) {
+        final data = userSnapshot.data?.data();
         final firestoreName = (data?['displayName'] as String?)?.trim();
 
         if (firestoreName != null && firestoreName.isNotEmpty) {
@@ -103,7 +77,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
           _displayName = _getStudentNameFromUser(user);
         }
 
-        return buildBody(_displayName ?? 'Student');
+        return StreamBuilder<List<ClassModel>>(
+          stream: _classesStream,
+          builder: (context, classesSnapshot) {
+            final classes = classesSnapshot.data ?? [];
+            return buildBody(_displayName ?? 'Student', classes);
+          },
+        );
       },
     );
   }
@@ -136,7 +116,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     );
   }
 
-  Widget _buildGreeting(String displayName) {
+  Widget _buildGreeting(String displayName, int classCount) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -150,25 +130,25 @@ class _StudentDashboardState extends State<StudentDashboard> {
         ),
         const SizedBox(height: 6),
         Text(
-          'You have ${dashboard.todayClasses} classes and ${dashboard.todayQuizzes} quizzes today.',
+          'You have $classCount classes enrolled.',
           style: const TextStyle(color: Colors.grey, fontSize: 14),
         ),
       ],
     );
   }
 
-  Widget _buildStatsSection() {
+  Widget _buildStatsSection(List<ClassModel> classes) {
     return Row(
       children: [
         StatCard(
-          title: dashboard.totalClasses?.toString() ?? '-',
+          title: classes.length.toString(),
           subtitle: 'Total Classes',
           icon: Icons.menu_book_rounded,
           filled: true,
         ),
         const SizedBox(width: 12),
         StatCard(
-          title: dashboard.totalQuizzes?.toString() ?? '-',
+          title: '-',
           subtitle: 'Total Quizzes',
           icon: Icons.assignment_rounded,
           filled: false,
@@ -318,8 +298,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
     );
   }
 
-  Widget _buildActiveClassesList() {
-    if (dashboard.activeClasses.isEmpty) {
+  Widget _buildActiveClassesList(List<ClassModel> classes) {
+    if (classes.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -341,7 +321,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
             ),
             SizedBox(height: 6),
             Text(
-              'Your active classes will appear here.',
+              'Join a class to get started.',
               style: TextStyle(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
@@ -351,7 +331,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     }
 
     return Column(
-      children: dashboard.activeClasses
+      children: classes
           .map(
             (item) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -360,11 +340,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 subject: item.subject,
                 description: item.description,
                 color: item.color,
-                students: item.students,
+                students: item.studentCount,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => StudentClassesDetail(
+                        classId: item.id,
                         classTitle: item.title,
                         classColor: item.color,
                       ),
@@ -377,38 +358,4 @@ class _StudentDashboardState extends State<StudentDashboard> {
           .toList(),
     );
   }
-}
-
-class DashboardData {
-  final String studentName;
-  final int? totalClasses;
-  final int? totalQuizzes;
-  final int todayClasses;
-  final int todayQuizzes;
-  final List<ActiveClassData> activeClasses;
-
-  DashboardData({
-    required this.studentName,
-    required this.totalClasses,
-    required this.totalQuizzes,
-    required this.todayClasses,
-    required this.todayQuizzes,
-    required this.activeClasses,
-  });
-}
-
-class ActiveClassData {
-  final String subject;
-  final String title;
-  final String description;
-  final int students;
-  final Color color;
-
-  ActiveClassData({
-    required this.subject,
-    required this.title,
-    required this.description,
-    required this.students,
-    required this.color,
-  });
 }

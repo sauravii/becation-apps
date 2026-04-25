@@ -1,64 +1,184 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../models/class_model.dart';
+import '../../services/class_service.dart';
 import 'student_classes_detail.dart';
-import 'studentdashboard_page.dart';
 
-class StudentClassesPage extends StatelessWidget {
+class StudentClassesPage extends StatefulWidget {
   const StudentClassesPage({super.key, this.onTabRequested});
 
   final ValueChanged<int>? onTabRequested;
 
-  List<ActiveClassData> _buildDummyActiveClasses() {
-    return [
-      ActiveClassData(
-        subject: "Mathematics",
-        title: "Grade 10 - Algebra Basics",
-        description: "Introduction to equations and variables",
-        students: 32,
-        color: const Color(0xFF6F5AAA),
-      ),
-      ActiveClassData(
-        subject: "Science",
-        title: "Biology - Cell Structure",
-        description: "Understanding animal and plant cells",
-        students: 28,
-        color: const Color(0xFF3A86FF),
-      ),
-      ActiveClassData(
-        subject: "English",
-        title: "Narrative Text",
-        description: "Reading and writing narrative paragraphs",
-        students: 30,
-        color: const Color(0xFFFF7B54),
-      ),
-    ];
+  @override
+  State<StudentClassesPage> createState() => _StudentClassesPageState();
+}
+
+class _StudentClassesPageState extends State<StudentClassesPage> {
+  late final Stream<List<ClassModel>> _classesStream;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    _classesStream = user != null
+        ? ClassService.studentClassesStream(user.uid)
+        : const Stream.empty();
   }
 
   @override
   Widget build(BuildContext context) {
-    final activeClasses = _buildDummyActiveClasses();
+    final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Header(title: 'Classes'),
-          const SizedBox(height: 24),
-          if (activeClasses.isEmpty)
-            _EmptyState()
-          else
-            Column(
-              children: activeClasses
-                  .map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _ClassCard(item: item),
+    return Stack(
+      children: [
+        Column(
+          children: [
+            Expanded(
+              child: StreamBuilder<List<ClassModel>>(
+                stream: _classesStream,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final classes = snapshot.data ?? [];
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _Header(title: 'Classes'),
+                        const SizedBox(height: 24),
+                        if (classes.isEmpty)
+                          _EmptyState()
+                        else
+                          Column(
+                            children: classes
+                                .map(
+                                  (item) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _ClassCard(item: item),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                      ],
                     ),
-                  )
-                  .toList(),
+                  );
+                },
+              ),
             ),
-        ],
+          ],
+        ),
+        Positioned(
+          right: 20,
+          bottom: bottomInset + 10,
+          child: FloatingActionButton(
+            heroTag: 'student_join_class',
+            backgroundColor: const Color(0xFF6F5AAA),
+            foregroundColor: Colors.white,
+            onPressed: () => _showJoinClassDialog(context),
+            child: const Icon(Icons.add),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showJoinClassDialog(BuildContext context) {
+    final codeController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Join Class'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter the class code from your teacher:',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: codeController,
+                textCapitalization: TextCapitalization.characters,
+                maxLength: 6,
+                decoration: InputDecoration(
+                  hintText: 'e.g. A3X7K9',
+                  counterText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF6F5AAA)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final code = codeController.text.trim();
+                      if (code.isEmpty) return;
+
+                      setDialogState(() => isLoading = true);
+
+                      try {
+                        await ClassService.joinClassByCode(classCode: code);
+
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Joined class successfully!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isLoading = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('$e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF6F5AAA),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Join'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -112,7 +232,7 @@ class _EmptyState extends StatelessWidget {
           ),
           SizedBox(height: 6),
           Text(
-            "Your active classes will appear here.",
+            "Tap + to join a class with a code.",
             style: TextStyle(color: Colors.grey),
             textAlign: TextAlign.center,
           ),
@@ -123,7 +243,7 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ClassCard extends StatelessWidget {
-  final ActiveClassData item;
+  final ClassModel item;
 
   const _ClassCard({required this.item});
 
@@ -136,6 +256,7 @@ class _ClassCard extends StatelessWidget {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => StudentClassesDetail(
+                classId: item.id,
                 classTitle: item.title,
                 classColor: item.color,
               ),
@@ -218,7 +339,7 @@ class _ClassCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          "${item.students} Students",
+                          "${item.studentCount} Students",
                           style: const TextStyle(
                             fontWeight: FontWeight.w500,
                             color: Colors.black87,
@@ -229,28 +350,10 @@ class _ClassCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.more_vert),
-                splashRadius: 20,
-              ),
             ],
           ),
         ),
       ),
     );
-  }
-}
-
-class _BottomNav extends StatelessWidget {
-  final int activeIndex;
-  final ValueChanged<int>? onTabRequested;
-
-  const _BottomNav({required this.activeIndex, this.onTabRequested});
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox.shrink();
   }
 }

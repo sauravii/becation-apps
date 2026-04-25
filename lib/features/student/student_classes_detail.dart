@@ -1,17 +1,26 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../../services/user_service.dart';
+import '../../models/class_model.dart';
+import '../../models/topic_model.dart';
+import '../../models/material_model.dart';
+import '../../models/member_model.dart';
+import '../../services/class_service.dart';
+import '../../services/topic_service.dart';
+import '../../services/material_service.dart';
 import '../../components/cards/material_card.dart';
 import '../../components/cards/topic_section.dart';
 import '../../components/navigation/nav_item.dart';
 import 'student_material_detail.dart';
 
 class StudentClassesDetail extends StatefulWidget {
+  final String classId;
   final String classTitle;
   final Color classColor;
 
   const StudentClassesDetail({
     super.key,
+    required this.classId,
     required this.classTitle,
     required this.classColor,
   });
@@ -21,25 +30,14 @@ class StudentClassesDetail extends StatefulWidget {
 }
 
 class _StudentClassesDetailState extends State<StudentClassesDetail> {
-  int _selectedIndex = 1;
-  String _userRole = 'student';
-  bool _isLoading = true;
+  int _selectedIndex = 0;
+
+  late final Stream<List<TopicModel>> _topicsStream;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserRole();
-  }
-
-  Future<void> _fetchUserRole() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final role = await UserService.getUserRole(user.uid);
-      setState(() {
-        _userRole = role;
-        _isLoading = false;
-      });
-    }
+    _topicsStream = TopicService.topicsStream(widget.classId);
   }
 
   @override
@@ -51,25 +49,6 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
           children: [
             _buildHeader(),
             Expanded(child: _buildContent()),
-            if (_userRole == 'teacher' && !_isLoading)
-              Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 20),
-                      child: FloatingActionButton(
-                        onPressed: () {
-                          _showAddOptions(context);
-                        },
-                        backgroundColor: const Color(0xFF6F5AAA),
-                        child: const Icon(Icons.add, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             _buildBottomNav(),
           ],
         ),
@@ -77,99 +56,129 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
     );
   }
 
-  void _showAddOptions(BuildContext context) {
-    showModalBottomSheet(
+  // Dialog konfirmasi leave class dengan countdown 3 detik.
+  void _showLeaveClassDialog() {
+    int countdown = 3;
+    Timer? timer;
+    bool isLeaving = false;
+
+    showDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          timer ??= Timer.periodic(const Duration(seconds: 1), (t) {
+            if (countdown > 0) {
+              setDialogState(() => countdown--);
+            } else {
+              t.cancel();
+            }
+          });
+
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.exit_to_app, color: Colors.red, size: 28),
+                SizedBox(width: 10),
+                Text('Leave Class'),
+              ],
             ),
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                'Add Options',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+            content: RichText(
+              text: TextSpan(
+                style: const TextStyle(
+                  fontSize: 15,
                   color: Color(0xFF1C1B20),
+                  height: 1.5,
                 ),
-              ),
-            ),
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6F5AAA).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.topic, color: Color(0xFF6F5AAA)),
-              ),
-              title: const Text('Add Topic'),
-              subtitle: const Text('Create a new topic for this class'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Implement add topic functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Add topic functionality coming soon!'),
+                children: [
+                  const TextSpan(text: 'Are you sure you want to leave '),
+                  TextSpan(
+                    text: '"${widget.classTitle}"',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                );
-              },
-            ),
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6F5AAA).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.description, color: Color(0xFF6F5AAA)),
-              ),
-              title: const Text('Add Material'),
-              subtitle: const Text('Add new material to existing topic'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Implement add material functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Add material functionality coming soon!'),
+                  const TextSpan(
+                    text: '? You will lose access to all materials in this class.',
                   ),
-                );
-              },
+                ],
+              ),
             ),
-            const SizedBox(height: 20),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: isLeaving
+                    ? null
+                    : () {
+                        timer?.cancel();
+                        Navigator.pop(dialogContext);
+                      },
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: (countdown > 0 || isLeaving)
+                    ? null
+                    : () async {
+                        setDialogState(() => isLeaving = true);
+
+                        try {
+                          await ClassService.leaveClass(widget.classId);
+
+                          timer?.cancel();
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
+                          if (mounted) {
+                            Navigator.of(this.context).pop();
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(
+                                content: Text('You left the class'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          setDialogState(() => isLeaving = false);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to leave: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                style: FilledButton.styleFrom(
+                  backgroundColor: countdown > 0 ? Colors.grey : Colors.red,
+                ),
+                child: isLeaving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(countdown > 0 ? 'Leave ($countdown)' : 'Leave'),
+              ),
+            ],
+          );
+        },
       ),
-    );
+    ).then((_) => timer?.cancel());
   }
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.only(left: 20, top: 20, right: 20),
-
+      padding: const EdgeInsets.only(left: 20, top: 20, right: 8),
       child: Row(
         children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF1C1B20)),
+          ),
+          const SizedBox(width: 4),
           const Icon(Icons.class_rounded, color: Color(0xFF1C1B20), size: 24),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Text(
               widget.classTitle,
@@ -179,6 +188,26 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Color(0xFF1C1B20)),
+            onSelected: (value) {
+              if (value == 'leave') {
+                _showLeaveClassDialog();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'leave',
+                child: Row(
+                  children: [
+                    Icon(Icons.exit_to_app, size: 20, color: Colors.red),
+                    SizedBox(width: 12),
+                    Text('Leave Class', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -199,176 +228,384 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
   }
 
   Widget _buildClassTab() {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Illustration
-          Image.asset('lib/assets/img_animasi_class.png'),
-          const SizedBox(height: 40),
+    return StreamBuilder<ClassModel?>(
+      stream: ClassService.classStream(widget.classId),
+      builder: (context, snapshot) {
+        final classData = snapshot.data;
 
-          // Description text
-          const Text(
-            'This is where you can view your classwork.',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF1F1F1F),
-            ),
-            textAlign: TextAlign.center,
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Class Detail Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Subject badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: widget.classColor,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Text(
+                        classData?.subject ?? '...',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Teacher
+                    Row(
+                      children: [
+                        const Icon(Icons.person, size: 18, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Text(
+                          classData?.teacherName.isNotEmpty == true
+                              ? classData!.teacherName
+                              : 'Teacher',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF1C1B20),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Student count
+                    Row(
+                      children: [
+                        const Icon(Icons.groups_2_outlined,
+                            size: 18, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${classData?.studentCount ?? 0} Students',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF1C1B20),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (classData?.description.isNotEmpty == true) ...[
+                      const SizedBox(height: 16),
+                      const Divider(height: 1),
+                      const SizedBox(height: 16),
+                      Text(
+                        classData!.description,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Quizzes Section
+              _buildSectionHeader('Quizzes'),
+              const Divider(
+                  color: Color(0xFF49454E), thickness: 1, height: 20),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE7DFF8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Text(
+                    'No quizzes yet',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Materials Section
+              _buildSectionHeader('Materials'),
+              const Divider(
+                  color: Color(0xFF49454E), thickness: 1, height: 20),
+              const SizedBox(height: 10),
+              _buildAllMaterialsList(),
+            ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'You can view materials and quizzes from the class',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF1C1B20),
+        ),
       ),
+    );
+  }
+
+  Widget _buildAllMaterialsList() {
+    return StreamBuilder<List<MaterialModel>>(
+      stream: MaterialService.materialsStream(widget.classId),
+      builder: (context, snapshot) {
+        final materials = snapshot.data ?? [];
+
+        if (materials.isEmpty) {
+          return Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7DFF8),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: Text(
+                'No materials yet',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: materials
+              .map((m) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: MaterialCard(
+                      material: MaterialItem(
+                        id: m.id,
+                        title: m.title,
+                        timestamp: m.formattedTime,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => StudentMaterialDetail(
+                                classId: widget.classId,
+                                materialId: m.id,
+                                materialTitle: m.title,
+                                materialTimestamp: m.formattedTime,
+                                topicTitle: m.topicTitle,
+                                topicColor: widget.classColor,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      topicTitle: m.topicTitle,
+                      topicColor: widget.classColor,
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 
   Widget _buildClassworkTab() {
-    final topics = [
-      TopicItem(
-        id: '1',
-        title: 'Topic 1',
-        materials: [
-          MaterialItem(
-            id: '1',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => StudentMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 1',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-          MaterialItem(
-            id: '2',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => StudentMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 1',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      TopicItem(
-        id: '2',
-        title: 'Topic 2',
-        materials: [
-          MaterialItem(
-            id: '3',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => StudentMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 2',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-          MaterialItem(
-            id: '4',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => StudentMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 2',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      TopicItem(
-        id: '3',
-        title: 'Topic 3',
-        materials: [
-          MaterialItem(
-            id: '5',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => StudentMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 3',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-          MaterialItem(
-            id: '6',
-            title: 'New material: Material Name',
-            timestamp: '6:38 PM',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => StudentMaterialDetail(
-                    materialTitle: 'New material: Material Name',
-                    materialTimestamp: '6:38 PM',
-                    topicTitle: 'Topic 3',
-                    topicColor: const Color(0xFF6F5AAA),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    ];
+    return StreamBuilder<List<TopicModel>>(
+      stream: _topicsStream,
+      builder: (context, topicSnapshot) {
+        if (topicSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: topics
-            .map<Widget>((topic) => TopicSection(topic: topic))
-            .toList(),
-      ),
+        final topics = topicSnapshot.data ?? [];
+
+        if (topics.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.topic_outlined, size: 48, color: Colors.grey),
+                SizedBox(height: 12),
+                Text(
+                  'No topics yet',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                    fontSize: 16,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Your teacher will add topics and materials here.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: topics.map<Widget>((topic) {
+              return StreamBuilder<List<MaterialModel>>(
+                stream: MaterialService.materialsStream(
+                  widget.classId,
+                  topicId: topic.id,
+                ),
+                builder: (context, materialSnapshot) {
+                  final materials = materialSnapshot.data ?? [];
+
+                  final topicItem = TopicItem(
+                    id: topic.id,
+                    title: topic.title,
+                    materials: materials
+                        .map((m) => MaterialItem(
+                              id: m.id,
+                              title: m.title,
+                              timestamp: m.formattedTime,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => StudentMaterialDetail(
+                                      classId: widget.classId,
+                                      materialId: m.id,
+                                      materialTitle: m.title,
+                                      materialTimestamp: m.formattedTime,
+                                      topicTitle: topic.title,
+                                      topicColor: widget.classColor,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ))
+                        .toList(),
+                  );
+
+                  return TopicSection(topic: topicItem);
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildPeopleTab() {
-    return const Center(
-      child: Text(
-        'People tab content',
-        style: TextStyle(fontSize: 16, color: Colors.grey),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: ClassService.classMembersStream(widget.classId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final membersData = snapshot.data ?? [];
+        final members =
+            membersData.map((m) => MemberModel.fromMap(m)).toList();
+
+        members.sort((a, b) {
+          if (a.isTeacher && !b.isTeacher) return -1;
+          if (!a.isTeacher && b.isTeacher) return 1;
+          return a.displayName.compareTo(b.displayName);
+        });
+
+        if (members.isEmpty) {
+          return const Center(
+            child: Text(
+              'No members yet',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          );
+        }
+
+        final teachers = members.where((m) => m.isTeacher).toList();
+        final students = members.where((m) => !m.isTeacher).toList();
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Teacher (${teachers.length})',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF6F5AAA),
+                ),
+              ),
+              const Divider(color: Color(0xFF6F5AAA)),
+              ...teachers.map((m) => _buildMemberTile(m)),
+
+              const SizedBox(height: 20),
+
+              Text(
+                'Students (${students.length})',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF6F5AAA),
+                ),
+              ),
+              const Divider(color: Color(0xFF6F5AAA)),
+              if (students.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'No students yet',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              else
+                ...students.map((m) => _buildMemberTile(m)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMemberTile(MemberModel member) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: member.isTeacher
+            ? const Color(0xFF6F5AAA)
+            : const Color(0xFFE9DFF0),
+        child: Icon(
+          member.isTeacher ? Icons.school : Icons.person,
+          color: member.isTeacher ? Colors.white : const Color(0xFF6F5AAA),
+          size: 20,
+        ),
+      ),
+      title: Text(
+        member.displayName.isNotEmpty ? member.displayName : 'No name',
+        style: const TextStyle(fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        member.email,
+        style: const TextStyle(fontSize: 12, color: Colors.grey),
       ),
     );
   }

@@ -26,20 +26,34 @@ class AttachmentSection extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Attachments',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1C1B20),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Attachments',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1C1B20),
+              ),
             ),
-          ),
-          const SizedBox(height: 15),
-          ...attachments.map((attachment) => attachment).toList(),
-        ],
+            const SizedBox(height: 15),
+            if (attachments.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(
+                  child: Text(
+                    'No attachments yet',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ),
+              )
+            else
+              ...attachments.map((attachment) => attachment).toList(),
+          ],
+        ),
       ),
     );
   }

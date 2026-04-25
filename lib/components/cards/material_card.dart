@@ -86,10 +86,6 @@ class MaterialCard extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.more_vert, color: Color(0xFF1C1B20)),
-                onPressed: () {},
-              ),
             ],
           ),
         ),

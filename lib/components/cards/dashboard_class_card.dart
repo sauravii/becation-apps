@@ -7,7 +7,6 @@ class DashboardClassCard extends StatelessWidget {
   final Color color;
   final int students;
   final VoidCallback? onTap;
-  final VoidCallback? onMoreTap;
 
   const DashboardClassCard({
     super.key,
@@ -17,7 +16,6 @@ class DashboardClassCard extends StatelessWidget {
     required this.color,
     required this.students,
     this.onTap,
-    this.onMoreTap,
   });
 
   @override
@@ -112,12 +110,6 @@ class DashboardClassCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: onMoreTap ?? () {},
-                icon: const Icon(Icons.more_vert),
-                splashRadius: 20,
               ),
             ],
           ),

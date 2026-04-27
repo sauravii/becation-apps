@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isClassMember(classId) {
+      return exists(/databases/$(database)/documents/classes/$(classId)/members/$(request.auth.uid));
+    }
+
+    function isClassTeacher(classId) {
+      return get(/databases/$(database)/documents/classes/$(classId)/members/$(request.auth.uid)).data.role == 'teacher';
+    }
+
+    // USERS
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && isOwner(userId);
+      allow update: if isAuth() && (isOwner(userId) || getUserRole() == 'teacher');
+    }
+
+    // CLASSES
+    match /classes/{classId} {
+      allow get: if isAuth();
+      // list: teacher bisa query where teacherId == uid
+      //       student bisa query where memberIds arrayContains uid
+      allow list: if isAuth() && (
+        resource.data.teacherId == request.auth.uid ||
+        request.auth.uid in resource.data.memberIds
+      );
+      allow create: if isAuth() && getUserRole() == 'teacher';
+      // Allow update jika: teacher, existing member, atau student yang sedang join
+      // (UID-nya ada di memberIds baru tapi belum ada di memberIds lama).
+      allow update: if isAuth() && (
+        isClassTeacher(classId) ||
+        isClassMember(classId) ||
+        (request.auth.uid in request.resource.data.memberIds &&
+         !(request.auth.uid in resource.data.memberIds))
+      );
+      allow delete: if isAuth() && isClassTeacher(classId);
+
+      // MEMBERS
+      match /members/{memberId} {
+        allow read: if isAuth() && (isClassMember(classId) || isOwner(memberId));
+        allow create: if isAuth() && (isClassTeacher(classId) || isOwner(memberId));
+        allow delete: if isAuth() && (isClassTeacher(classId) || isOwner(memberId));
+      }
+
+      // TOPICS
+      match /topics/{topicId} {
+        allow read: if isAuth() && isClassMember(classId);
+        allow write: if isAuth() && isClassTeacher(classId);
+      }
+
+      // MATERIALS
+      match /materials/{materialId} {
+        allow read: if isAuth() && isClassMember(classId);
+        allow write: if isAuth() && isClassTeacher(classId);
+
+        // ATTACHMENTS
+        match /attachments/{attachmentId} {
+          allow read: if isAuth() && isClassMember(classId);
+          allow write: if isAuth() && isClassTeacher(classId);
+        }
+      }
+    }
+
+    // CLASS_CODES (lookup for joining)
+    match /class_codes/{code} {
+      allow read: if isAuth();
+      allow create: if isAuth() && getUserRole() == 'teacher';
+      allow delete: if isAuth() && getUserRole() == 'teacher';
+    }
+  }
+}

@@ -12,6 +12,7 @@
 .swiftpm/
 migrate_working_dir/
 .claude
+UI Design/
 
 # IntelliJ related
 *.iml

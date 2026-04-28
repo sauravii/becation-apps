@@ -5,6 +5,7 @@ import '../../models/topic_model.dart';
 import '../../services/topic_service.dart';
 import '../../services/class_service.dart';
 import 'teacher_create_material_screen.dart';
+import 'teacher_create_quiz_screen.dart';
 
 /// Bottom sheet untuk memilih create Topic atau Material.
 void showAddOptionsSheet(
@@ -44,26 +45,6 @@ void showAddOptionsSheet(
           ),
           ListTile(
             leading: Container(
-              padding: const EdgeInsets.only(left: 10, right: 10),
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF6F5AAA).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.quiz, color: Color(0xFF6F5AAA)),
-            ),
-            title: const Text(
-              'Quiz',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: const Text('Create a new quiz'),
-            onTap: () {
-              Navigator.pop(sheetContext);
-            },
-          ),
-          ListTile(
-            leading: Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
@@ -83,6 +64,32 @@ void showAddOptionsSheet(
                 MaterialPageRoute(
                   builder: (_) =>
                       TeacherCreateMaterialScreen(classId: classId),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.only(left: 10, right: 10),
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF6F5AAA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.quiz, color: Color(0xFF6F5AAA)),
+            ),
+            title: const Text(
+              'Quiz',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: const Text('Create a new quiz'),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      TeacherCreateQuizScreen(classId: classId),
                 ),
               );
             },

@@ -31,9 +31,9 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - Lihat jumlah siswa di tiap kelas secara real-time
 
 **Detail Kelas (3 tab)**
-- **Class**: kode kelas, informasi kelas & preview materi terbaru
+- **Class**: banner info kelas (subject, judul, deskripsi) & toggle Quiz/Material untuk lihat list materi
 - **Classwork**: kelola topik & materi pembelajaran
-- **People**: daftar anggota kelas, select mode untuk remove student (centang & hapus sekaligus)
+- **People**: kode kelas di atas, daftar anggota kelas, select mode untuk remove student (centang & hapus sekaligus)
 
 **Topik & Materi**
 - Buat **topik** sebagai pengelompok materi (misal: "Bab 1 - Pengenalan")

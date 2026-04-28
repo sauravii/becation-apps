@@ -33,6 +33,8 @@ class TeacherClassesDetail extends StatefulWidget {
 
 class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
   int _selectedIndex = 0;
+  // 0 = Quiz, 1 = Material. Default Material.
+  int _activeContentTab = 1;
   String _userRole = 'teacher';
   bool _isLoading = true;
   // Select mode untuk People tab — pilih student untuk di-remove.
@@ -142,96 +144,39 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
       stream: ClassService.classStream(widget.classId),
       builder: (context, snapshot) {
         final classData = snapshot.data;
-        final classCode = classData?.classCode ?? '...';
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Class Code Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Class Code',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      classCode,
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF6F5AAA),
-                        letterSpacing: 4,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: classCode));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Class code copied!'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.copy, size: 16),
-                      label: const Text('Copy Code'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF6F5AAA),
-                        side: const BorderSide(color: Color(0xFF6F5AAA)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              _buildClassBanner(classData),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(child: _buildContentTabButton('Quiz', 0)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildContentTabButton('Material', 1)),
+                ],
               ),
-              const SizedBox(height: 24),
-
-              // Quizzes Section
-              _buildSectionHeader('Quizzes'),
-              const Divider(
-                  color: Color(0xFF49454E), thickness: 1, height: 20),
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 10),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE7DFF8),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Text(
-                    'No quizzes yet',
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
+              const SizedBox(height: 16),
+              if (_activeContentTab == 0)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7DFF8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Materials Section
-              _buildSectionHeader('Materials'),
-              const Divider(
-                  color: Color(0xFF49454E), thickness: 1, height: 20),
-              const SizedBox(height: 10),
-              _buildAllMaterialsList(),
+                  child: const Center(
+                    child: Text(
+                      'No quizzes yet',
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                  ),
+                )
+              else
+                _buildAllMaterialsList(),
             ],
           ),
         );
@@ -239,17 +184,143 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF1C1B20),
+  Widget _buildClassBanner(ClassModel? classData) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE7DFF8),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: widget.classColor,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Text(
+              classData?.subject.isNotEmpty == true
+                  ? classData!.subject
+                  : 'Subject',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            widget.classTitle,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1C1B20),
+            ),
+          ),
+          if (classData?.description.isNotEmpty == true) ...[
+            const SizedBox(height: 8),
+            Text(
+              classData!.description,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF49454E),
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContentTabButton(String label, int index) {
+    final isActive = _activeContentTab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _activeContentTab = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF6F5AAA) : Colors.transparent,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: const Color(0xFF6F5AAA), width: 1.5),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isActive ? Colors.white : const Color(0xFF6F5AAA),
+            ),
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildClassCodeCard() {
+    return StreamBuilder<ClassModel?>(
+      stream: ClassService.classStream(widget.classId),
+      builder: (context, snapshot) {
+        final classCode = snapshot.data?.classCode ?? '...';
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: [
+              const Text(
+                'Class Code',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                classCode,
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF6F5AAA),
+                  letterSpacing: 4,
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: classCode));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Class code copied!'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy, size: 16),
+                label: const Text('Copy Code'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF6F5AAA),
+                  side: const BorderSide(color: Color(0xFF6F5AAA)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -436,6 +507,8 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildClassCodeCard(),
+              const SizedBox(height: 24),
               Text(
                 'Teacher (${teachers.length})',
                 style: const TextStyle(

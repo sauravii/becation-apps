@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/topic_model.dart';
 import '../../services/topic_service.dart';
-import '../../services/material_service.dart';
 import '../../services/class_service.dart';
+import 'teacher_create_material_screen.dart';
 
 /// Bottom sheet untuk memilih create Topic atau Material.
 void showAddOptionsSheet(
@@ -51,16 +51,15 @@ void showAddOptionsSheet(
                 color: const Color(0xFF6F5AAA).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.topic, color: Color(0xFF6F5AAA)),
+              child: const Icon(Icons.quiz, color: Color(0xFF6F5AAA)),
             ),
             title: const Text(
-              'Topic',
+              'Quiz',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
-            subtitle: const Text('Create a new topic'),
+            subtitle: const Text('Create a new quiz'),
             onTap: () {
               Navigator.pop(sheetContext);
-              showAddTopicDialog(context, classId: classId);
             },
           ),
           ListTile(
@@ -77,375 +76,19 @@ void showAddOptionsSheet(
               'Material',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
-            subtitle: const Text('Add material to a topic'),
+            subtitle: const Text('Create a new material'),
             onTap: () {
               Navigator.pop(sheetContext);
-              showAddMaterialDialog(context, classId: classId);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      TeacherCreateMaterialScreen(classId: classId),
+                ),
+              );
             },
           ),
           SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
         ],
-      ),
-    ),
-  );
-}
-
-/// Dialog untuk membuat topic baru.
-void showAddTopicDialog(
-  BuildContext context, {
-  required String classId,
-}) {
-  final titleController = TextEditingController();
-  bool isLoading = false;
-
-  showDialog(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
-        title: const Text('Add Topic'),
-        content: TextField(
-          controller: titleController,
-          decoration: InputDecoration(
-            hintText: 'e.g. Chapter 1: Introduction',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF6F5AAA)),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: isLoading
-                ? null
-                : () async {
-                    final title = titleController.text.trim();
-                    if (title.isEmpty) return;
-
-                    setDialogState(() => isLoading = true);
-
-                    try {
-                      final count =
-                          await TopicService.getTopicCount(classId);
-                      await TopicService.createTopic(
-                        classId: classId,
-                        title: title,
-                        order: count,
-                      );
-
-                      if (dialogContext.mounted) {
-                        Navigator.pop(dialogContext);
-                      }
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Topic created!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      setDialogState(() => isLoading = false);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Failed: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  },
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF6F5AAA),
-            ),
-            child: isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Create'),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-/// Dialog untuk menambah material ke topic.
-void showAddMaterialDialog(
-  BuildContext context, {
-  required String classId,
-}) {
-  final titleController = TextEditingController();
-  final descriptionController = TextEditingController();
-  String? selectedTopicId;
-  String? selectedTopicTitle;
-  bool isLoading = false;
-
-  showDialog(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: SingleChildScrollView(
-          child: Container(
-            width: 400,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Add Material',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1C1B20),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      icon: const Icon(Icons.close, color: Color(0xFF49454F)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Material Title',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF1C1B20),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    hintText: 'Enter material title',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF79747E)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF6F5AAA)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Description',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF1C1B20),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: descriptionController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: 'Enter material description',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF79747E)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF6F5AAA)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Topic',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF1C1B20),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                StreamBuilder<List<TopicModel>>(
-                  stream: TopicService.topicsStream(classId),
-                  builder: (context, snapshot) {
-                    final topics = snapshot.data ?? [];
-
-                    if (topics.isEmpty) {
-                      return Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFF79747E)),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'No topics yet. Create a topic first.',
-                          style: TextStyle(color: Colors.grey, fontSize: 14),
-                        ),
-                      );
-                    }
-
-                    return DropdownButtonFormField<String>(
-                      value: selectedTopicId,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide:
-                              const BorderSide(color: Color(0xFF79747E)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide:
-                              const BorderSide(color: Color(0xFF6F5AAA)),
-                        ),
-                      ),
-                      hint: const Text('Select Topic'),
-                      items: topics
-                          .map((t) => DropdownMenuItem(
-                                value: t.id,
-                                child: Text(
-                                  t.title,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        setDialogState(() {
-                          selectedTopicId = value;
-                          selectedTopicTitle =
-                              topics.firstWhere((t) => t.id == value).title;
-                        });
-                      },
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: isLoading
-                            ? null
-                            : () => Navigator.pop(dialogContext),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: const BorderSide(color: Color(0xFF79747E)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(
-                            color: Color(0xFF49454F),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: isLoading
-                            ? null
-                            : () async {
-                                final title = titleController.text.trim();
-                                if (title.isEmpty || selectedTopicId == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Title and topic are required'),
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                setDialogState(() => isLoading = true);
-
-                                try {
-                                  await MaterialService.createMaterial(
-                                    classId: classId,
-                                    topicId: selectedTopicId!,
-                                    topicTitle: selectedTopicTitle ?? '',
-                                    title: title,
-                                    description:
-                                        descriptionController.text.trim(),
-                                  );
-
-                                  if (dialogContext.mounted) {
-                                    Navigator.pop(dialogContext);
-                                  }
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Material added!'),
-                                        backgroundColor: Colors.green,
-                                      ),
-                                    );
-                                  }
-                                } catch (e) {
-                                  setDialogState(() => isLoading = false);
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Failed: $e'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6F5AAA),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'Add Material',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     ),
   );

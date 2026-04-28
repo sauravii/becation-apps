@@ -65,17 +65,20 @@ class AuthTextField extends StatelessWidget {
                   hintText: hintText,
                   border: const UnderlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(vertical: 16.h),
+                  suffixIcon: onToggleObscure == null
+                      ? null
+                      : IconButton(
+                          icon: Icon(
+                            obscureText
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: onToggleObscure,
+                        ),
                 ),
               ),
             ),
-            if (onToggleObscure != null)
-              IconButton(
-                icon: Icon(
-                  obscureText ? Icons.visibility_off : Icons.visibility,
-                  color: Colors.grey,
-                ),
-                onPressed: onToggleObscure,
-              ),
           ],
         ),
         

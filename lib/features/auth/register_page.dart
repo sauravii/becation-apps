@@ -1,4 +1,5 @@
 import 'package:becation_apps/features/auth/login_page.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -155,13 +156,17 @@ class _RegisterPageState extends State<RegisterPage> {
           );
         }
       }
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseAuthException catch (e, st) {
+      debugPrint('[GoogleSignIn] FirebaseAuthException code=${e.code} msg=${e.message}');
+      debugPrint('$st');
       setState(() {
         generalError = 'Google sign in failed: ${e.message}';
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[GoogleSignIn] error: $e');
+      debugPrint('$st');
       setState(() {
-        generalError = 'An unexpected error occurred during Google sign in.';
+        generalError = 'Google sign in error: $e';
       });
     } finally {
       setState(() => isGoogleLoading = false);

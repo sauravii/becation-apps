@@ -1,5 +1,6 @@
 import 'package:becation_apps/services/user_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:becation_apps/features/auth/register_page.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -175,13 +176,17 @@ class _LoginPageState extends State<LoginPage> {
         await UserService.ensureUserDocument(userCredential.user!);
         await _navigateByRole(userCredential.user!);
       }
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseAuthException catch (e, st) {
+      debugPrint('[GoogleSignIn] FirebaseAuthException code=${e.code} msg=${e.message}');
+      debugPrint('$st');
       setState(() {
         generalError = 'Google sign in failed: ${e.message}';
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[GoogleSignIn] error: $e');
+      debugPrint('$st');
       setState(() {
-        generalError = 'An unexpected error occurred during Google sign in.';
+        generalError = 'Google sign in error: $e';
       });
     } finally {
       if (mounted) {

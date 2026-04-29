@@ -21,6 +21,8 @@ class TeacherDashboard extends StatefulWidget {
 class _TeacherDashboardState extends State<TeacherDashboard> {
   String? _displayName;
   late final Stream<List<ClassModel>> _classesStream;
+  DateTime? _selectedDate;
+  DateTime? _focusedDate;
 
   @override
   void initState() {
@@ -28,6 +30,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
 
     final currentUser = FirebaseAuth.instance.currentUser;
     _displayName = _getTeacherNameFromUser(currentUser);
+    _selectedDate ??= DateTime.now();
+    _focusedDate ??= DateTime.now();
 
     _classesStream = currentUser != null
         ? ClassService.teacherClassesStream(currentUser.uid)
@@ -162,9 +166,15 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   }
 
   Widget _buildCalendar(DateTime today) {
+    final focusedDate = _focusedDate ?? today;
+    final baseDate = DateTime(
+      focusedDate.year,
+      focusedDate.month,
+      focusedDate.day,
+    );
     final days = List<DateTime>.generate(
       5,
-      (index) => today.subtract(Duration(days: 2 - index)),
+      (index) => baseDate.subtract(Duration(days: 2 - index)),
     );
 
     String getDayName(int weekday) {
@@ -209,15 +219,35 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.chevron_left, color: Colors.grey),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    final nextDate = (_focusedDate ?? today).subtract(
+                      const Duration(days: 5),
+                    );
+                    _focusedDate = nextDate;
+                  });
+                },
+                child: const Icon(Icons.chevron_left, color: Colors.grey),
+              ),
               Text(
-                '${getMonthName(today.month)} ${today.year}',
+                '${getMonthName(baseDate.month)} ${baseDate.year}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    final nextDate = (_focusedDate ?? today).add(
+                      const Duration(days: 5),
+                    );
+                    _focusedDate = nextDate;
+                  });
+                },
+                child: const Icon(Icons.chevron_right, color: Colors.grey),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -230,40 +260,47 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                   date.year == today.year;
 
               return Expanded(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: isToday
-                        ? const Color(0xFF6F5AAA)
-                        : const Color(0xFFF8F5FB),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedDate = date;
+                    });
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    height: 72,
+                    decoration: BoxDecoration(
                       color: isToday
                           ? const Color(0xFF6F5AAA)
-                          : Colors.grey.shade200,
+                          : const Color(0xFFF8F5FB),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: isToday
+                            ? const Color(0xFF6F5AAA)
+                            : Colors.grey.shade200,
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        getDayName(date.weekday),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isToday ? Colors.white70 : Colors.grey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          getDayName(date.weekday),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isToday ? Colors.white70 : Colors.grey,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${date.day}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: isToday ? Colors.white : Colors.black87,
+                        const SizedBox(height: 6),
+                        Text(
+                          '${date.day}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: isToday ? Colors.white : Colors.black87,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );

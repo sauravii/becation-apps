@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "673684476864-5jbqsb6vcut05lips0i25qe2se3rjqoi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.becation.app",
+            "certificate_hash": "51682ccfed2a7db377401ccc369379b7adfde58d"
+          }
+        },
+        {
           "client_id": "673684476864-jg4fci7bjcaf2caen4p77mq9f53g9hna.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -21,42 +29,6 @@
             "certificate_hash": "3ba0d4ba0f1565d7cd3740eb1510e5aee59951a1"
           }
         },
-        {
-          "client_id": "673684476864-aknguuuj2scrq1jfvvr9s8acqvif8g4t.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBi83kf-7I_geDwKd_5LtwUqhjy10FRSW4"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "673684476864-aknguuuj2scrq1jfvvr9s8acqvif8g4t.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "673684476864-avk00sa4cmg9uote1ee7eu38cvgq8cb1.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.example.becationApps"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:673684476864:android:bf3acda1de2c410b516e25",
-        "android_client_info": {
-          "package_name": "com.example.becation_apps"
-        }
-      },
-      "oauth_client": [
         {
           "client_id": "673684476864-aknguuuj2scrq1jfvvr9s8acqvif8g4t.apps.googleusercontent.com",
           "client_type": 3

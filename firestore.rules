@@ -73,6 +73,36 @@ service cloud.firestore {
           allow write: if isAuth() && isClassTeacher(classId);
         }
       }
+
+      // QUIZZES
+      match /quizzes/{quizId} {
+        allow read: if isAuth() && isClassMember(classId);
+        allow write: if isAuth() && isClassTeacher(classId);
+
+        // QUESTIONS — option text only, no answer key (safe for student to read)
+        match /questions/{questionId} {
+          allow read: if isAuth() && isClassMember(classId);
+          allow write: if isAuth() && isClassTeacher(classId);
+        }
+
+        // ANSWER KEYS — separated to prevent student from reading correct answers
+        match /answer_keys/{questionId} {
+          allow read: if isAuth() && isClassTeacher(classId);
+          allow write: if isAuth() && isClassTeacher(classId);
+        }
+
+        // ATTEMPTS — only Cloud Functions (admin SDK) can create.
+        // Read: student own attempts, or teacher of the class.
+        // Delete: teacher can clean up (e.g., cascade delete from topic).
+        match /attempts/{attemptId} {
+          allow read: if isAuth() && (
+            isClassTeacher(classId) ||
+            resource.data.studentId == request.auth.uid
+          );
+          allow create, update: if false;
+          allow delete: if isAuth() && isClassTeacher(classId);
+        }
+      }
     }
 
     // CLASS_CODES (lookup for joining)

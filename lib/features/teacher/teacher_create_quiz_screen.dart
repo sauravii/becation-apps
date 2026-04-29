@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../models/question_model.dart';
+import '../../services/quiz_service.dart';
 import 'teacher_create_question_screen.dart';
 import 'teacher_select_topic_screen.dart';
 
@@ -49,6 +51,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
       _topic != null &&
       _timeLimit != null &&
       _passingGrade != null &&
+      _questions.isNotEmpty &&
       !_isPosting;
 
   @override
@@ -68,15 +71,13 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
                   children: [
                     _buildTitleCard(),
                     const SizedBox(height: 12),
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(child: _buildTimeLimitCard()),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildPassingGradeCard()),
-                        ],
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildTimeLimitCard()),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildPassingGradeCard()),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     _buildAttemptLimitCard(),
@@ -97,10 +98,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: _bg,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-      ),
+      decoration: BoxDecoration(color: _bg),
       child: Row(
         children: [
           IconButton(
@@ -131,7 +129,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
         decoration: BoxDecoration(
           color: _canPublish ? _purple : Colors.grey.shade300,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: _isPosting
             ? const SizedBox(
@@ -281,9 +279,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
               ),
               const SizedBox(width: 6),
               GestureDetector(
-                onTap: _isPosting
-                    ? null
-                    : () => setState(() => _topic = null),
+                onTap: _isPosting ? null : () => setState(() => _topic = null),
                 child: const Icon(Icons.close, size: 16),
               ),
             ],
@@ -318,7 +314,12 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     );
   }
 
-  Widget _buildClickableValueRow({required int? value, required int placeholder, required String suffix}) {
+  Widget _buildClickableValueRow({
+    required int? value,
+    required int placeholder,
+    required String suffix,
+    double valueWidth = 40,
+  }) {
     final isSet = value != null;
     final displayValue = value ?? placeholder;
     final valueColor = isSet ? _ink : _hint;
@@ -327,20 +328,26 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Text(
-          '$displayValue',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: valueColor,
-            decoration: TextDecoration.underline,
-            decorationColor: valueColor,
+        SizedBox(
+          width: valueWidth,
+          child: Text(
+            '$displayValue',
+            textAlign: TextAlign.left,
+            style: TextStyle(
+              fontSize: isSet ? 20 : 18,
+              fontWeight: isSet ? FontWeight.w700 : FontWeight.w600,
+              color: valueColor,
+            ),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 8),
         Text(
           suffix,
-          style: TextStyle(fontSize: 13, color: suffixColor),
+          style: TextStyle(
+            fontSize: isSet ? 13 : 12,
+            color: suffixColor,
+            fontWeight: isSet ? FontWeight.w600 : FontWeight.w500,
+          ),
         ),
       ],
     );
@@ -478,15 +485,19 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   Widget _buildShowAnswerToggle() {
     return Row(
       children: [
-        Switch(
-          value: _showAnswer,
-          onChanged: _isPosting
-              ? null
-              : (v) => setState(() => _showAnswer = v),
-          activeThumbColor: Colors.white,
-          activeTrackColor: _purple,
-          inactiveThumbColor: Colors.white,
-          inactiveTrackColor: Colors.grey.shade400,
+        Transform.scale(
+          scaleX: 0.9,
+          scaleY: 0.85,
+          child: Switch(
+            value: _showAnswer,
+            onChanged: _isPosting
+                ? null
+                : (v) => setState(() => _showAnswer = v),
+            activeThumbColor: Colors.white,
+            activeTrackColor: _purple,
+            inactiveThumbColor: Colors.white,
+            inactiveTrackColor: Colors.grey.shade400,
+          ),
         ),
         const SizedBox(width: 8),
         const Text(
@@ -524,10 +535,8 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
             buildDefaultDragHandles: false,
             itemCount: _questions.length,
             onReorder: _onReorderQuestions,
-            proxyDecorator: (child, index, animation) => Material(
-              color: Colors.transparent,
-              child: child,
-            ),
+            proxyDecorator: (child, index, animation) =>
+                Material(color: Colors.transparent, child: child),
             itemBuilder: (context, index) => Padding(
               key: ObjectKey(_questions[index]),
               padding: const EdgeInsets.only(bottom: 12),
@@ -549,11 +558,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
         _buildOrDivider(),
         const SizedBox(height: 16),
         _outlineActionButton(
-          iconWidget: const Icon(
-            Icons.auto_awesome,
-            size: 18,
-            color: _ink,
-          ),
+          iconWidget: const Icon(Icons.auto_awesome, size: 18, color: _ink),
           label: 'Generate with AI',
           onTap: _isPosting ? null : _onGenerateWithAI,
         ),
@@ -669,11 +674,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: const Color(0xFFEAE3F2)),
                   ),
-                  child: const Icon(
-                    Icons.drag_handle,
-                    size: 14,
-                    color: _label,
-                  ),
+                  child: const Icon(Icons.drag_handle, size: 14, color: _label),
                 ),
               ),
             ),
@@ -741,9 +742,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   Widget _buildOrDivider() {
     return Row(
       children: [
-        const Expanded(
-          child: Divider(color: Color(0xFFCAC4CF), thickness: 1),
-        ),
+        const Expanded(child: Divider(color: Color(0xFFCAC4CF), thickness: 1)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
@@ -756,9 +755,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
             ),
           ),
         ),
-        const Expanded(
-          child: Divider(color: Color(0xFFCAC4CF), thickness: 1),
-        ),
+        const Expanded(child: Divider(color: Color(0xFFCAC4CF), thickness: 1)),
       ],
     );
   }
@@ -768,10 +765,8 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   Future<void> _openSelectTopic() async {
     final result = await Navigator.of(context).push<SelectedTopic>(
       MaterialPageRoute(
-        builder: (_) => TeacherSelectTopicScreen(
-          classId: widget.classId,
-          initial: _topic,
-        ),
+        builder: (_) =>
+            TeacherSelectTopicScreen(classId: widget.classId, initial: _topic),
       ),
     );
     if (result != null) {
@@ -795,6 +790,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
       title: 'Choose passing grade',
       label: 'Passing grade',
       hint: '70',
+      maxValue: 100,
     );
     if (result != null) {
       setState(() => _passingGrade = result);
@@ -805,6 +801,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     required String title,
     required String label,
     required String hint,
+    int? maxValue,
   }) {
     final controller = TextEditingController();
     String? errorText;
@@ -847,9 +844,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
                   controller: controller,
                   autofocus: true,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   style: const TextStyle(fontSize: 16, color: _ink),
                   decoration: InputDecoration(
                     isDense: true,
@@ -901,6 +896,10 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
                     setDialogState(() => errorText = 'Must be a number');
                     return;
                   }
+                  if (maxValue != null && parsed > maxValue) {
+                    setDialogState(() => errorText = 'Max value is $maxValue');
+                    return;
+                  }
                   Navigator.pop(dialogContext, parsed);
                 },
                 style: TextButton.styleFrom(foregroundColor: _ink),
@@ -917,13 +916,26 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   }
 
   Future<void> _onCreateQuestion() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final result = await Navigator.of(context).push<PendingQuestion>(
-      MaterialPageRoute(
-        builder: (_) => const TeacherCreateQuestionScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const TeacherCreateQuestionScreen()),
     );
-    if (result != null && mounted) {
-      setState(() => _questions.add(result));
+    if (!mounted) return;
+
+    // Defeat Flutter's focus restoration after pop — without this, the
+    // title TextField regains focus and auto-scrolls itself into view,
+    // racing with our animateTo to the new question.
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    if (result == null) return;
+    setState(() => _questions.add(result));
+
+    // Two frames: first lets the new card lay out (ReorderableListView
+    // shrinkwrap), second computes the correct maxScrollExtent.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Re-assert unfocus in case anything tries to take focus back.
+      FocusManager.instance.primaryFocus?.unfocus();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients) return;
         _scrollController.animateTo(
@@ -932,18 +944,21 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
           curve: Curves.easeOut,
         );
       });
-    }
+    });
   }
 
   Future<void> _onEditQuestion(int index) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final result = await Navigator.of(context).push<PendingQuestion>(
       MaterialPageRoute(
-        builder: (_) => TeacherCreateQuestionScreen(
-          initial: _questions[index],
-        ),
+        builder: (_) => TeacherCreateQuestionScreen(initial: _questions[index]),
       ),
     );
-    if (result != null && mounted) {
+    if (!mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    if (result != null) {
       setState(() => _questions[index] = result);
     }
   }
@@ -957,13 +972,73 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     );
   }
 
-  void _publish() {
+  Future<void> _publish() async {
     if (!_canPublish) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Publish quiz — coming soon'),
-        backgroundColor: _purple,
-      ),
-    );
+
+    final topic = _topic!;
+    final timeLimit = _timeLimit!;
+    final passingGrade = _passingGrade!;
+
+    setState(() => _isPosting = true);
+
+    try {
+      final drafts = _questions
+          .map(
+            (q) => QuizDraftQuestion(
+              type: _questionTypeKey(q.type),
+              question: q.question,
+              options: q.options
+                  .asMap()
+                  .entries
+                  .map(
+                    (e) => QuestionOption(
+                      text: e.value,
+                      isCorrect: e.key == q.correctIndex,
+                    ),
+                  )
+                  .toList(),
+            ),
+          )
+          .toList();
+
+      await QuizService.createQuiz(
+        classId: widget.classId,
+        title: _titleController.text.trim(),
+        topicId: topic.id ?? '',
+        topicTitle: topic.title ?? '',
+        timeLimit: timeLimit,
+        passingGrade: passingGrade,
+        attemptLimit: _attemptLimit,
+        showAnswer: _showAnswer,
+        questions: drafts,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quiz published!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isPosting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to publish: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  String _questionTypeKey(String displayType) {
+    switch (displayType) {
+      case 'Multiple Choice':
+        return 'multiple_choice';
+      default:
+        return displayType.toLowerCase().replaceAll(' ', '_');
+    }
   }
 }

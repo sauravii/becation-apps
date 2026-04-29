@@ -1,0 +1,486 @@
+import 'package:flutter/material.dart';
+
+import '../../models/question_model.dart';
+import '../../models/quiz_model.dart';
+import '../../services/quiz_service.dart';
+
+class TeacherQuizDetail extends StatefulWidget {
+  final String classId;
+  final String quizId;
+  final Color classColor;
+
+  const TeacherQuizDetail({
+    super.key,
+    required this.classId,
+    required this.quizId,
+    required this.classColor,
+  });
+
+  @override
+  State<TeacherQuizDetail> createState() => _TeacherQuizDetailState();
+}
+
+class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
+  static const _bg = Color(0xFFF7F2FA);
+  static const _label = Color(0xFF49454E);
+  static const _ink = Color(0xFF1C1B20);
+
+  late final Stream<QuizModel?> _quizStream;
+  late final Stream<List<QuestionModel>> _questionsStream;
+  Map<String, List<int>> _answerKeys = {};
+  bool _loadingKeys = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _quizStream = QuizService.quizStream(widget.classId, widget.quizId);
+    _questionsStream =
+        QuizService.questionsStream(widget.classId, widget.quizId);
+    _fetchAnswerKeys();
+  }
+
+  Future<void> _fetchAnswerKeys() async {
+    try {
+      final keys = await QuizService.fetchAnswerKeys(
+        widget.classId,
+        widget.quizId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _answerKeys = keys;
+        _loadingKeys = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingKeys = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: StreamBuilder<QuizModel?>(
+                stream: _quizStream,
+                builder: (context, quizSnap) {
+                  if (quizSnap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final quiz = quizSnap.data;
+                  if (quiz == null) {
+                    return const Center(
+                      child: Text(
+                        'Quiz not found or has been deleted.',
+                        style: TextStyle(color: _label),
+                      ),
+                    );
+                  }
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildBanner(quiz),
+                        const SizedBox(height: 16),
+                        _buildMetadataRow(quiz),
+                        const SizedBox(height: 24),
+                        _buildQuestionsHeader(quiz),
+                        const SizedBox(height: 12),
+                        _buildQuestionsList(),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: _bg,
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back, color: _ink),
+          ),
+          const Expanded(
+            child: Text(
+              'Quiz',
+              style: TextStyle(
+                color: _ink,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBanner(QuizModel quiz) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE7DFF8),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (quiz.topicTitle.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: widget.classColor,
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Text(
+                quiz.topicTitle,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          if (quiz.topicTitle.isNotEmpty) const SizedBox(height: 12),
+          Text(
+            quiz.title,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: _ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetadataRow(QuizModel quiz) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            label: 'TIME LIMIT',
+            value: '${quiz.timeLimit}',
+            suffix: 'mins',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildStatCard(
+            label: 'PASSING GRADE',
+            value: '${quiz.passingGrade}',
+            suffix: '%',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildStatCard(
+            label: 'ATTEMPTS',
+            value: '${quiz.attemptLimit}',
+            suffix: 'max',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard({
+    required String label,
+    required String value,
+    required String suffix,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFEAE3F2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: _label,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  suffix,
+                  style: const TextStyle(fontSize: 11, color: _label),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuestionsHeader(QuizModel quiz) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          '${quiz.questionCount} Question',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: _ink,
+          ),
+        ),
+        _ShowAnswerToggle(
+          classId: widget.classId,
+          quizId: widget.quizId,
+          showAnswer: quiz.showAnswer,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuestionsList() {
+    return StreamBuilder<List<QuestionModel>>(
+      stream: _questionsStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting || _loadingKeys) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final questions = snap.data ?? [];
+        if (questions.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(20),
+            child: Center(
+              child: Text(
+                'This quiz has no questions.',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ),
+          );
+        }
+        return Column(
+          children: [
+            for (var i = 0; i < questions.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildQuestionCard(
+                  i,
+                  questions[i].withAnswers(
+                    _answerKeys[questions[i].id] ?? const [],
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildQuestionCard(int index, QuestionModel q) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFEAE3F2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${(index + 1).toString().padLeft(2, '0')}   ${_typeLabel(q.type)}',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: _label,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            q.question,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: _ink,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...q.options.asMap().entries.map((e) {
+            final isCorrect = e.value.isCorrect;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(
+                      isCorrect
+                          ? Icons.check_circle
+                          : Icons.radio_button_off,
+                      size: 18,
+                      color: isCorrect ? Colors.green : Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      e.value.text,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _ink,
+                        fontWeight:
+                            isCorrect ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  String _typeLabel(String type) {
+    switch (type) {
+      case 'multiple_choice':
+        return 'MULTIPLE CHOICE';
+      default:
+        return type.toUpperCase().replaceAll('_', ' ');
+    }
+  }
+}
+
+class _ShowAnswerToggle extends StatefulWidget {
+  final String classId;
+  final String quizId;
+  final bool showAnswer;
+
+  const _ShowAnswerToggle({
+    required this.classId,
+    required this.quizId,
+    required this.showAnswer,
+  });
+
+  @override
+  State<_ShowAnswerToggle> createState() => _ShowAnswerToggleState();
+}
+
+class _ShowAnswerToggleState extends State<_ShowAnswerToggle> {
+  bool _saving = false;
+
+  Future<void> _toggle(bool value) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await QuizService.updateQuizMeta(
+        widget.classId,
+        widget.quizId,
+        showAnswer: value,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const labelColor = Color(0xFF49454E);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          widget.showAnswer
+              ? Icons.visibility_outlined
+              : Icons.visibility_off_outlined,
+          size: 16,
+          color: labelColor,
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          'Show answer',
+          style: TextStyle(fontSize: 12, color: labelColor),
+        ),
+        const SizedBox(width: 6),
+        if (_saving)
+          const SizedBox(
+            width: 36,
+            height: 20,
+            child: Center(
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else
+          Transform.scale(
+            scale: 0.75,
+            child: Switch(
+              value: widget.showAnswer,
+              onChanged: _toggle,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              activeThumbColor: Colors.white,
+              activeTrackColor: const Color(0xFF6F5AAA),
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: Colors.grey.shade400,
+            ),
+          ),
+      ],
+    );
+  }
+}

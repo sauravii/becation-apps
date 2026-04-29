@@ -13,6 +13,7 @@
 migrate_working_dir/
 .claude
 UI Design/
+ErrorImage/
 
 # IntelliJ related
 *.iml

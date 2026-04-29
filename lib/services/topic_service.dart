@@ -46,31 +46,74 @@ class TopicService {
     return snapshot.docs.length;
   }
 
-  /// Hapus topic beserta semua material yang ada di dalamnya.
-  static Future<void> deleteTopicWithMaterials(
+  /// Hapus topic beserta semua material & quiz (termasuk subcollections-nya:
+  /// questions, answer_keys, attempts) yang ada di dalamnya.
+  ///
+  /// Catatan skala: Firestore batch limit 500 ops. Kalau topic punya banyak
+  /// quiz dengan banyak attempts, pecah jadi multi-batch (TODO kalau perlu).
+  static Future<void> deleteTopicWithContent(
       String classId, String topicId) async {
-    final materialsSnapshot = await _firestore
-        .collection('classes')
-        .doc(classId)
+    final classRef = _firestore.collection('classes').doc(classId);
+
+    // 1. Find all materials and quizzes with this topicId.
+    final materialsSnap = await classRef
         .collection('materials')
+        .where('topicId', isEqualTo: topicId)
+        .get();
+    final quizzesSnap = await classRef
+        .collection('quizzes')
         .where('topicId', isEqualTo: topicId)
         .get();
 
     final batch = _firestore.batch();
 
-    // Hapus semua material yang terhubung ke topic ini.
-    for (final doc in materialsSnapshot.docs) {
+    // 2. Materials (note: their attachment subcollections become orphan —
+    // pre-existing behavior, separate issue).
+    for (final doc in materialsSnap.docs) {
       batch.delete(doc.reference);
     }
 
-    // Hapus topic itu sendiri.
+    // 3. Quizzes — read each quiz's subcollections and queue all for deletion.
+    var totalQuestions = 0;
+    var totalKeys = 0;
+    var totalAttempts = 0;
+    for (final quizDoc in quizzesSnap.docs) {
+      final quizRef = quizDoc.reference;
+      final qs = await quizRef.collection('questions').get();
+      final ks = await quizRef.collection('answer_keys').get();
+      final ats = await quizRef.collection('attempts').get();
+      for (final d in qs.docs) {
+        batch.delete(d.reference);
+      }
+      for (final d in ks.docs) {
+        batch.delete(d.reference);
+      }
+      for (final d in ats.docs) {
+        batch.delete(d.reference);
+      }
+      batch.delete(quizRef);
+      totalQuestions += qs.size;
+      totalKeys += ks.size;
+      totalAttempts += ats.size;
+    }
+
+    // 4. Topic itself.
     batch.delete(_topicsRef(classId).doc(topicId));
 
     await batch.commit();
     debugPrint(
-      '[TopicService] Topic deleted: $topicId (${materialsSnapshot.docs.length} materials removed)',
+      '[TopicService] Topic deleted: $topicId — '
+      '${materialsSnap.size} materials, '
+      '${quizzesSnap.size} quizzes '
+      '(questions: $totalQuestions, keys: $totalKeys, attempts: $totalAttempts)',
     );
   }
+
+  /// Backward-compat alias. Prefer [deleteTopicWithContent].
+  @Deprecated('Use deleteTopicWithContent — also deletes quizzes')
+  static Future<void> deleteTopicWithMaterials(
+      String classId, String topicId) =>
+      deleteTopicWithContent(classId, topicId);
 
   /// Hapus topic saja (tanpa material).
   static Future<void> deleteTopic(String classId, String topicId) async {

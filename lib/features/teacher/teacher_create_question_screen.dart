@@ -167,7 +167,6 @@ class _TeacherCreateQuestionScreenState
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: _bg,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
       ),
       child: Row(
         children: [
@@ -194,7 +193,7 @@ class _TeacherCreateQuestionScreenState
               ),
               decoration: BoxDecoration(
                 color: _canSave ? _purple : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 'Save',

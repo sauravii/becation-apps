@@ -1,54 +1,50 @@
 import 'package:flutter/material.dart';
 
-class MaterialItem {
-  final String id;
+class QuizCard extends StatelessWidget {
   final String title;
-  final String timestamp;
-  final IconData icon;
+  final int questionCount;
+  final int timeLimit;
+  final int passingGrade;
+  final String topicTitle;
   final VoidCallback? onTap;
 
-  MaterialItem({
-    required this.id,
-    required this.title,
-    required this.timestamp,
-    this.icon = Icons.description_outlined,
-    this.onTap,
-  });
-}
-
-class MaterialCard extends StatelessWidget {
-  final MaterialItem material;
-  final String topicTitle;
-  final Color topicColor;
-
-  const MaterialCard({
+  const QuizCard({
     super.key,
-    required this.material,
-    required this.topicTitle,
-    required this.topicColor,
+    required this.title,
+    required this.questionCount,
+    required this.timeLimit,
+    required this.passingGrade,
+    this.topicTitle = '',
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final subtitle = [
+      '$questionCount question${questionCount == 1 ? '' : 's'}',
+      '$timeLimit min${timeLimit == 1 ? '' : 's'}',
+      '$passingGrade% to pass',
+    ].join(' · ');
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: material.onTap,
+        onTap: onTap,
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 10),
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            color: const Color(0xFFE7DFF8),
+            color: const Color(0xFFFFE9D6),
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(12),
               topRight: Radius.circular(12),
             ),
-            border: Border(
-              bottom: BorderSide(color: const Color(0xFF63568F), width: 1),
+            border: const Border(
+              bottom: BorderSide(color: Color(0xFFFF7B54), width: 1),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -60,10 +56,10 @@ class MaterialCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF615B71),
+                  color: const Color(0xFFFF7B54),
                   borderRadius: BorderRadius.circular(25),
                 ),
-                child: Icon(material.icon, color: Colors.white, size: 20),
+                child: const Icon(Icons.quiz, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 15),
               Expanded(
@@ -71,7 +67,7 @@ class MaterialCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      material.title,
+                      title,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -82,9 +78,20 @@ class MaterialCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      material.timestamp,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      subtitle,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
+                    if (topicTitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        topicTitle,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6F5AAA),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

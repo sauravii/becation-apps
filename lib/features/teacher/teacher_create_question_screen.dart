@@ -52,10 +52,7 @@ class _TeacherCreateQuestionScreenState
           .toList();
       _correctIndex = initial.correctIndex;
     } else {
-      _optionControllers = [
-        TextEditingController(),
-        TextEditingController(),
-      ];
+      _optionControllers = [TextEditingController(), TextEditingController()];
     }
 
     _questionController.addListener(() => setState(() {}));
@@ -146,11 +143,11 @@ class _TeacherCreateQuestionScreenState
                     ),
                     const SizedBox(height: 12),
                     ..._optionControllers.asMap().entries.map(
-                          (entry) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildOptionCard(entry.key),
-                          ),
-                        ),
+                      (entry) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildOptionCard(entry.key),
+                      ),
+                    ),
                     _buildAddOptionButton(),
                   ],
                 ),
@@ -165,9 +162,7 @@ class _TeacherCreateQuestionScreenState
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: _bg,
-      ),
+      decoration: BoxDecoration(color: _bg),
       child: Row(
         children: [
           IconButton(
@@ -187,10 +182,7 @@ class _TeacherCreateQuestionScreenState
           GestureDetector(
             onTap: _canSave ? _save : null,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 22,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
               decoration: BoxDecoration(
                 color: _canSave ? _purple : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(10),
@@ -262,9 +254,7 @@ class _TeacherCreateQuestionScreenState
               icon: const Icon(Icons.keyboard_arrow_down, color: _label),
               style: const TextStyle(fontSize: 15, color: _ink),
               items: _types
-                  .map(
-                    (t) => DropdownMenuItem(value: t, child: Text(t)),
-                  )
+                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                   .toList(),
               onChanged: (v) {
                 if (v != null) setState(() => _type = v);
@@ -321,9 +311,7 @@ class _TeacherCreateQuestionScreenState
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isCorrect
-              ? Colors.green.shade400
-              : const Color(0xFFEAE3F2),
+          color: isCorrect ? Colors.green.shade400 : const Color(0xFFEAE3F2),
           width: isCorrect ? 1.5 : 1,
         ),
       ),
@@ -334,10 +322,7 @@ class _TeacherCreateQuestionScreenState
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: isCorrect
                       ? Colors.green.shade100
@@ -392,10 +377,7 @@ class _TeacherCreateQuestionScreenState
                 tooltip: canDelete ? 'Delete option' : 'Minimum 2 options',
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 32,
-                  minHeight: 32,
-                ),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),

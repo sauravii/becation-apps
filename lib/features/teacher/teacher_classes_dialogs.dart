@@ -188,12 +188,14 @@ void showEditTopicDialog(
 }
 
 /// Dialog hapus topic dengan countdown 5 detik.
-/// Menghapus topic beserta semua material di dalamnya.
+/// Menghapus topic beserta semua material & quiz (termasuk pertanyaan,
+/// answer keys, dan attempts).
 void showDeleteTopicDialog(
   BuildContext context, {
   required String classId,
   required TopicModel topic,
   required int materialCount,
+  int quizCount = 0,
 }) {
   int countdown = 5;
   Timer? timer;
@@ -212,9 +214,13 @@ void showDeleteTopicDialog(
           }
         });
 
-        final materialText = materialCount > 0
-            ? '$materialCount material(s) inside will also be permanently deleted.'
-            : 'This topic has no materials.';
+        final hasContent = materialCount > 0 || quizCount > 0;
+        final parts = <String>[];
+        if (materialCount > 0) parts.add('$materialCount material(s)');
+        if (quizCount > 0) parts.add('$quizCount quiz(zes)');
+        final contentText = hasContent
+            ? '${parts.join(' and ')} inside will also be permanently deleted.'
+            : 'This topic has no materials or quizzes.';
 
         return AlertDialog(
           title: const Row(
@@ -247,12 +253,12 @@ void showDeleteTopicDialog(
               ),
               const SizedBox(height: 12),
               Text(
-                materialText,
+                contentText,
                 style: TextStyle(
                   fontSize: 14,
-                  color: materialCount > 0 ? Colors.red : Colors.grey,
+                  color: hasContent ? Colors.red : Colors.grey,
                   fontWeight:
-                      materialCount > 0 ? FontWeight.w600 : FontWeight.normal,
+                      hasContent ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ],
@@ -274,7 +280,7 @@ void showDeleteTopicDialog(
                       setDialogState(() => isDeleting = true);
 
                       try {
-                        await TopicService.deleteTopicWithMaterials(
+                        await TopicService.deleteTopicWithContent(
                           classId,
                           topic.id,
                         );

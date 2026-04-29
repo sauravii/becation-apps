@@ -5,13 +5,17 @@ import '../../models/class_model.dart';
 import '../../models/topic_model.dart';
 import '../../models/material_model.dart';
 import '../../models/member_model.dart';
+import '../../models/quiz_model.dart';
 import '../../services/class_service.dart';
 import '../../services/topic_service.dart';
 import '../../services/material_service.dart';
+import '../../services/quiz_service.dart';
 import '../../components/cards/material_card.dart';
+import '../../components/cards/quiz_card.dart';
 import '../../components/cards/topic_section.dart';
 import '../../components/navigation/nav_item.dart';
 import 'student_material_detail.dart';
+import 'student_quiz_attempt_screen.dart';
 
 class StudentClassesDetail extends StatefulWidget {
   final String classId;
@@ -33,11 +37,13 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
   int _selectedIndex = 0;
 
   late final Stream<List<TopicModel>> _topicsStream;
+  late final Stream<List<QuizModel>> _quizzesStream;
 
   @override
   void initState() {
     super.initState();
     _topicsStream = TopicService.topicsStream(widget.classId);
+    _quizzesStream = QuizService.quizzesStream(widget.classId);
   }
 
   @override
@@ -326,21 +332,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
               const Divider(
                   color: Color(0xFF49454E), thickness: 1, height: 20),
               const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 10),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE7DFF8),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Text(
-                    'No quizzes yet',
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
-                  ),
-                ),
-              ),
+              _buildAllQuizzesList(),
               const SizedBox(height: 24),
 
               // Materials Section
@@ -367,6 +359,93 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
           color: Color(0xFF1C1B20),
         ),
       ),
+    );
+  }
+
+  Widget _buildAllQuizzesList() {
+    return StreamBuilder<List<QuizModel>>(
+      stream: _quizzesStream,
+      builder: (context, snapshot) {
+        final quizzes = snapshot.data ?? [];
+
+        if (quizzes.isEmpty) {
+          return Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7DFF8),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: Text(
+                'No quizzes yet',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: quizzes
+              .map((q) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: QuizCard(
+                      title: q.title,
+                      questionCount: q.questionCount,
+                      timeLimit: q.timeLimit,
+                      passingGrade: q.passingGrade,
+                      topicTitle: q.topicTitle,
+                      onTap: () async {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => const Center(child: CircularProgressIndicator()),
+                        );
+
+                        try {
+                          final attempts = await QuizService.getStudentAttemptsCount(widget.classId, q.id);
+                          if (!context.mounted) return;
+                          Navigator.pop(context); // close loading modal
+
+                          if (attempts >= q.attemptLimit) {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Access Denied'),
+                                content: Text('You have reached the maximum attempt limit (${q.attemptLimit}) for this quiz.'),
+                                actions: [
+                                  FilledButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => StudentQuizAttemptScreen(
+                                classId: widget.classId,
+                                quiz: q,
+                              ),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error checking attempts: $e')),
+                          );
+                        }
+                      },
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 

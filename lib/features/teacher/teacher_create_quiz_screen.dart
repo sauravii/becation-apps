@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../models/question_model.dart';
+import '../../services/quiz_service.dart';
 import 'teacher_create_question_screen.dart';
 import 'teacher_select_topic_screen.dart';
 
@@ -49,6 +51,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
       _topic != null &&
       _timeLimit != null &&
       _passingGrade != null &&
+      _questions.isNotEmpty &&
       !_isPosting;
 
   @override
@@ -917,13 +920,28 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   }
 
   Future<void> _onCreateQuestion() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final result = await Navigator.of(context).push<PendingQuestion>(
       MaterialPageRoute(
         builder: (_) => const TeacherCreateQuestionScreen(),
       ),
     );
-    if (result != null && mounted) {
-      setState(() => _questions.add(result));
+    if (!mounted) return;
+
+    // Defeat Flutter's focus restoration after pop — without this, the
+    // title TextField regains focus and auto-scrolls itself into view,
+    // racing with our animateTo to the new question.
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    if (result == null) return;
+    setState(() => _questions.add(result));
+
+    // Two frames: first lets the new card lay out (ReorderableListView
+    // shrinkwrap), second computes the correct maxScrollExtent.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Re-assert unfocus in case anything tries to take focus back.
+      FocusManager.instance.primaryFocus?.unfocus();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients) return;
         _scrollController.animateTo(
@@ -932,10 +950,12 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
           curve: Curves.easeOut,
         );
       });
-    }
+    });
   }
 
   Future<void> _onEditQuestion(int index) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final result = await Navigator.of(context).push<PendingQuestion>(
       MaterialPageRoute(
         builder: (_) => TeacherCreateQuestionScreen(
@@ -943,7 +963,10 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
         ),
       ),
     );
-    if (result != null && mounted) {
+    if (!mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    if (result != null) {
       setState(() => _questions[index] = result);
     }
   }
@@ -957,13 +980,73 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     );
   }
 
-  void _publish() {
+  Future<void> _publish() async {
     if (!_canPublish) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Publish quiz — coming soon'),
-        backgroundColor: _purple,
-      ),
-    );
+
+    final topic = _topic!;
+    final timeLimit = _timeLimit!;
+    final passingGrade = _passingGrade!;
+
+    setState(() => _isPosting = true);
+
+    try {
+      final drafts = _questions
+          .map(
+            (q) => QuizDraftQuestion(
+              type: _questionTypeKey(q.type),
+              question: q.question,
+              options: q.options
+                  .asMap()
+                  .entries
+                  .map(
+                    (e) => QuestionOption(
+                      text: e.value,
+                      isCorrect: e.key == q.correctIndex,
+                    ),
+                  )
+                  .toList(),
+            ),
+          )
+          .toList();
+
+      await QuizService.createQuiz(
+        classId: widget.classId,
+        title: _titleController.text.trim(),
+        topicId: topic.id ?? '',
+        topicTitle: topic.title ?? '',
+        timeLimit: timeLimit,
+        passingGrade: passingGrade,
+        attemptLimit: _attemptLimit,
+        showAnswer: _showAnswer,
+        questions: drafts,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quiz published!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isPosting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to publish: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  String _questionTypeKey(String displayType) {
+    switch (displayType) {
+      case 'Multiple Choice':
+        return 'multiple_choice';
+      default:
+        return displayType.toLowerCase().replaceAll(' ', '_');
+    }
   }
 }

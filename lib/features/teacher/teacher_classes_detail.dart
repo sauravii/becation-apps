@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'teacher_material_detail.dart';
+import 'teacher_quiz_detail.dart';
 import 'teacher_classes_dialogs.dart';
 import '../../models/class_model.dart';
 import '../../models/member_model.dart';
 import '../../models/topic_model.dart';
 import '../../models/material_model.dart';
+import '../../models/quiz_model.dart';
 import '../../services/user_service.dart';
 import '../../services/class_service.dart';
 import '../../services/topic_service.dart';
 import '../../services/material_service.dart';
+import '../../services/quiz_service.dart';
 import '../../components/cards/topic_section.dart';
 import '../../components/cards/material_card.dart';
+import '../../components/cards/quiz_card.dart';
 import '../../components/navigation/nav_item.dart';
 
 class TeacherClassesDetail extends StatefulWidget {
@@ -42,12 +46,14 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
   final Set<String> _selectedStudentUids = {};
 
   late final Stream<List<TopicModel>> _topicsStream;
+  late final Stream<List<QuizModel>> _quizzesStream;
 
   @override
   void initState() {
     super.initState();
     _fetchUserRole();
     _topicsStream = TopicService.topicsStream(widget.classId);
+    _quizzesStream = QuizService.quizzesStream(widget.classId);
   }
 
   Future<void> _fetchUserRole() async {
@@ -65,6 +71,8 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
 
   @override
   Widget build(BuildContext context) {
+    final showFab =
+        _userRole == 'teacher' && !_isLoading && _selectedIndex != 2;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F2FA),
       body: SafeArea(
@@ -72,30 +80,22 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
           children: [
             _buildHeader(),
             Expanded(child: _buildContent()),
-            if (_userRole == 'teacher' && !_isLoading && _selectedIndex != 2)
-              Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 20),
-                      child: FloatingActionButton(
-                        onPressed: () {
-                          showAddOptionsSheet(context,
-                              classId: widget.classId);
-                        },
-                        backgroundColor: const Color(0xFF6F5AAA),
-                        child: const Icon(Icons.add, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             _buildBottomNav(),
           ],
         ),
       ),
+      floatingActionButton: showFab
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 70),
+              child: FloatingActionButton(
+                onPressed: () {
+                  showAddOptionsSheet(context, classId: widget.classId);
+                },
+                backgroundColor: const Color(0xFF6F5AAA),
+                child: const Icon(Icons.add, color: Colors.white),
+              ),
+            )
+          : null,
     );
   }
 
@@ -146,7 +146,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
         final classData = snapshot.data;
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -161,20 +161,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
               ),
               const SizedBox(height: 16),
               if (_activeContentTab == 0)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE7DFF8),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'No quizzes yet',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                    ),
-                  ),
-                )
+                _buildAllQuizzesList()
               else
                 _buildAllMaterialsList(),
             ],
@@ -324,6 +311,59 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
     );
   }
 
+  Widget _buildAllQuizzesList() {
+    return StreamBuilder<List<QuizModel>>(
+      stream: _quizzesStream,
+      builder: (context, snapshot) {
+        final quizzes = snapshot.data ?? [];
+
+        if (quizzes.isEmpty) {
+          return Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7DFF8),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: Text(
+                'No quizzes yet',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: quizzes
+              .map((q) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: QuizCard(
+                      title: q.title,
+                      questionCount: q.questionCount,
+                      timeLimit: q.timeLimit,
+                      passingGrade: q.passingGrade,
+                      topicTitle: q.topicTitle,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => TeacherQuizDetail(
+                              classId: widget.classId,
+                              quizId: q.id,
+                              classColor: widget.classColor,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+
   Widget _buildAllMaterialsList() {
     return StreamBuilder<List<MaterialModel>>(
       stream: MaterialService.materialsStream(widget.classId),
@@ -418,7 +458,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
         }
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: topics.map<Widget>((topic) {
@@ -430,39 +470,70 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
                 builder: (context, materialSnapshot) {
                   final materials = materialSnapshot.data ?? [];
 
-                  final topicItem = TopicItem(
-                    id: topic.id,
-                    title: topic.title,
-                    onEdit: () => showEditTopicDialog(context,
-                        classId: widget.classId, topic: topic),
-                    onDelete: () => showDeleteTopicDialog(context,
-                        classId: widget.classId,
-                        topic: topic,
-                        materialCount: materials.length),
-                    materials: materials
-                        .map((m) => MaterialItem(
-                              id: m.id,
-                              title: m.title,
-                              timestamp: m.formattedTime,
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => TeacherMaterialDetail(
-                                      classId: widget.classId,
-                                      materialId: m.id,
-                                      materialTitle: m.title,
-                                      materialTimestamp: m.formattedTime,
-                                      topicTitle: topic.title,
-                                      topicColor: widget.classColor,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ))
-                        .toList(),
-                  );
+                  return StreamBuilder<List<QuizModel>>(
+                    stream: QuizService.quizzesStream(
+                      widget.classId,
+                      topicId: topic.id,
+                    ),
+                    builder: (context, quizSnapshot) {
+                      final quizzes = quizSnapshot.data ?? [];
 
-                  return TopicSection(topic: topicItem);
+                      final topicItem = TopicItem(
+                        id: topic.id,
+                        title: topic.title,
+                        onEdit: () => showEditTopicDialog(context,
+                            classId: widget.classId, topic: topic),
+                        onDelete: () => showDeleteTopicDialog(context,
+                            classId: widget.classId,
+                            topic: topic,
+                            materialCount: materials.length,
+                            quizCount: quizzes.length),
+                        materials: materials
+                            .map((m) => MaterialItem(
+                                  id: m.id,
+                                  title: m.title,
+                                  timestamp: m.formattedTime,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => TeacherMaterialDetail(
+                                          classId: widget.classId,
+                                          materialId: m.id,
+                                          materialTitle: m.title,
+                                          materialTimestamp: m.formattedTime,
+                                          topicTitle: topic.title,
+                                          topicColor: widget.classColor,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ))
+                            .toList(),
+                        quizzes: quizzes
+                            .map((q) => QuizItem(
+                                  id: q.id,
+                                  title: q.title,
+                                  questionCount: q.questionCount,
+                                  timeLimit: q.timeLimit,
+                                  passingGrade: q.passingGrade,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => TeacherQuizDetail(
+                                          classId: widget.classId,
+                                          quizId: q.id,
+                                          classColor: widget.classColor,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ))
+                            .toList(),
+                      );
+
+                      return TopicSection(topic: topicItem);
+                    },
+                  );
                 },
               );
             }).toList(),

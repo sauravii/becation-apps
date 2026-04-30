@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
 import '../../services/quiz_service.dart';
+import 'teacher_classes_dialogs.dart';
+
+enum _QuizMenuAction { edit, delete }
 
 class TeacherQuizDetail extends StatefulWidget {
   final String classId;
@@ -61,50 +64,56 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: StreamBuilder<QuizModel?>(
-                stream: _quizStream,
-                builder: (context, quizSnap) {
-                  if (quizSnap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final quiz = quizSnap.data;
-                  if (quiz == null) {
-                    return const Center(
-                      child: Text(
-                        'Quiz not found or has been deleted.',
-                        style: TextStyle(color: _label),
-                      ),
-                    );
-                  }
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildBanner(quiz),
-                        const SizedBox(height: 16),
-                        _buildMetadataRow(quiz),
-                        const SizedBox(height: 24),
-                        _buildQuestionsHeader(quiz),
-                        const SizedBox(height: 12),
-                        _buildQuestionsList(),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+        child: StreamBuilder<QuizModel?>(
+          stream: _quizStream,
+          builder: (context, quizSnap) {
+            final quiz = quizSnap.data;
+            return Column(
+              children: [
+                _buildHeader(quiz),
+                Expanded(
+                  child: Builder(
+                    builder: (context) {
+                      if (quizSnap.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Center(
+                            child: CircularProgressIndicator());
+                      }
+                      if (quiz == null) {
+                        return const Center(
+                          child: Text(
+                            'Quiz not found or has been deleted.',
+                            style: TextStyle(color: _label),
+                          ),
+                        );
+                      }
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildBanner(quiz),
+                            const SizedBox(height: 16),
+                            _buildMetadataRow(quiz),
+                            const SizedBox(height: 24),
+                            _buildQuestionsHeader(quiz),
+                            const SizedBox(height: 12),
+                            _buildQuestionsList(),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(QuizModel? quiz) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -127,8 +136,81 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
               ),
             ),
           ),
+          if (quiz != null) _buildOverflowMenu(quiz),
         ],
       ),
+    );
+  }
+
+  Widget _buildOverflowMenu(QuizModel quiz) {
+    return PopupMenuButton<_QuizMenuAction>(
+      icon: const Icon(Icons.more_vert, color: _ink),
+      onSelected: (action) => _onMenuSelected(action, quiz),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: _QuizMenuAction.edit,
+          child: Row(
+            children: const [
+              Icon(Icons.edit_outlined, size: 20, color: _ink),
+              SizedBox(width: 12),
+              Text('Edit'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: _QuizMenuAction.delete,
+          child: Row(
+            children: const [
+              Icon(Icons.delete_outline, size: 20, color: Colors.red),
+              SizedBox(width: 12),
+              Text('Delete', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _onMenuSelected(
+    _QuizMenuAction action,
+    QuizModel quiz,
+  ) async {
+    switch (action) {
+      case _QuizMenuAction.edit:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Edit Quiz — coming soon'),
+            backgroundColor: Color(0xFF6F5AAA),
+          ),
+        );
+        break;
+      case _QuizMenuAction.delete:
+        await _onDeletePressed(quiz);
+        break;
+    }
+  }
+
+  Future<void> _onDeletePressed(QuizModel quiz) async {
+    int attemptCount = 0;
+    try {
+      attemptCount = await QuizService.getTotalAttemptsCount(
+        widget.classId,
+        widget.quizId,
+      );
+    } catch (_) {
+      // Non-fatal — fall through with 0; the dialog still works.
+    }
+    if (!mounted) return;
+
+    showDeleteQuizDialog(
+      context,
+      classId: widget.classId,
+      quizId: widget.quizId,
+      quizTitle: quiz.title,
+      attemptCount: attemptCount,
+      onDeleted: () {
+        if (mounted) Navigator.of(context).pop();
+      },
     );
   }
 

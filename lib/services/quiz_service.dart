@@ -194,4 +194,47 @@ class QuizService {
 
     return snap.count ?? 0;
   }
+
+  /// Total attempt count across all students for a quiz. Teacher-only.
+  static Future<int> getTotalAttemptsCount(
+    String classId,
+    String quizId,
+  ) async {
+    final snap = await _quizzesRef(classId)
+        .doc(quizId)
+        .collection('attempts')
+        .count()
+        .get();
+    return snap.count ?? 0;
+  }
+
+  /// Delete a quiz and all its subcollections (questions, answer_keys, attempts).
+  /// Teacher-only per Firestore rules.
+  static Future<void> deleteQuiz(String classId, String quizId) async {
+    final quizRef = _quizzesRef(classId).doc(quizId);
+
+    final questionsSnap = await quizRef.collection('questions').get();
+    final keysSnap = await quizRef.collection('answer_keys').get();
+    final attemptsSnap = await quizRef.collection('attempts').get();
+
+    final batch = _firestore.batch();
+    for (final d in questionsSnap.docs) {
+      batch.delete(d.reference);
+    }
+    for (final d in keysSnap.docs) {
+      batch.delete(d.reference);
+    }
+    for (final d in attemptsSnap.docs) {
+      batch.delete(d.reference);
+    }
+    batch.delete(quizRef);
+
+    await batch.commit();
+    debugPrint(
+      '[QuizService] Quiz deleted: $quizId — '
+      'questions: ${questionsSnap.size}, '
+      'keys: ${keysSnap.size}, '
+      'attempts: ${attemptsSnap.size}',
+    );
+  }
 }

@@ -15,7 +15,7 @@ import '../../components/cards/quiz_card.dart';
 import '../../components/cards/topic_section.dart';
 import '../../components/navigation/nav_item.dart';
 import 'student_material_detail.dart';
-import 'student_quiz_attempt_screen.dart';
+import 'student_quiz_intro_screen.dart';
 
 class StudentClassesDetail extends StatefulWidget {
   final String classId;
@@ -427,9 +427,10 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
 
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => StudentQuizAttemptScreen(
+                              builder: (_) => StudentQuizIntroScreen(
                                 classId: widget.classId,
                                 quiz: q,
+                                attemptCount: attempts,
                               ),
                             ),
                           );

@@ -389,10 +389,22 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
             color: _ink,
           ),
         ),
-        _ShowAnswerToggle(
-          classId: widget.classId,
-          quizId: widget.quizId,
-          showAnswer: quiz.showAnswer,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              quiz.showAnswer
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              size: 16,
+              color: _label,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Show answer: ${quiz.showAnswer ? 'ON' : 'OFF'}',
+              style: const TextStyle(fontSize: 12, color: _label),
+            ),
+          ],
         ),
       ],
     );
@@ -514,95 +526,5 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
       default:
         return type.toUpperCase().replaceAll('_', ' ');
     }
-  }
-}
-
-class _ShowAnswerToggle extends StatefulWidget {
-  final String classId;
-  final String quizId;
-  final bool showAnswer;
-
-  const _ShowAnswerToggle({
-    required this.classId,
-    required this.quizId,
-    required this.showAnswer,
-  });
-
-  @override
-  State<_ShowAnswerToggle> createState() => _ShowAnswerToggleState();
-}
-
-class _ShowAnswerToggleState extends State<_ShowAnswerToggle> {
-  bool _saving = false;
-
-  Future<void> _toggle(bool value) async {
-    if (_saving) return;
-    setState(() => _saving = true);
-    try {
-      await QuizService.updateQuizMeta(
-        widget.classId,
-        widget.quizId,
-        showAnswer: value,
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const labelColor = Color(0xFF49454E);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          widget.showAnswer
-              ? Icons.visibility_outlined
-              : Icons.visibility_off_outlined,
-          size: 16,
-          color: labelColor,
-        ),
-        const SizedBox(width: 6),
-        const Text(
-          'Show answer',
-          style: TextStyle(fontSize: 12, color: labelColor),
-        ),
-        const SizedBox(width: 6),
-        if (_saving)
-          const SizedBox(
-            width: 36,
-            height: 20,
-            child: Center(
-              child: SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          )
-        else
-          Transform.scale(
-            scale: 0.75,
-            child: Switch(
-              value: widget.showAnswer,
-              onChanged: _toggle,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              activeThumbColor: Colors.white,
-              activeTrackColor: const Color(0xFF6F5AAA),
-              inactiveThumbColor: Colors.white,
-              inactiveTrackColor: Colors.grey.shade400,
-            ),
-          ),
-      ],
-    );
   }
 }

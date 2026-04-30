@@ -7,14 +7,17 @@ import '../../services/quiz_service.dart';
 import 'teacher_create_question_screen.dart';
 import 'teacher_select_topic_screen.dart';
 
-/// One row in the editor list. Either an existing question (id != null,
-/// content locked — only deletable) or a new draft (id == null, fully editable).
+/// One row in the editor list. Either an existing question (id != null) or a
+/// new draft (id == null). Both are fully editable. [dirty] tracks whether
+/// an existing question's content was modified — only dirty existing rows get
+/// rewritten on save (clean ones just get an order update).
 class _EditableQuestion {
   final String? id;
   String type;
   String question;
   List<String> options;
   int correctIndex;
+  bool dirty = false;
 
   _EditableQuestion({
     required this.id,
@@ -53,6 +56,15 @@ class _EditableQuestion {
       options: List.of(options),
       correctIndex: correctIndex,
     );
+  }
+
+  /// Mutate from an editor result. Preserves [id]; sets [dirty]=true.
+  void updateFromPending(PendingQuestion p) {
+    type = _typeKeyFromDisplay(p.type);
+    question = p.question;
+    options = List.of(p.options);
+    correctIndex = p.correctIndex;
+    dirty = true;
   }
 }
 
@@ -102,6 +114,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
   final List<_EditableQuestion> _questions = [];
   late final Set<String> _initialIds;
   bool _isSaving = false;
+  bool _hasChanges = false;
 
   @override
   void initState() {
@@ -120,7 +133,39 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     );
     _initialIds = widget.initialQuestions.map((e) => e.id).toSet();
 
-    _titleController.addListener(() => setState(() {}));
+    // Listener attached AFTER pre-fill so initial setText doesn't trip _hasChanges.
+    _titleController.addListener(() {
+      _hasChanges = true;
+      setState(() {});
+    });
+  }
+
+  void _markChanged() {
+    _hasChanges = true;
+  }
+
+  Future<bool> _confirmDiscard() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard changes?'),
+        content: const Text(
+          'Your unsaved edits to this quiz will be lost.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep editing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   @override
@@ -140,40 +185,52 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTitleCard(),
-                    const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _buildTimeLimitCard()),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildPassingGradeCard()),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildAttemptLimitCard(),
-                    const SizedBox(height: 16),
-                    _buildShowAnswerToggle(),
-                    const SizedBox(height: 20),
-                    _buildQuestionsSection(),
-                  ],
+    return PopScope(
+      // Block system back when there are unsaved changes (or save in flight).
+      // Programmatic Navigator.pop() bypasses this, so post-save pop still works.
+      canPop: !_hasChanges && !_isSaving,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (_isSaving) return;
+        final navigator = Navigator.of(context);
+        final shouldDiscard = await _confirmDiscard();
+        if (shouldDiscard && mounted) navigator.pop();
+      },
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTitleCard(),
+                      const SizedBox(height: 12),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: _buildTimeLimitCard()),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildPassingGradeCard()),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildAttemptLimitCard(),
+                      const SizedBox(height: 16),
+                      _buildShowAnswerToggle(),
+                      const SizedBox(height: 20),
+                      _buildQuestionsSection(),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -186,7 +243,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
       child: Row(
         children: [
           IconButton(
-            onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+            onPressed: _isSaving ? null : () => Navigator.maybePop(context),
             icon: const Icon(Icons.arrow_back, color: _ink),
           ),
           const Expanded(
@@ -353,7 +410,10 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
               GestureDetector(
                 onTap: _isSaving
                     ? null
-                    : () => setState(() => _topic = null),
+                    : () {
+                        setState(() => _topic = null);
+                        _markChanged();
+                      },
                 child: const Icon(Icons.close, size: 16),
               ),
             ],
@@ -514,7 +574,10 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
           _counterButton(
             icon: Icons.remove,
             onTap: _attemptLimit > 1
-                ? () => setState(() => _attemptLimit--)
+                ? () {
+                    setState(() => _attemptLimit--);
+                    _markChanged();
+                  }
                 : null,
           ),
           Padding(
@@ -531,7 +594,10 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
           _counterButton(
             icon: Icons.add,
             onTap: _attemptLimit < 99
-                ? () => setState(() => _attemptLimit++)
+                ? () {
+                    setState(() => _attemptLimit++);
+                    _markChanged();
+                  }
                 : null,
           ),
         ],
@@ -565,7 +631,10 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
             value: _showAnswer,
             onChanged: _isSaving
                 ? null
-                : (v) => setState(() => _showAnswer = v),
+                : (v) {
+                    setState(() => _showAnswer = v);
+                    _markChanged();
+                  },
             activeThumbColor: Colors.white,
             activeTrackColor: _purple,
             inactiveThumbColor: Colors.white,
@@ -616,7 +685,6 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
   }
 
   Widget _buildQuestionCard(int index, _EditableQuestion q) {
-    final existing = q.isExisting;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
@@ -644,18 +712,20 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
               IconButton(
                 onPressed: _isSaving
                     ? null
-                    : () => setState(() => _questions.removeAt(index)),
+                    : () {
+                        setState(() => _questions.removeAt(index));
+                        _markChanged();
+                      },
                 icon: const Icon(Icons.delete_outline, size: 20),
                 color: _ink,
                 visualDensity: VisualDensity.compact,
               ),
-              if (!existing)
-                IconButton(
-                  onPressed: _isSaving ? null : () => _onEditNewQuestion(index),
-                  icon: const Icon(Icons.edit_outlined, size: 20),
-                  color: _ink,
-                  visualDensity: VisualDensity.compact,
-                ),
+              IconButton(
+                onPressed: _isSaving ? null : () => _onEditQuestion(index),
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                color: _ink,
+                visualDensity: VisualDensity.compact,
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -756,6 +826,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     );
     if (result != null) {
       setState(() => _topic = result);
+      _markChanged();
     }
   }
 
@@ -767,6 +838,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     );
     if (result != null) {
       setState(() => _timeLimit = result);
+      _markChanged();
     }
   }
 
@@ -779,6 +851,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     );
     if (result != null) {
       setState(() => _passingGrade = result);
+      _markChanged();
     }
   }
 
@@ -904,13 +977,16 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     FocusManager.instance.primaryFocus?.unfocus();
 
     final result = await Navigator.of(context).push<PendingQuestion>(
-      MaterialPageRoute(builder: (_) => const TeacherCreateQuestionScreen()),
+      MaterialPageRoute(
+        builder: (_) => const TeacherCreateQuestionScreen(lockType: true),
+      ),
     );
     if (!mounted) return;
     FocusManager.instance.primaryFocus?.unfocus();
 
     if (result == null) return;
     setState(() => _questions.add(_EditableQuestion.fromDraft(result)));
+    _markChanged();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusManager.instance.primaryFocus?.unfocus();
@@ -925,23 +1001,51 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     });
   }
 
-  Future<void> _onEditNewQuestion(int index) async {
+  Future<void> _onEditQuestion(int index) async {
     final q = _questions[index];
-    if (q.isExisting) return;
 
     FocusManager.instance.primaryFocus?.unfocus();
 
     final result = await Navigator.of(context).push<PendingQuestion>(
       MaterialPageRoute(
-        builder: (_) => TeacherCreateQuestionScreen(initial: q.toPending()),
+        builder: (_) => TeacherCreateQuestionScreen(
+          initial: q.toPending(),
+          lockType: true,
+        ),
       ),
     );
     if (!mounted) return;
     FocusManager.instance.primaryFocus?.unfocus();
 
     if (result != null) {
-      setState(() => _questions[index] = _EditableQuestion.fromDraft(result));
+      setState(() {
+        if (q.isExisting) {
+          // Mutate in place to preserve id; mark dirty so save rewrites it.
+          q.updateFromPending(result);
+        } else {
+          // New draft: replace with fresh instance.
+          _questions[index] = _EditableQuestion.fromDraft(result);
+        }
+      });
+      _markChanged();
     }
+  }
+
+  QuizDraftQuestion _toDraft(_EditableQuestion q) {
+    return QuizDraftQuestion(
+      type: q.type,
+      question: q.question,
+      options: q.options
+          .asMap()
+          .entries
+          .map(
+            (e) => QuestionOption(
+              text: e.value,
+              isCorrect: e.key == q.correctIndex,
+            ),
+          )
+          .toList(),
+    );
   }
 
   Future<void> _save() async {
@@ -951,31 +1055,19 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     final timeLimit = _timeLimit!;
     final passingGrade = _passingGrade!;
 
-    final keptIds = <String>[];
+    final kept = <QuizKeptQuestion>[];
     final newDrafts = <QuizDraftQuestion>[];
     for (final q in _questions) {
       if (q.isExisting) {
-        keptIds.add(q.id!);
+        kept.add(QuizKeptQuestion(
+          id: q.id!,
+          edited: q.dirty ? _toDraft(q) : null,
+        ));
       } else {
-        newDrafts.add(
-          QuizDraftQuestion(
-            type: q.type,
-            question: q.question,
-            options: q.options
-                .asMap()
-                .entries
-                .map(
-                  (e) => QuestionOption(
-                    text: e.value,
-                    isCorrect: e.key == q.correctIndex,
-                  ),
-                )
-                .toList(),
-          ),
-        );
+        newDrafts.add(_toDraft(q));
       }
     }
-    final keptIdSet = keptIds.toSet();
+    final keptIdSet = {for (final k in kept) k.id};
     final removedIds =
         _initialIds.where((id) => !keptIdSet.contains(id)).toList();
 
@@ -992,7 +1084,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
         passingGrade: passingGrade,
         attemptLimit: _attemptLimit,
         showAnswer: _showAnswer,
-        keptOrderedQuestionIds: keptIds,
+        keptOrdered: kept,
         removedQuestionIds: removedIds,
         newQuestions: newDrafts,
       );

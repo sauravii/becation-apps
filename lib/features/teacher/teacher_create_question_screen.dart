@@ -16,8 +16,13 @@ class PendingQuestion {
 
 class TeacherCreateQuestionScreen extends StatefulWidget {
   final PendingQuestion? initial;
+  final bool lockType;
 
-  const TeacherCreateQuestionScreen({super.key, this.initial});
+  const TeacherCreateQuestionScreen({
+    super.key,
+    this.initial,
+    this.lockType = false,
+  });
 
   @override
   State<TeacherCreateQuestionScreen> createState() =>
@@ -249,6 +254,7 @@ class _TeacherCreateQuestionScreenState
   }
 
   Widget _buildTypeCard() {
+    final locked = widget.lockType;
     return _buildCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,16 +265,27 @@ class _TeacherCreateQuestionScreenState
             child: DropdownButton<String>(
               value: _type,
               isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down, color: _label),
-              style: const TextStyle(fontSize: 15, color: _ink),
+              icon: Icon(
+                locked
+                    ? Icons.lock_outline
+                    : Icons.keyboard_arrow_down,
+                color: locked ? _hint : _label,
+                size: locked ? 16 : 24,
+              ),
+              style: TextStyle(
+                fontSize: 15,
+                color: locked ? _hint : _ink,
+              ),
               items: _types
                   .map(
                     (t) => DropdownMenuItem(value: t, child: Text(t)),
                   )
                   .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _type = v);
-              },
+              onChanged: locked
+                  ? null
+                  : (v) {
+                      if (v != null) setState(() => _type = v);
+                    },
             ),
           ),
         ],

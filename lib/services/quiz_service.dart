@@ -150,6 +150,84 @@ class QuizService {
     };
   }
 
+  /// Atomic full-edit: update quiz metadata, delete removed questions
+  /// (and their answer_keys), and append new ones.
+  ///
+  /// [keptOrderedQuestionIds] — question IDs the user kept, in final display
+  /// order (renumbered 0..K-1).
+  /// [removedQuestionIds] — IDs to delete (must not also appear in kept).
+  /// [newQuestions] — new drafts, appended after kept (orders K..K+M-1).
+  static Future<void> updateQuizFull({
+    required String classId,
+    required String quizId,
+    required String title,
+    required String topicId,
+    String topicTitle = '',
+    required int timeLimit,
+    required int passingGrade,
+    required int attemptLimit,
+    required bool showAnswer,
+    required List<String> keptOrderedQuestionIds,
+    required List<String> removedQuestionIds,
+    required List<QuizDraftQuestion> newQuestions,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('User belum login');
+
+    final quizRef = _quizzesRef(classId).doc(quizId);
+    final batch = _firestore.batch();
+    final totalCount = keptOrderedQuestionIds.length + newQuestions.length;
+
+    batch.update(quizRef, {
+      'title': title,
+      'topicId': topicId,
+      'topicTitle': topicTitle,
+      'timeLimit': timeLimit,
+      'passingGrade': passingGrade,
+      'attemptLimit': attemptLimit,
+      'showAnswer': showAnswer,
+      'questionCount': totalCount,
+    });
+
+    // Renumber kept questions to 0..K-1 in display order.
+    for (var i = 0; i < keptOrderedQuestionIds.length; i++) {
+      final qRef = quizRef.collection('questions').doc(keptOrderedQuestionIds[i]);
+      batch.update(qRef, {'order': i});
+    }
+
+    // Delete removed questions + their answer keys.
+    for (final id in removedQuestionIds) {
+      batch.delete(quizRef.collection('questions').doc(id));
+      batch.delete(quizRef.collection('answer_keys').doc(id));
+    }
+
+    // Append new questions starting at order = K.
+    for (var i = 0; i < newQuestions.length; i++) {
+      final q = newQuestions[i];
+      final qRef = quizRef.collection('questions').doc();
+      batch.set(qRef, {
+        'type': q.type,
+        'question': q.question,
+        'options': q.options.map((o) => {'text': o.text}).toList(),
+        'order': keptOrderedQuestionIds.length + i,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      final correctIndices = [
+        for (var j = 0; j < q.options.length; j++)
+          if (q.options[j].isCorrect) j,
+      ];
+      batch.set(quizRef.collection('answer_keys').doc(qRef.id), {
+        'correctIndices': correctIndices,
+      });
+    }
+
+    await batch.commit();
+    debugPrint(
+      '[QuizService] Quiz updated: $quizId — kept ${keptOrderedQuestionIds.length}, '
+      'removed ${removedQuestionIds.length}, added ${newQuestions.length}',
+    );
+  }
+
   /// Update individual quiz fields. Only meta — not questions or answer keys.
   /// Per Firestore rules, only the class teacher can call this.
   static Future<void> updateQuizMeta(

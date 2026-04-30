@@ -4,6 +4,7 @@ import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
 import '../../services/quiz_service.dart';
 import 'teacher_classes_dialogs.dart';
+import 'teacher_edit_quiz_screen.dart';
 
 enum _QuizMenuAction { edit, delete }
 
@@ -177,17 +178,56 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
   ) async {
     switch (action) {
       case _QuizMenuAction.edit:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Edit Quiz — coming soon'),
-            backgroundColor: Color(0xFF6F5AAA),
-          ),
-        );
+        await _onEditPressed(quiz);
         break;
       case _QuizMenuAction.delete:
         await _onDeletePressed(quiz);
         break;
     }
+  }
+
+  Future<void> _onEditPressed(QuizModel quiz) async {
+    // Need answer_keys merged into questions so the editor knows the correct
+    // option for each existing question. _answerKeys is already loaded in
+    // initState; if it's still loading, fetch now.
+    Map<String, List<int>> keys = _answerKeys;
+    if (_loadingKeys) {
+      try {
+        keys = await QuizService.fetchAnswerKeys(
+          widget.classId,
+          widget.quizId,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load answers: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    final questions = await QuizService.questionsStream(
+      widget.classId,
+      widget.quizId,
+    ).first;
+    if (!mounted) return;
+
+    final merged = [
+      for (final q in questions) q.withAnswers(keys[q.id] ?? const []),
+    ];
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TeacherEditQuizScreen(
+          classId: widget.classId,
+          quiz: quiz,
+          initialQuestions: merged,
+        ),
+      ),
+    );
   }
 
   Future<void> _onDeletePressed(QuizModel quiz) async {

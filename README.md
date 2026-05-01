@@ -51,6 +51,14 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - Hapus attachment (file di Storage ikut terhapus)
 - Label otomatis tipe & ukuran file (misal "PDF • 2.5 MB")
 
+**Kuis & Evaluasi**
+- **AI Quiz Generator**: Membuat kuis otomatis dalam hitungan detik menggunakan **Gemini 2.0 Flash**.
+- Konfigurasi AI: Pilih jumlah soal (5-20), jumlah pilihan jawaban (2-5), dan masukkan prompt topik kuis.
+- **Tipe Soal True/False**: Mendukung pembuatan soal Benar/Salah baik secara manual maupun otomatis via AI.
+- **Kuis Manual**: Susun soal pilihan ganda sendiri dengan kontrol penuh atas pilihan jawaban.
+- Pengaturan Kuis: Judul kuis, batas waktu (time limit), nilai kelulusan (passing grade), dan batas percobaan (attempt limit).
+- **Preview & Edit**: Guru bisa meninjau, mengubah urutan (reorder), dan mengedit soal hasil AI sebelum dipublikasikan.
+
 **Settings**
 - Lihat & edit profil (nama, email)
 - Manajemen role user
@@ -71,8 +79,14 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 
 **Detail Kelas (3 tab)**
 - **Class**: detail kelas (nama guru, subject, jumlah siswa, deskripsi)
-- **Classwork**: semua topik & materi yang bisa diakses
+- **Classwork**: semua topik, materi, dan kuis yang bisa diakses
 - **People**: lihat guru pengampu & teman sekelas
+
+**Pengerjaan Kuis**
+- Kerjakan kuis dengan antarmuka yang bersih dan fokus.
+- Indikator waktu sisa (countdown timer).
+- **Server-side Scoring**: Penilaian otomatis yang aman dijalankan melalui **Firebase Functions** (mencegah kecurangan).
+- Hasil Kuis: Skor langsung muncul, status lulus/gagal, dan melihat kunci jawaban (jika diaktifkan guru).
 
 **Akses Materi**
 - Buka materi pembelajaran yang dibagikan guru
@@ -87,8 +101,10 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 
 ### Fitur Sistem
 
+- **AI-Powered** — Integrasi model bahasa besar (LLM) Gemini untuk asisten pembuatan konten kuis.
 - **Real-time sync** — perubahan dari guru langsung muncul di perangkat siswa tanpa refresh
 - **Offline-aware** — Firestore cache otomatis menyimpan data terakhir
+- **Secure Backend** — Logika krusial (seperti penilaian kuis) dijalankan di Node.js via Firebase Functions.
 - **Responsive design** — menyesuaikan berbagai ukuran layar (flutter_screenutil)
 - **Role-based access** — siswa tidak bisa modifikasi materi, hanya guru pemilik kelas
 - **Atomic operations** — pembuatan kelas, join, dan leave dijalankan sebagai batch transaction
@@ -102,7 +118,9 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 | Layer | Teknologi |
 |---|---|
 | Framework | Flutter 3.x |
-| Language | Dart |
+| Language | Dart, Node.js (Backend) |
+| AI Model | Gemini 2.0 Flash (AI Studio) |
+| Backend Framework | Express.js (on Firebase Functions) |
 | Auth | Firebase Authentication |
 | Database | Cloud Firestore |
 | Storage | Firebase Storage (file upload) |
@@ -120,25 +138,33 @@ lib/
 ├── spashscreen.dart       # Splash & role routing
 ├── features/              # Halaman per role
 │   ├── auth/              # Login, register, forgot password
-│   ├── student/           # Dashboard, kelas, materi, settings siswa
-│   └── teacher/           # Dashboard, kelas, materi, settings guru
+│   ├── student/           # Dashboard, kuis, materi, settings siswa
+│   └── teacher/           # Dashboard, kuis (AI & Manual), materi, guru
 ├── components/            # Widget reusable
-│   ├── cards/             # Card UI (kelas, materi, topik, attachment)
+│   ├── cards/             # Card UI (kelas, materi, kuis, attachment)
 │   ├── forms/             # Input field & button
 │   ├── navigation/        # Bottom nav item
 │   └── viewers/           # Image viewer
 ├── services/              # Business logic & Firebase operations
 │   ├── user_service.dart
 │   ├── class_service.dart
+│   ├── quiz_service.dart  # Logika kuis & integrasi AI
 │   ├── topic_service.dart
 │   ├── material_service.dart
 │   └── attachment_service.dart
 ├── models/                # Data class
 │   ├── class_model.dart
+│   ├── quiz_model.dart
 │   ├── topic_model.dart
 │   ├── material_model.dart
 │   ├── attachment_model.dart
 │   └── member_model.dart
+functions/                 # Backend (Node.js + Express)
+├── src/                   # Logika modular
+│   ├── quiz_ai.js         # Integrasi Gemini AI
+│   └── quiz_scoring.js    # Penilaian kuis aman
+├── index.js               # Entry point Cloud Functions
 docs/
-└── FIREBASE_RULES_GUIDE.md  # Dokumentasi Firestore & Storage rules
+├── FIREBASE_RULES_GUIDE.md  # Dokumentasi Firestore & Storage rules
+└── CHANGELOG.md             # Catatan perubahan versi aplikasi
 ```

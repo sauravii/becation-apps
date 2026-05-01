@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
 import '../../services/quiz_service.dart';
+import 'teacher_classes_dialogs.dart';
+import 'teacher_edit_quiz_screen.dart';
+
+enum _QuizMenuAction { edit, delete }
 
 class TeacherQuizDetail extends StatefulWidget {
   final String classId;
@@ -61,50 +65,56 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: StreamBuilder<QuizModel?>(
-                stream: _quizStream,
-                builder: (context, quizSnap) {
-                  if (quizSnap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final quiz = quizSnap.data;
-                  if (quiz == null) {
-                    return const Center(
-                      child: Text(
-                        'Quiz not found or has been deleted.',
-                        style: TextStyle(color: _label),
-                      ),
-                    );
-                  }
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildBanner(quiz),
-                        const SizedBox(height: 16),
-                        _buildMetadataRow(quiz),
-                        const SizedBox(height: 24),
-                        _buildQuestionsHeader(quiz),
-                        const SizedBox(height: 12),
-                        _buildQuestionsList(),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+        child: StreamBuilder<QuizModel?>(
+          stream: _quizStream,
+          builder: (context, quizSnap) {
+            final quiz = quizSnap.data;
+            return Column(
+              children: [
+                _buildHeader(quiz),
+                Expanded(
+                  child: Builder(
+                    builder: (context) {
+                      if (quizSnap.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Center(
+                            child: CircularProgressIndicator());
+                      }
+                      if (quiz == null) {
+                        return const Center(
+                          child: Text(
+                            'Quiz not found or has been deleted.',
+                            style: TextStyle(color: _label),
+                          ),
+                        );
+                      }
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildBanner(quiz),
+                            const SizedBox(height: 16),
+                            _buildMetadataRow(quiz),
+                            const SizedBox(height: 24),
+                            _buildQuestionsHeader(quiz),
+                            const SizedBox(height: 12),
+                            _buildQuestionsList(),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(QuizModel? quiz) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -127,8 +137,120 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
               ),
             ),
           ),
+          if (quiz != null) _buildOverflowMenu(quiz),
         ],
       ),
+    );
+  }
+
+  Widget _buildOverflowMenu(QuizModel quiz) {
+    return PopupMenuButton<_QuizMenuAction>(
+      icon: const Icon(Icons.more_vert, color: _ink),
+      onSelected: (action) => _onMenuSelected(action, quiz),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: _QuizMenuAction.edit,
+          child: Row(
+            children: const [
+              Icon(Icons.edit_outlined, size: 20, color: _ink),
+              SizedBox(width: 12),
+              Text('Edit'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: _QuizMenuAction.delete,
+          child: Row(
+            children: const [
+              Icon(Icons.delete_outline, size: 20, color: Colors.red),
+              SizedBox(width: 12),
+              Text('Delete', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _onMenuSelected(
+    _QuizMenuAction action,
+    QuizModel quiz,
+  ) async {
+    switch (action) {
+      case _QuizMenuAction.edit:
+        await _onEditPressed(quiz);
+        break;
+      case _QuizMenuAction.delete:
+        await _onDeletePressed(quiz);
+        break;
+    }
+  }
+
+  Future<void> _onEditPressed(QuizModel quiz) async {
+    // Need answer_keys merged into questions so the editor knows the correct
+    // option for each existing question. _answerKeys is already loaded in
+    // initState; if it's still loading, fetch now.
+    Map<String, List<int>> keys = _answerKeys;
+    if (_loadingKeys) {
+      try {
+        keys = await QuizService.fetchAnswerKeys(
+          widget.classId,
+          widget.quizId,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load answers: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    final questions = await QuizService.questionsStream(
+      widget.classId,
+      widget.quizId,
+    ).first;
+    if (!mounted) return;
+
+    final merged = [
+      for (final q in questions) q.withAnswers(keys[q.id] ?? const []),
+    ];
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TeacherEditQuizScreen(
+          classId: widget.classId,
+          quiz: quiz,
+          initialQuestions: merged,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onDeletePressed(QuizModel quiz) async {
+    int attemptCount = 0;
+    try {
+      attemptCount = await QuizService.getTotalAttemptsCount(
+        widget.classId,
+        widget.quizId,
+      );
+    } catch (_) {
+      // Non-fatal — fall through with 0; the dialog still works.
+    }
+    if (!mounted) return;
+
+    showDeleteQuizDialog(
+      context,
+      classId: widget.classId,
+      quizId: widget.quizId,
+      quizTitle: quiz.title,
+      attemptCount: attemptCount,
+      onDeleted: () {
+        if (mounted) Navigator.of(context).pop();
+      },
     );
   }
 
@@ -267,10 +389,22 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
             color: _ink,
           ),
         ),
-        _ShowAnswerToggle(
-          classId: widget.classId,
-          quizId: widget.quizId,
-          showAnswer: quiz.showAnswer,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              quiz.showAnswer
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              size: 16,
+              color: _label,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Show answer: ${quiz.showAnswer ? 'ON' : 'OFF'}',
+              style: const TextStyle(fontSize: 12, color: _label),
+            ),
+          ],
         ),
       ],
     );
@@ -392,95 +526,5 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
       default:
         return type.toUpperCase().replaceAll('_', ' ');
     }
-  }
-}
-
-class _ShowAnswerToggle extends StatefulWidget {
-  final String classId;
-  final String quizId;
-  final bool showAnswer;
-
-  const _ShowAnswerToggle({
-    required this.classId,
-    required this.quizId,
-    required this.showAnswer,
-  });
-
-  @override
-  State<_ShowAnswerToggle> createState() => _ShowAnswerToggleState();
-}
-
-class _ShowAnswerToggleState extends State<_ShowAnswerToggle> {
-  bool _saving = false;
-
-  Future<void> _toggle(bool value) async {
-    if (_saving) return;
-    setState(() => _saving = true);
-    try {
-      await QuizService.updateQuizMeta(
-        widget.classId,
-        widget.quizId,
-        showAnswer: value,
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const labelColor = Color(0xFF49454E);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          widget.showAnswer
-              ? Icons.visibility_outlined
-              : Icons.visibility_off_outlined,
-          size: 16,
-          color: labelColor,
-        ),
-        const SizedBox(width: 6),
-        const Text(
-          'Show answer',
-          style: TextStyle(fontSize: 12, color: labelColor),
-        ),
-        const SizedBox(width: 6),
-        if (_saving)
-          const SizedBox(
-            width: 36,
-            height: 20,
-            child: Center(
-              child: SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          )
-        else
-          Transform.scale(
-            scale: 0.75,
-            child: Switch(
-              value: widget.showAnswer,
-              onChanged: _toggle,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              activeThumbColor: Colors.white,
-              activeTrackColor: const Color(0xFF6F5AAA),
-              inactiveThumbColor: Colors.white,
-              inactiveTrackColor: Colors.grey.shade400,
-            ),
-          ),
-      ],
-    );
   }
 }

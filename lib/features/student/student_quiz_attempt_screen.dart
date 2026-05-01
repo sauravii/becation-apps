@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
 import '../../services/quiz_service.dart';
+import 'student_quiz_result_screen.dart';
 
 class StudentQuizAttemptScreen extends StatefulWidget {
   final String classId;
@@ -41,14 +42,6 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
   late int _remainingSeconds;
   bool _autoSubmitted = false;
 
-  // Review state (after submission, if quiz.showAnswer == true)
-  bool _isReviewing = false;
-  Map<String, List<int>> _correctAnswers = {};
-  int _score = 0;
-  int _correct = 0;
-  int _total = 0;
-  bool _passed = false;
-
   @override
   void initState() {
     super.initState();
@@ -75,7 +68,7 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
       }
       if (_remainingSeconds <= 0) {
         t.cancel();
-        if (!_isSubmitting && !_isReviewing) {
+        if (!_isSubmitting) {
           _autoSubmitted = true;
           _submitQuiz(skipIncompleteWarning: true);
         }
@@ -161,15 +154,23 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
         if (!mounted) return;
       }
 
-      setState(() {
-        _isSubmitting = false;
-        _isReviewing = true;
-        _correctAnswers = correctAnswers;
-        _score = score;
-        _correct = correct;
-        _total = total;
-        _passed = passed;
-      });
+      // Replace this screen with the result screen so back from result goes
+      // straight to whatever was below us (quiz detail), not back to the
+      // answering view.
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => StudentQuizResultScreen(
+            quiz: widget.quiz,
+            questions: _questions,
+            userAnswers: Map.of(_answers),
+            correctAnswers: correctAnswers,
+            score: score,
+            correct: correct,
+            total: total,
+            passed: passed,
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
@@ -180,6 +181,40 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
         ),
       );
     }
+  }
+
+  Future<bool> _confirmSubmitAndExit() async {
+    final unanswered = _questions.length - _answers.length;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: Colors.orange, size: 26),
+            SizedBox(width: 10),
+            Text('Submit & exit?'),
+          ],
+        ),
+        content: Text(
+          unanswered > 0
+              ? "Leaving now will submit your quiz. $unanswered question(s) will be marked as unanswered."
+              : 'Leaving now will submit your quiz.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep working'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Submit & exit'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   Future<void> _showAutoSubmitNotice() {
@@ -195,8 +230,7 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
           ],
         ),
         content: const Text(
-          'Time limit reached. Your quiz was submitted automatically with the answers you had.',
-        ),
+            'Time limit reached. Your quiz was submitted automatically with the answers you had.'),
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(ctx),
@@ -209,98 +243,78 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            Expanded(
-              child: StreamBuilder<List<QuestionModel>>(
-                stream: _questionsStream,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text('Error loading questions: ${snapshot.error}'),
-                    );
-                  }
-
-                  _questions = snapshot.data ?? [];
-                  if (_questions.isEmpty) {
-                    return const Center(
-                      child: Text('No questions available in this quiz.'),
-                    );
-                  }
-
-                  if (_currentIndex >= _questions.length) {
-                    _currentIndex = 0;
-                  }
-
-                  if (_isReviewing) {
-                    return _buildReviewView();
-                  }
-
-                  return _buildAnsweringView();
-                },
+    return PopScope(
+      // Always intercept while on this screen — answering or submitting.
+      // After successful submit we pushReplacement to the result screen,
+      // which doesn't go through this PopScope, so no special exit case.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (_isSubmitting) return;
+        final shouldSubmit = await _confirmSubmitAndExit();
+        if (!mounted || !shouldSubmit) return;
+        await _submitQuiz(skipIncompleteWarning: true);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF7F2FA),
+        appBar: AppBar(
+          title: Text(widget.quiz.title, style: const TextStyle(fontSize: 18)),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1C1B20),
+          elevation: 1,
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _timerColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _timerColor, width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.timer_outlined,
+                          size: 16, color: _timerColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formattedTime,
+                        style: TextStyle(
+                          color: _timerColor,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
+        body: StreamBuilder<List<QuestionModel>>(
+          stream: _questionsStream,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                  child: Text('Error loading questions: ${snapshot.error}'));
+            }
 
-  Widget _buildTopBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: const BoxDecoration(color: _primary),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-          ),
-          Expanded(
-            child: Text(
-              widget.quiz.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Opacity(
-            opacity: 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.timer, size: 14, color: _timerColor),
-                  const SizedBox(width: 6),
-                  Text(
-                    _formattedTime,
-                    style: TextStyle(
-                      color: _timerColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+            _questions = snapshot.data ?? [];
+            if (_questions.isEmpty) {
+              return const Center(
+                  child: Text('No questions available in this quiz.'));
+            }
+
+            return _buildAnsweringView();
+          },
+        ),
       ),
     );
   }
@@ -359,227 +373,30 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Next', style: TextStyle(fontSize: 14)),
-              ),
-            ),
-          );
-        },
-      );
-    }
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () {
-              _pageController.previousPage(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-              );
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF6F5AAA),
-              side: const BorderSide(color: Color(0xFF6F5AAA)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Previous', style: TextStyle(fontSize: 14)),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: FilledButton(
-            onPressed: isLast
-                ? (_isSubmitting ? null : () => _submitQuiz())
-                : () {
-                    _pageController.nextPage(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOut,
-                    );
-                  },
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF6F5AAA),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              isLast ? 'Submit' : 'Next',
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReviewView() {
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        16 + MediaQuery.of(context).padding.bottom,
-      ),
-      itemCount: _questions.length + 3,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return _buildResultBanner();
-        }
-        if (index == 1) {
-          return _buildAttemptInfoCard(showStats: widget.quiz.showAnswer);
-        }
-        if (index == _questions.length + 2) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF6F5AAA),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Done', style: TextStyle(fontSize: 16)),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text('Submit Quiz',
+                        style: TextStyle(fontSize: 16)),
               ),
             ),
           );
         }
 
-        final q = _questions[index - 2];
-        return _buildQuestionCard(index: index - 2, q: q, interactive: false);
+        final q = _questions[index];
+        return _buildQuestionCard(index: index, q: q);
       },
     );
   }
 
-  Widget _buildAttemptInfoCard({bool showStats = true}) {
-    final answered = _answers.length;
-    final remaining = (_questions.length - answered).clamp(
-      0,
-      _questions.length,
-    );
-    final wrong = (_total - _correct).clamp(0, _total);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Text(
-                  'Question ${_currentIndex + 1}/${_questions.length}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1C1B20),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (showStats) ...[
-            _buildMiniStat(
-              icon: Icons.check_circle,
-              color: const Color(0xFF58B368),
-              value: '${widget.quiz.showAnswer ? _correct : answered}',
-            ),
-            const SizedBox(width: 6),
-            _buildMiniStat(
-              icon: Icons.cancel,
-              color: const Color(0xFFE06B6B),
-              value: '${widget.quiz.showAnswer ? wrong : remaining}',
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniStat({
-    required IconData icon,
-    required Color color,
-    required String value,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: color,
-            fontSize: 12,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildResultBanner() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _passed ? Colors.green.shade50 : Colors.red.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _passed ? Colors.green.shade300 : Colors.red.shade300,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                _passed ? Icons.check_circle : Icons.cancel,
-                size: 28,
-                color: _passed ? Colors.green : Colors.red,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                _passed ? 'Passed' : 'Failed',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _passed ? Colors.green.shade800 : Colors.red.shade800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Score: $_score / 100',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$_correct / $_total correct  ·  Passing grade ${widget.quiz.passingGrade}%',
-            style: const TextStyle(fontSize: 13, color: Color(0xFF49454E)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuestionCard({
-    required int index,
-    required QuestionModel q,
-    required bool interactive,
-  }) {
+  Widget _buildQuestionCard({required int index, required QuestionModel q}) {
     final selected = _answers[q.id];
-    final correctIndices = _correctAnswers[q.id] ?? const <int>[];
-    final showStatus = _isReviewing && widget.quiz.showAnswer;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -607,111 +424,28 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
                 color: Color(0xFF1C1B20),
               ),
             ),
-          ),
-          const SizedBox(height: 22),
-          Column(
-            children: List.generate(q.options.length, (optIndex) {
-              final isCorrect = correctIndices.contains(optIndex);
-              final isSelected = selected == optIndex;
-              final isWrongPick = isSelected && !isCorrect;
-              return _buildOptionTile(
-                label: String.fromCharCode(65 + optIndex),
-                text: q.options[optIndex].text,
-                selected: isSelected,
-                correct: isCorrect,
-                wrongPick: isWrongPick,
-                showStatus: showStatus,
-                onTap: interactive
-                    ? () => setState(() => _answers[q.id] = optIndex)
-                    : null,
-              );
-            }),
-          ),
-          if (interactive) ...[const SizedBox(height: 24), _buildNavButtons()],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOptionTile({
-    required String label,
-    required String text,
-    bool selected = false,
-    bool correct = false,
-    bool wrongPick = false,
-    bool showStatus = false,
-    VoidCallback? onTap,
-  }) {
-    Color borderColor = const Color(0xFFE4DDEE);
-    Color fillColor = Colors.white;
-    Color badgeColor = const Color(0xFF6F5AAA);
-    Color badgeText = Colors.white;
-
-    if (selected) {
-      borderColor = const Color(0xFF6F5AAA);
-      fillColor = const Color(0xFFF4F0FB);
-    }
-    if (showStatus) {
-      if (correct) {
-        borderColor = const Color(0xFF58B368);
-        fillColor = const Color(0xFFEAF6EE);
-        badgeColor = const Color(0xFF58B368);
-      } else if (wrongPick) {
-        borderColor = const Color(0xFFE06B6B);
-        fillColor = const Color(0xFFFCEDED);
-        badgeColor = const Color(0xFFE06B6B);
-      }
-    }
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: fillColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 26,
-              height: 26,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: badgeColor,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                label,
-                style: TextStyle(fontWeight: FontWeight.w700, color: badgeText),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF2B2633),
+            const SizedBox(height: 12),
+            RadioGroup<int>(
+              groupValue: selected,
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _answers[q.id] = val);
+                }
+              },
+              child: Column(
+                children: List.generate(
+                  q.options.length,
+                  (optIndex) => RadioListTile<int>(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      q.options[optIndex].text,
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                    value: optIndex,
+                  ),
                 ),
               ),
             ),
-            if (showStatus && (correct || wrongPick))
-              Padding(
-                padding: const EdgeInsets.only(left: 6),
-                child: Icon(
-                  correct ? Icons.check_circle : Icons.cancel,
-                  color: correct
-                      ? const Color(0xFF58B368)
-                      : const Color(0xFFE06B6B),
-                  size: 18,
-                ),
-              ),
           ],
         ),
       ),

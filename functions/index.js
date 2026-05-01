@@ -63,7 +63,11 @@ exports.submitQuizAttempt = onCall(
         );
       }
 
-      // 4. Read answer keys (admin SDK bypasses Firestore rules)
+      // 4. Read questions + answer keys (admin SDK bypasses Firestore rules)
+      const questionsSnap = await quizRef
+          .collection("questions")
+          .orderBy("order")
+          .get();
       const keysSnap = await quizRef.collection("answer_keys").get();
       const keys = {};
       keysSnap.docs.forEach((doc) => {
@@ -86,7 +90,20 @@ exports.submitQuizAttempt = onCall(
       const passed = score >= (quiz.passingGrade ?? 0);
       const attemptNumber = existing.size + 1;
 
-      // 6. Persist attempt
+      // 6. Snapshot the quiz state at submission time so future edits
+      // to questions/answer_keys don't break past attempt review.
+      const questionSnapshot = questionsSnap.docs.map((doc) => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          type: d.type ?? "multiple_choice",
+          question: d.question ?? "",
+          options: d.options ?? [],
+          correctIndices: keys[doc.id] ?? [],
+        };
+      });
+
+      // 7. Persist attempt
       const studentName =
         memberSnap.data().displayName ?? auth.token?.name ?? "";
       await quizRef.collection("attempts").add({
@@ -98,10 +115,11 @@ exports.submitQuizAttempt = onCall(
         total,
         passed,
         attemptNumber,
+        questionSnapshot,
         completedAt: FieldValue.serverTimestamp(),
       });
 
-      // 7. Build response. Only reveal correctAnswers if quiz opted in.
+      // 8. Build response. Only reveal correctAnswers if quiz opted in.
       const response = {score, correct, total, passed, attemptNumber};
       if (quiz.showAnswer === true) {
         response.correctAnswers = keys; // {questionId: [correctIndices]}

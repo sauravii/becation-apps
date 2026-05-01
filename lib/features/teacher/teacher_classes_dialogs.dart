@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../models/topic_model.dart';
 import '../../services/topic_service.dart';
 import '../../services/class_service.dart';
+import '../../services/quiz_service.dart';
 import 'teacher_create_material_screen.dart';
 import 'teacher_create_quiz_screen.dart';
 
@@ -293,6 +294,146 @@ void showDeleteTopicDialog(
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Topic deleted'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isDeleting = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to delete: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: FilledButton.styleFrom(
+                backgroundColor: countdown > 0 ? Colors.grey : Colors.red,
+              ),
+              child: isDeleting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      countdown > 0 ? 'Delete ($countdown)' : 'Delete',
+                    ),
+            ),
+          ],
+        );
+      },
+    ),
+  ).then((_) => timer?.cancel());
+}
+
+/// Dialog hapus quiz dengan countdown 5 detik.
+/// Menghapus quiz beserta semua questions, answer_keys, dan attempts.
+void showDeleteQuizDialog(
+  BuildContext context, {
+  required String classId,
+  required String quizId,
+  required String quizTitle,
+  required int attemptCount,
+  VoidCallback? onDeleted,
+}) {
+  int countdown = 5;
+  Timer? timer;
+  bool isDeleting = false;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setDialogState) {
+        timer ??= Timer.periodic(const Duration(seconds: 1), (t) {
+          if (countdown > 0) {
+            setDialogState(() => countdown--);
+          } else {
+            t.cancel();
+          }
+        });
+
+        final hasAttempts = attemptCount > 0;
+        final contentText = hasAttempts
+            ? '$attemptCount student attempt(s) and all questions will also be permanently deleted.'
+            : 'All questions in this quiz will also be deleted.';
+
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+              SizedBox(width: 10),
+              Text('Delete Quiz'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF1C1B20),
+                    height: 1.5,
+                  ),
+                  children: [
+                    const TextSpan(text: 'You are about to delete '),
+                    TextSpan(
+                      text: '"$quizTitle"',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const TextSpan(text: '. This action cannot be undone.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                contentText,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: hasAttempts ? Colors.red : Colors.grey,
+                  fontWeight:
+                      hasAttempts ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isDeleting
+                  ? null
+                  : () {
+                      timer?.cancel();
+                      Navigator.pop(dialogContext);
+                    },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: (countdown > 0 || isDeleting)
+                  ? null
+                  : () async {
+                      setDialogState(() => isDeleting = true);
+
+                      try {
+                        await QuizService.deleteQuiz(classId, quizId);
+
+                        timer?.cancel();
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                        onDeleted?.call();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Quiz deleted'),
                               backgroundColor: Colors.green,
                             ),
                           );

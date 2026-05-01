@@ -17,6 +17,16 @@ class QuizDraftQuestion {
   });
 }
 
+/// One kept question in [QuizService.updateQuizFull]. If [edited] is non-null,
+/// the question doc + its answer_key get rewritten with the new content.
+/// If null, only the order is updated.
+class QuizKeptQuestion {
+  final String id;
+  final QuizDraftQuestion? edited;
+
+  const QuizKeptQuestion({required this.id, this.edited});
+}
+
 class QuizService {
   static final _firestore = FirebaseFirestore.instance;
 
@@ -150,31 +160,104 @@ class QuizService {
     };
   }
 
-  /// Update individual quiz fields. Only meta — not questions or answer keys.
-  /// Per Firestore rules, only the class teacher can call this.
-  static Future<void> updateQuizMeta(
-    String classId,
-    String quizId, {
-    String? title,
-    String? topicId,
-    String? topicTitle,
-    int? timeLimit,
-    int? passingGrade,
-    int? attemptLimit,
-    bool? showAnswer,
+  /// Atomic full-edit: update quiz metadata, rewrite edited kept questions,
+  /// delete removed questions (and their answer_keys), and append new ones.
+  ///
+  /// [keptOrdered] — kept questions in final display order (renumbered 0..K-1).
+  ///   Each entry's `edited` is null (order-only update) or carries new content
+  ///   that overwrites both the question doc and its answer_key.
+  /// [removedQuestionIds] — IDs to delete (must not also appear in kept).
+  /// [newQuestions] — new drafts, appended after kept (orders K..K+M-1).
+  static Future<void> updateQuizFull({
+    required String classId,
+    required String quizId,
+    required String title,
+    required String topicId,
+    String topicTitle = '',
+    required int timeLimit,
+    required int passingGrade,
+    required int attemptLimit,
+    required bool showAnswer,
+    required List<QuizKeptQuestion> keptOrdered,
+    required List<String> removedQuestionIds,
+    required List<QuizDraftQuestion> newQuestions,
   }) async {
-    final updates = <String, dynamic>{};
-    if (title != null) updates['title'] = title;
-    if (topicId != null) updates['topicId'] = topicId;
-    if (topicTitle != null) updates['topicTitle'] = topicTitle;
-    if (timeLimit != null) updates['timeLimit'] = timeLimit;
-    if (passingGrade != null) updates['passingGrade'] = passingGrade;
-    if (attemptLimit != null) updates['attemptLimit'] = attemptLimit;
-    if (showAnswer != null) updates['showAnswer'] = showAnswer;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('User belum login');
 
-    if (updates.isEmpty) return;
-    await _quizzesRef(classId).doc(quizId).update(updates);
-    debugPrint('[QuizService] Quiz updated: $quizId — fields: ${updates.keys}');
+    final quizRef = _quizzesRef(classId).doc(quizId);
+    final batch = _firestore.batch();
+    final totalCount = keptOrdered.length + newQuestions.length;
+    var editedCount = 0;
+
+    batch.update(quizRef, {
+      'title': title,
+      'topicId': topicId,
+      'topicTitle': topicTitle,
+      'timeLimit': timeLimit,
+      'passingGrade': passingGrade,
+      'attemptLimit': attemptLimit,
+      'showAnswer': showAnswer,
+      'questionCount': totalCount,
+    });
+
+    // Renumber kept questions to 0..K-1; rewrite content for edited ones.
+    for (var i = 0; i < keptOrdered.length; i++) {
+      final kept = keptOrdered[i];
+      final qRef = quizRef.collection('questions').doc(kept.id);
+      final edited = kept.edited;
+      if (edited == null) {
+        batch.update(qRef, {'order': i});
+      } else {
+        editedCount++;
+        batch.update(qRef, {
+          'type': edited.type,
+          'question': edited.question,
+          'options': edited.options.map((o) => {'text': o.text}).toList(),
+          'order': i,
+        });
+        final correctIndices = [
+          for (var j = 0; j < edited.options.length; j++)
+            if (edited.options[j].isCorrect) j,
+        ];
+        batch.set(quizRef.collection('answer_keys').doc(kept.id), {
+          'correctIndices': correctIndices,
+        });
+      }
+    }
+
+    // Delete removed questions + their answer keys.
+    for (final id in removedQuestionIds) {
+      batch.delete(quizRef.collection('questions').doc(id));
+      batch.delete(quizRef.collection('answer_keys').doc(id));
+    }
+
+    // Append new questions starting at order = K.
+    for (var i = 0; i < newQuestions.length; i++) {
+      final q = newQuestions[i];
+      final qRef = quizRef.collection('questions').doc();
+      batch.set(qRef, {
+        'type': q.type,
+        'question': q.question,
+        'options': q.options.map((o) => {'text': o.text}).toList(),
+        'order': keptOrdered.length + i,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      final correctIndices = [
+        for (var j = 0; j < q.options.length; j++)
+          if (q.options[j].isCorrect) j,
+      ];
+      batch.set(quizRef.collection('answer_keys').doc(qRef.id), {
+        'correctIndices': correctIndices,
+      });
+    }
+
+    await batch.commit();
+    debugPrint(
+      '[QuizService] Quiz updated: $quizId — kept ${keptOrdered.length} '
+      '(edited $editedCount), removed ${removedQuestionIds.length}, '
+      'added ${newQuestions.length}',
+    );
   }
 
   /// Get the number of attempts the current student has made for a specific quiz.
@@ -193,5 +276,48 @@ class QuizService {
         .get();
 
     return snap.count ?? 0;
+  }
+
+  /// Total attempt count across all students for a quiz. Teacher-only.
+  static Future<int> getTotalAttemptsCount(
+    String classId,
+    String quizId,
+  ) async {
+    final snap = await _quizzesRef(classId)
+        .doc(quizId)
+        .collection('attempts')
+        .count()
+        .get();
+    return snap.count ?? 0;
+  }
+
+  /// Delete a quiz and all its subcollections (questions, answer_keys, attempts).
+  /// Teacher-only per Firestore rules.
+  static Future<void> deleteQuiz(String classId, String quizId) async {
+    final quizRef = _quizzesRef(classId).doc(quizId);
+
+    final questionsSnap = await quizRef.collection('questions').get();
+    final keysSnap = await quizRef.collection('answer_keys').get();
+    final attemptsSnap = await quizRef.collection('attempts').get();
+
+    final batch = _firestore.batch();
+    for (final d in questionsSnap.docs) {
+      batch.delete(d.reference);
+    }
+    for (final d in keysSnap.docs) {
+      batch.delete(d.reference);
+    }
+    for (final d in attemptsSnap.docs) {
+      batch.delete(d.reference);
+    }
+    batch.delete(quizRef);
+
+    await batch.commit();
+    debugPrint(
+      '[QuizService] Quiz deleted: $quizId — '
+      'questions: ${questionsSnap.size}, '
+      'keys: ${keysSnap.size}, '
+      'attempts: ${attemptsSnap.size}',
+    );
   }
 }

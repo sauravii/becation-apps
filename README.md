@@ -115,17 +115,18 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 
 ## Tech Stack
 
-| Layer | Teknologi |
-|---|---|
-| Framework | Flutter 3.x |
-| Language | Dart, Node.js (Backend) |
-| AI Model | Gemini 2.0 Flash (AI Studio) |
-| Backend Framework | Express.js (on Firebase Functions) |
-| Auth | Firebase Authentication |
-| Database | Cloud Firestore |
-| Storage | Firebase Storage (file upload) |
-| State | StreamBuilder + Firestore Streams |
-| UI Helper | flutter_screenutil, flutter_svg |
+| Layer | Teknologi                                                     |
+|---|---------------------------------------------------------------|
+| Framework | Flutter 3.x                                                   |
+| Language | Dart, Node.js (Backend)                                       |
+| AI Model | Gemini 3.1 Flash-Lite Preview (AI Studio)                     |
+| AI Framework | Genkit + Firebase Genkit Monitoring                           |
+| Backend | Node.js on Firebase Cloud Functions                           |
+| Auth | Firebase Authentication                                       |
+| Database | Cloud Firestore                                               |
+| Storage | Firebase Storage (file upload)                                |
+| State | StreamBuilder + Firestore Streams                             |
+| UI Helper | flutter_screenutil, flutter_svg                               |
 | Utility | url_launcher, google_sign_in, file_picker, permission_handler |
 
 ---
@@ -159,9 +160,9 @@ lib/
 │   ├── material_model.dart
 │   ├── attachment_model.dart
 │   └── member_model.dart
-functions/                 # Backend (Node.js + Express)
+functions/                 # Backend (Node.js + Genkit on Firebase Functions)
 ├── src/                   # Logika modular
-│   ├── quiz_ai.js         # Integrasi Gemini AI
+│   ├── quiz_ai.js         # Genkit flow: AI Studio Gemini integration
 │   └── quiz_scoring.js    # Penilaian kuis aman
 ├── index.js               # Entry point Cloud Functions
 docs/

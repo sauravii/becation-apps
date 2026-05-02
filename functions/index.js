@@ -18,6 +18,3 @@ const quizAI = require("./src/quiz_ai");
  */
 exports.submitQuizAttempt = quizScoring.submitQuizAttempt;
 exports.generateQuizAI = quizAI.generateQuizAI;
-
-// Endpoint AI akan ditambahkan di bawah ini nantinya
-// exports.generateQuizAI = ...

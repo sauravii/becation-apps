@@ -3,14 +3,10 @@ import 'package:flutter/material.dart';
 import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
 
-/// Read-only result view shown after a quiz attempt is submitted. If
-/// [correctAnswers] is empty (quiz has showAnswer=off, or this is being
-/// reused for a context where keys aren't available), the per-question
-/// breakdown is hidden and only the banner + Done button are shown.
-class StudentQuizResultScreen extends StatelessWidget {
+class StudentQuizResultPage extends StatelessWidget {
   final QuizModel quiz;
   final List<QuestionModel> questions;
-  final Map<String, int> userAnswers;
+  final Map<String, int> answers;
   final Map<String, List<int>> correctAnswers;
   final int score;
   final int correct;
@@ -18,11 +14,11 @@ class StudentQuizResultScreen extends StatelessWidget {
   final bool passed;
   final bool isFinalAttempt;
 
-  const StudentQuizResultScreen({
+  const StudentQuizResultPage({
     super.key,
     required this.quiz,
     required this.questions,
-    required this.userAnswers,
+    required this.answers,
     required this.correctAnswers,
     required this.score,
     required this.correct,
@@ -31,61 +27,148 @@ class StudentQuizResultScreen extends StatelessWidget {
     this.isFinalAttempt = true,
   });
 
+  static const _primary = Color(0xFF5E4B8B);
+  static const _bg = Color(0xFFF7F2FA);
+
+  bool get _hasReview => correctAnswers.isNotEmpty && quiz.showAnswer;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F2FA),
-      appBar: AppBar(
-        title: Text(quiz.title, style: const TextStyle(fontSize: 18, color: Colors.white)),
-        backgroundColor: const Color(0xFF6F5AAA),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6F5AAA),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(width: 4),
-                    Text(
-                      'Finished',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(context),
+              Expanded(child: _buildReviewView(context)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: const BoxDecoration(color: _primary),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+          ),
+          const Expanded(
+            child: Text(
+              'Quiz Result',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
         ],
       ),
-      body: ListView.builder(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          16 + MediaQuery.of(context).padding.bottom,
+    );
+  }
+
+  Widget _buildReviewView(BuildContext context) {
+    final wrong = (total - correct).clamp(0, total);
+
+    return ListView.builder(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        16 + MediaQuery.of(context).padding.bottom,
+      ),
+      itemCount: questions.length + 3,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return _buildResultBanner();
+        }
+        if (index == 1) {
+          return _buildAttemptInfoCard(wrong: wrong);
+        }
+        if (index == questions.length + 2) {
+          return _buildDoneButton(context);
+        }
+
+        final q = questions[index - 2];
+        return _buildQuestionCard(index: index - 2, q: q);
+      },
+    );
+  }
+
+  Widget _buildDoneButton(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF6F5AAA),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text('Done', style: TextStyle(fontSize: 16)),
         ),
-        itemCount: questions.length + 2,
-        itemBuilder: (context, index) {
-          if (index == 0) return _buildResultBanner();
-          if (index == questions.length + 1) {
-            return _buildDoneButton(context);
-          }
-          final q = questions[index - 1];
-          return _buildQuestionCard(index - 1, q);
-        },
+      ),
+    );
+  }
+
+  Widget _buildAnswersHiddenNotice() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.visibility_off_outlined,
+            color: Color(0xFF6F5AAA),
+            size: 22,
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Answers hidden',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1C1B20),
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Your teacher has hidden the correct answers for this quiz, so the per-question review is not shown.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF49454E),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -140,8 +223,69 @@ class StudentQuizResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuestionCard(int index, QuestionModel q) {
-    final selected = userAnswers[q.id];
+  Widget _buildAttemptInfoCard({required int wrong}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${questions.length} Questions',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1C1B20),
+              ),
+            ),
+          ),
+          if (quiz.showAnswer && isFinalAttempt) ...[
+            _buildMiniStat(
+              icon: Icons.check_circle,
+              color: const Color(0xFF58B368),
+              value: '$correct',
+            ),
+            const SizedBox(width: 6),
+            _buildMiniStat(
+              icon: Icons.cancel,
+              color: const Color(0xFFE06B6B),
+              value: '$wrong',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStat({
+    required IconData icon,
+    required Color color,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: color,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuestionCard({
+    required int index,
+    required QuestionModel q,
+  }) {
+    final selected = answers[q.id];
     final correctIndices = correctAnswers[q.id] ?? const <int>[];
     final showStatus = quiz.showAnswer && isFinalAttempt;
 
@@ -278,26 +422,6 @@ class StudentQuizResultScreen extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDoneButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: SizedBox(
-        width: double.infinity,
-        height: 50,
-        child: FilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF6F5AAA),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const Text('Done', style: TextStyle(fontSize: 16)),
-        ),
       ),
     );
   }

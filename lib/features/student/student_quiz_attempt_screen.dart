@@ -25,7 +25,10 @@ class StudentQuizAttemptScreen extends StatefulWidget {
 
 class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
   late final Stream<List<QuestionModel>> _questionsStream;
+  final PageController _pageController = PageController();
+
   List<QuestionModel> _questions = [];
+  int _currentIndex = 0;
   bool _isSubmitting = false;
 
   // Map of questionId -> selected option index
@@ -39,8 +42,10 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
   @override
   void initState() {
     super.initState();
-    _questionsStream =
-        QuizService.questionsStream(widget.classId, widget.quiz.id);
+    _questionsStream = QuizService.questionsStream(
+      widget.classId,
+      widget.quiz.id,
+    );
     _remainingSeconds = widget.quiz.timeLimit * 60;
     _startTimer();
   }
@@ -48,6 +53,7 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -88,7 +94,8 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text('Incomplete Quiz'),
           content: const Text(
-              'You have not answered all questions. Are you sure you want to submit?'),
+            'You have not answered all questions. Are you sure you want to submit?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -110,10 +117,10 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
       final result = await FirebaseFunctions.instance
           .httpsCallable('submitQuizAttempt')
           .call({
-        'classId': widget.classId,
-        'quizId': widget.quiz.id,
-        'answers': _answers,
-      });
+            'classId': widget.classId,
+            'quizId': widget.quiz.id,
+            'answers': _answers,
+          });
 
       if (!mounted) return;
 
@@ -124,6 +131,7 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
       final correct = (data['correct'] as num?)?.toInt() ?? 0;
       final total = (data['total'] as num?)?.toInt() ?? 0;
       final passed = data['passed'] as bool? ?? false;
+      final attemptNumber = (data['attemptNumber'] as num?)?.toInt() ?? 1;
 
       // Parse correctAnswers if function returned them (showAnswer == true)
       final Map<String, List<int>> correctAnswers = {};
@@ -131,8 +139,10 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
       if (rawCorrect is Map) {
         rawCorrect.forEach((k, v) {
           if (v is List) {
-            correctAnswers[k.toString()] =
-                v.whereType<num>().map((n) => n.toInt()).toList();
+            correctAnswers[k.toString()] = v
+                .whereType<num>()
+                .map((n) => n.toInt())
+                .toList();
           }
         });
       }
@@ -156,6 +166,7 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
             correct: correct,
             total: total,
             passed: passed,
+            isFinalAttempt: attemptNumber >= widget.quiz.attemptLimit,
           ),
         ),
       );
@@ -246,10 +257,10 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F2FA),
         appBar: AppBar(
-          title: Text(widget.quiz.title, style: const TextStyle(fontSize: 18)),
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF1C1B20),
-          elevation: 1,
+          title: Text(widget.quiz.title, style: const TextStyle(fontSize: 18, color: Colors.white)),
+          backgroundColor: const Color(0xFF6F5AAA),
+          foregroundColor: Colors.white,
+          elevation: 0,
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -258,22 +269,22 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _timerColor.withValues(alpha: 0.12),
+                    color: _remainingSeconds <= 60 ? Colors.red : const Color(0xFF6F5AAA),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _timerColor, width: 1.5),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.timer_outlined,
-                          size: 16, color: _timerColor),
+                      const Icon(Icons.timer_outlined,
+                          size: 16, color: Colors.white),
                       const SizedBox(width: 4),
                       Text(
                         _formattedTime,
-                        style: TextStyle(
-                          color: _timerColor,
+                        style: const TextStyle(
+                          color: Colors.white,
                           fontWeight: FontWeight.w700,
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                          fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
                     ],
@@ -308,96 +319,217 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
   }
 
   Widget _buildAnsweringView() {
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        16 + MediaQuery.of(context).padding.bottom,
-      ),
-      itemCount: _questions.length + 1,
-      itemBuilder: (context, index) {
-        if (index == _questions.length) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton(
-                onPressed: _isSubmitting ? null : () => _submitQuiz(),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF6F5AAA),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text('Submit Quiz',
-                        style: TextStyle(fontSize: 16)),
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          color: const Color(0xFF6F5AAA),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              'Question ${_currentIndex + 1}/${_questions.length}',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1C1B20),
               ),
             ),
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              16 + MediaQuery.of(context).padding.bottom,
+            ),
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: _questions.length,
+              onPageChanged: (index) => setState(() => _currentIndex = index),
+              itemBuilder: (context, index) {
+                final q = _questions[index];
+                return _buildQuestionCard(
+                  index: index,
+                  q: q,
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavButtonsFor(int index) {
+    final isFirst = index == 0;
+    final isLast = index == _questions.length - 1;
+
+    final nextOrSubmitButton = FilledButton(
+      onPressed: () {
+        if (isLast) {
+          _submitQuiz();
+        } else {
+          _pageController.nextPage(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
           );
         }
-
-        final q = _questions[index];
-        return _buildQuestionCard(index: index, q: q);
       },
+      style: FilledButton.styleFrom(
+        backgroundColor: const Color(0xFF6F5AAA),
+        minimumSize: const Size(200, 48),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: _isSubmitting && isLast
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
+          : Text(isLast ? 'Submit' : 'Next', style: const TextStyle(fontSize: 16)),
+    );
+
+    if (isFirst) {
+      return Center(child: nextOrSubmitButton);
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () {
+              _pageController.previousPage(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+              );
+            },
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              side: const BorderSide(color: Color(0xFF6F5AAA)),
+            ),
+            child: const Text('Previous', style: TextStyle(color: Color(0xFF6F5AAA), fontSize: 16)),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: nextOrSubmitButton,
+        ),
+      ],
     );
   }
 
   Widget _buildQuestionCard({required int index, required QuestionModel q}) {
     final selected = _answers[q.id];
 
-    return Card(
-      elevation: 0,
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
       ),
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${index + 1}. ${q.question}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1C1B20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE4DDEE), width: 1.5),
               ),
-            ),
-            const SizedBox(height: 12),
-            RadioGroup<int>(
-              groupValue: selected,
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _answers[q.id] = val);
-                }
-              },
-              child: Column(
-                children: List.generate(
-                  q.options.length,
-                  (optIndex) => RadioListTile<int>(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      q.options[optIndex].text,
-                      style: const TextStyle(fontSize: 15),
-                    ),
-                    value: optIndex,
-                  ),
+              child: Text(
+                q.question,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1C1B20),
                 ),
               ),
             ),
+            const SizedBox(height: 24), // Increased gap between question and options
+            Column(
+              children: List.generate(
+                q.options.length,
+                (optIndex) {
+                  final isSelected = selected == optIndex;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFF6F5AAA).withValues(alpha: 0.05) : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFF6F5AAA) : const Color(0xFFE4DDEE),
+                        width: isSelected ? 1.0 : 1.5,
+                      ),
+                    ),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() => _answers[q.id] = optIndex);
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: isSelected 
+                                    ? const Color(0xFF6F5AAA) 
+                                    : const Color(0xFF6F5AAA).withValues(alpha: 0.7),
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                String.fromCharCode(65 + optIndex),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                q.options[optIndex].text,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF49454E),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 32),
+            _buildNavButtonsFor(index),
           ],
         ),
       ),

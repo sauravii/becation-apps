@@ -14,6 +14,7 @@ import '../../components/cards/material_card.dart';
 import '../../components/cards/quiz_card.dart';
 import '../../components/cards/topic_section.dart';
 import '../../components/navigation/nav_item.dart';
+import '../../components/map/learning_map.dart';
 import 'student_material_detail.dart';
 import 'student_quiz_intro_screen.dart';
 import 'student_quiz_result_page.dart';
@@ -328,20 +329,12 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
               ),
               const SizedBox(height: 24),
 
-              // Quizzes Section
-              _buildSectionHeader('Quizzes'),
+              // Learning Path Section
+              _buildSectionHeader('Learning Path'),
               const Divider(
                   color: Color(0xFF49454E), thickness: 1, height: 20),
               const SizedBox(height: 10),
-              _buildAllQuizzesList(),
-              const SizedBox(height: 24),
-
-              // Materials Section
-              _buildSectionHeader('Materials'),
-              const Divider(
-                  color: Color(0xFF49454E), thickness: 1, height: 20),
-              const SizedBox(height: 10),
-              _buildAllMaterialsList(),
+              _buildLearningMap(),
             ],
           ),
         );
@@ -363,243 +356,294 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
     );
   }
 
-  Widget _buildAllQuizzesList() {
-    return StreamBuilder<List<QuizModel>>(
-      stream: _quizzesStream,
-      builder: (context, snapshot) {
-        final quizzes = snapshot.data ?? [];
+  Widget _buildLearningMap() {
+  return StreamBuilder<List<TopicModel>>(
+    stream: _topicsStream,
+    builder: (context, topicSnapshot) {
+      return StreamBuilder<List<QuizModel>>(
+        stream: _quizzesStream,
+        builder: (context, quizSnapshot) {
+          return StreamBuilder<List<MaterialModel>>(
+            stream: MaterialService.materialsStream(widget.classId),
+            builder: (context, materialSnapshot) {
+              final topics = topicSnapshot.data ?? [];
+              final quizzes = quizSnapshot.data ?? [];
+              final materials = materialSnapshot.data ?? [];
 
-        if (quizzes.isEmpty) {
-          return Container(
-            width: double.infinity,
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE7DFF8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(
-              child: Text(
-                'No quizzes yet',
-                style: TextStyle(color: Colors.grey, fontSize: 14),
-              ),
-            ),
-          );
-        }
+              final learningTopics = <LearningTopic>[];
+              final usedMaterials = <String>{};
+              final usedQuizzes = <String>{};
 
-        return Column(
-          children: quizzes
-              .map((q) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: QuizCard(
-                      title: q.title,
-                      questionCount: q.questionCount,
-                      timeLimit: q.timeLimit,
-                      passingGrade: q.passingGrade,
-                      topicTitle: q.topicTitle,
-                      onTap: () async {
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (_) => const Center(child: CircularProgressIndicator()),
-                        );
+              // Create a topic section for each defined topic
+              for (int i = 0; i < topics.length; i++) {
+                final t = topics[i];
+                final nodes = <LearningNode>[];
 
-                        try {
-                          final attempts = await QuizService.getStudentAttemptsCount(widget.classId, q.id);
-                          if (!context.mounted) return;
-                          Navigator.pop(context); // close loading modal
+                final topicMaterials = materials
+                    .where((m) => m.topicTitle == t.title)
+                    .toList();
 
-                          if (attempts > 0) {
-                            final bool reachedLimit = attempts >= q.attemptLimit;
-                            final proceed = await showDialog<String>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: Text(reachedLimit ? 'Attempt Limit Reached' : 'Quiz Attempt'),
-                                content: Text(
-                                  reachedLimit
-                                      ? 'You have reached the maximum attempt limit (${q.attemptLimit}) for this quiz.\nWould you like to review your last attempt?'
-                                      : 'You have made $attempts out of ${q.attemptLimit} attempts.\nWhat would you like to do?',
-                                ),
-                                actionsOverflowButtonSpacing: 10,
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx, 'cancel'),
-                                    child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () => Navigator.pop(ctx, 'check'),
-                                    style: FilledButton.styleFrom(
-                                        backgroundColor: const Color(0xFF6F5AAA)),
-                                    child: const Text('Check Answer'),
-                                  ),
-                                  if (!reachedLimit)
-                                    FilledButton(
-                                      onPressed: () => Navigator.pop(ctx, 'attempt'),
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: const Color(0xFF6F5AAA),
-                                      ),
-                                      child: const Text('Attempt Again'),
-                                    ),
-                                ],
-                              ),
-                            );
+                final topicQuizzes = quizzes
+                    .where((q) => q.topicTitle == t.title)
+                    .toList();
 
-                            if (proceed == null || proceed == 'cancel') return;
+                usedMaterials.addAll(topicMaterials.map((m) => m.id));
+                usedQuizzes.addAll(topicQuizzes.map((q) => q.id));
 
-                            if (proceed == 'check') {
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (_) => const Center(
-                                    child: CircularProgressIndicator()),
-                              );
-                              try {
-                                final questionsSnap =
-                                    await QuizService.getQuestionsFuture(
-                                        widget.classId, q.id);
-                                final latestAttempt =
-                                    await QuizService.getLatestStudentAttempt(
-                                        widget.classId, q.id);
-
-                                if (!context.mounted) return;
-                                Navigator.pop(context); // close loading
-
-                                if (latestAttempt == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text('No attempt data found.')),
-                                  );
-                                  return;
-                                }
-
-                                final answersMap = (latestAttempt['answers'] as Map?)
-                                        ?.cast<String, int>() ?? {};
-                                final correctAnswersMap = <String, List<int>>{};
-                                final questionSnap = latestAttempt['questionSnapshot'] as List?;
-                                if (questionSnap != null) {
-                                  for (final qData in questionSnap) {
-                                    if (qData is Map) {
-                                      final id = qData['id']?.toString();
-                                      final indices = qData['correctIndices'];
-                                      if (id != null && indices is List) {
-                                        correctAnswersMap[id] = indices
-                                            .whereType<num>()
-                                            .map((n) => n.toInt())
-                                            .toList();
-                                      }
-                                    }
-                                  }
-                                }
-
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => StudentQuizResultPage(
-                                      quiz: q,
-                                      questions: questionsSnap,
-                                      answers: answersMap,
-                                      correctAnswers: correctAnswersMap,
-                                      score: (latestAttempt['score'] as num?)?.toInt() ?? 0,
-                                      correct: (latestAttempt['correct'] as num?)?.toInt() ?? 0,
-                                      total: (latestAttempt['total'] as num?)?.toInt() ?? 0,
-                                      passed: latestAttempt['passed'] == true,
-                                      isFinalAttempt: reachedLimit,
-                                    ),
-                                  ),
-                                );
-                              } catch (e) {
-                                if (context.mounted) {
-                                  Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Error: $e')),
-                                  );
-                                }
-                              }
-                              return;
-                            }
-                            // If 'attempt', it falls through to push StudentQuizIntroScreen
-                          }
-
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => StudentQuizIntroScreen(
-                                classId: widget.classId,
-                                quiz: q,
-                                attemptCount: attempts,
-                              ),
-                            ),
-                          );
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error checking attempts: $e')),
-                          );
-                        }
-                      },
+                for (final m in topicMaterials) {
+                  nodes.add(
+                    LearningNode(
+                      id: m.id,
+                      title: m.title,
+                      type: 'material',
+                      color: const Color(0xFF7A6B9E),
+                      shadowColor: const Color(0xFF5A4A8A),
+                      icon: 'assets/icons/class_material.png',
+                      onTap: () => _handleMaterialTap(m),
                     ),
-                  ))
-              .toList(),
-        );
-      },
+                  );
+                }
+
+                for (final q in topicQuizzes) {
+                  nodes.add(
+                    LearningNode(
+                      id: q.id,
+                      title: q.title,
+                      type: 'quiz',
+                      color: const Color(0xFF9E6B7B),
+                      shadowColor: const Color(0xFF8A4A5D),
+                      icon: 'assets/icons/class_quiz.png',
+                      onTap: () => _handleQuizTap(q),
+                    ),
+                  );
+                }
+
+                nodes.sort((a, b) => a.id.compareTo(b.id));
+
+                learningTopics.add(
+                  LearningTopic(
+                    id: t.id,
+                    title: t.title,
+                    nodes: nodes,
+                  ),
+                );
+              }
+
+              // Add any uncategorized materials or quizzes to a generic "Other" topic
+              final unusedMaterials = materials
+                  .where((m) => !usedMaterials.contains(m.id))
+                  .toList();
+
+              final unusedQuizzes = quizzes
+                  .where((q) => !usedQuizzes.contains(q.id))
+                  .toList();
+
+              if (unusedMaterials.isNotEmpty ||
+                  unusedQuizzes.isNotEmpty ||
+                  topics.isEmpty) {
+                final nodes = <LearningNode>[];
+
+                for (final m in unusedMaterials) {
+                  nodes.add(
+                    LearningNode(
+                      id: m.id,
+                      title: m.title,
+                      type: 'material',
+                      color: const Color(0xFF7A6B9E),
+                      shadowColor: const Color(0xFF5A4A8A),
+                      icon: 'assets/icons/class_material.png',
+                      onTap: () => _handleMaterialTap(m),
+                    ),
+                  );
+                }
+
+                for (final q in unusedQuizzes) {
+                  nodes.add(
+                    LearningNode(
+                      id: q.id,
+                      title: q.title,
+                      type: 'quiz',
+                      color: const Color(0xFF9E6B7B),
+                      shadowColor: const Color(0xFF8A4A5D),
+                      icon: 'assets/icons/class_quiz.png',
+                      onTap: () => _handleQuizTap(q),
+                    ),
+                  );
+                }
+
+                nodes.sort((a, b) => a.id.compareTo(b.id));
+
+                learningTopics.add(
+                  LearningTopic(
+                    id: 'other',
+                    title: 'Classwork',
+                    nodes: nodes,
+                  ),
+                );
+              }
+
+              return LearningMap(topics: learningTopics);
+            },
+          );
+        },
+      );
+    },
+  );
+}
+
+  void _handleMaterialTap(MaterialModel m) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => StudentMaterialDetail(
+          classId: widget.classId,
+          materialId: m.id,
+          materialTitle: m.title,
+          materialTimestamp: m.formattedTime,
+          topicTitle: m.topicTitle,
+          topicColor: widget.classColor,
+        ),
+      ),
     );
   }
 
-  Widget _buildAllMaterialsList() {
-    return StreamBuilder<List<MaterialModel>>(
-      stream: MaterialService.materialsStream(widget.classId),
-      builder: (context, snapshot) {
-        final materials = snapshot.data ?? [];
-
-        if (materials.isEmpty) {
-          return Container(
-            width: double.infinity,
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE7DFF8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(
-              child: Text(
-                'No materials yet',
-                style: TextStyle(color: Colors.grey, fontSize: 14),
-              ),
-            ),
-          );
-        }
-
-        return Column(
-          children: materials
-              .map((m) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: MaterialCard(
-                      material: MaterialItem(
-                        id: m.id,
-                        title: m.title,
-                        timestamp: m.formattedTime,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => StudentMaterialDetail(
-                                classId: widget.classId,
-                                materialId: m.id,
-                                materialTitle: m.title,
-                                materialTimestamp: m.formattedTime,
-                                topicTitle: m.topicTitle,
-                                topicColor: widget.classColor,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      topicTitle: m.topicTitle,
-                      topicColor: widget.classColor,
-                    ),
-                  ))
-              .toList(),
-        );
-      },
+  Future<void> _handleQuizTap(QuizModel q) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      final attempts = await QuizService.getStudentAttemptsCount(widget.classId, q.id);
+      if (!context.mounted) return;
+      Navigator.pop(context); // close loading modal
+
+      if (attempts > 0) {
+        final bool reachedLimit = attempts >= q.attemptLimit;
+        final proceed = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(reachedLimit ? 'Attempt Limit Reached' : 'Quiz Attempt'),
+            content: Text(
+              reachedLimit
+                  ? 'You have reached the maximum attempt limit (${q.attemptLimit}) for this quiz.\nWould you like to review your last attempt?'
+                  : 'You have made $attempts out of ${q.attemptLimit} attempts.\nWhat would you like to do?',
+            ),
+            actionsOverflowButtonSpacing: 10,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'cancel'),
+                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, 'check'),
+                style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF6F5AAA)),
+                child: const Text('Check Answer'),
+              ),
+              if (!reachedLimit)
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, 'attempt'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF6F5AAA),
+                  ),
+                  child: const Text('Attempt Again'),
+                ),
+            ],
+          ),
+        );
+
+        if (proceed == null || proceed == 'cancel') return;
+
+        if (proceed == 'check') {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const Center(
+                child: CircularProgressIndicator()),
+          );
+          try {
+            final questionsSnap =
+                await QuizService.getQuestionsFuture(
+                    widget.classId, q.id);
+            final latestAttempt =
+                await QuizService.getLatestStudentAttempt(
+                    widget.classId, q.id);
+
+            if (!context.mounted) return;
+            Navigator.pop(context); // close loading
+
+            if (latestAttempt == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('No attempt data found.')),
+              );
+              return;
+            }
+
+            final answersMap = (latestAttempt['answers'] as Map?)
+                    ?.cast<String, int>() ?? {};
+            final correctAnswersMap = <String, List<int>>{};
+            final questionSnap = latestAttempt['questionSnapshot'] as List?;
+            if (questionSnap != null) {
+              for (final qData in questionSnap) {
+                if (qData is Map) {
+                  final id = qData['id']?.toString();
+                  final indices = qData['correctIndices'];
+                  if (id != null && indices is List) {
+                    correctAnswersMap[id] = indices
+                        .whereType<num>()
+                        .map((n) => n.toInt())
+                        .toList();
+                  }
+                }
+              }
+            }
+
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StudentQuizResultPage(
+                  quiz: q,
+                  questions: questionsSnap,
+                  answers: answersMap,
+                  correctAnswers: correctAnswersMap,
+                  score: (latestAttempt['score'] as num?)?.toInt() ?? 0,
+                  correct: (latestAttempt['correct'] as num?)?.toInt() ?? 0,
+                  total: (latestAttempt['total'] as num?)?.toInt() ?? 0,
+                  passed: latestAttempt['passed'] == true,
+                  isFinalAttempt: reachedLimit,
+                ),
+              ),
+            );
+          } catch (e) {
+            if (context.mounted) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error: $e')),
+              );
+            }
+          }
+          return;
+        }
+        // If 'attempt', it falls through to push StudentQuizIntroScreen
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => StudentQuizIntroScreen(
+            classId: widget.classId,
+            quiz: q,
+            attemptCount: attempts,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error checking attempts: $e')),
+      );
+    }
   }
 
   Widget _buildClassworkTab() {

@@ -477,7 +477,7 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: isSelected ? const Color(0xFF6F5AAA) : const Color(0xFFE4DDEE),
-                        width: isSelected ? 1.5 : 1.5,
+                        width: isSelected ? 1.0 : 1.5,
                       ),
                     ),
                     child: InkWell(

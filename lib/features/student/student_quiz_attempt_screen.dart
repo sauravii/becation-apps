@@ -24,9 +24,6 @@ class StudentQuizAttemptScreen extends StatefulWidget {
 }
 
 class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
-  static const _primary = Color(0xFF5E4B8B);
-  static const _bg = Color(0xFFF7F2FA);
-
   late final Stream<List<QuestionModel>> _questionsStream;
   final PageController _pageController = PageController();
 
@@ -329,7 +326,6 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
       ),
       child: Column(
         children: [
-          _buildAttemptInfoCard(showStats: false),
           Expanded(
             child: PageView.builder(
               controller: _pageController,
@@ -340,11 +336,12 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
                 return _buildQuestionCard(
                   index: index,
                   q: q,
-                  interactive: true,
                 );
               },
             ),
           ),
+          const SizedBox(height: 16),
+          _buildNavButtons(),
         ],
       ),
     );
@@ -353,45 +350,64 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
   Widget _buildNavButtons() {
     final isFirst = _currentIndex == 0;
     final isLast = _currentIndex == _questions.length - 1;
-    if (isFirst) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          return Align(
-            alignment: Alignment.center,
-            child: SizedBox(
-              width: constraints.maxWidth / 2,
-              child: FilledButton(
-                onPressed: () {
-                  _pageController.nextPage(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOut,
-                  );
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF6F5AAA),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        if (!isFirst)
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () {
+                _pageController.previousPage(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text('Submit Quiz',
-                        style: TextStyle(fontSize: 16)),
+                side: const BorderSide(color: Color(0xFF6F5AAA)),
+              ),
+              child: const Text('Previous', style: TextStyle(color: Color(0xFF6F5AAA), fontSize: 16)),
+            ),
+          )
+        else
+          const Spacer(),
+
+        const SizedBox(width: 16),
+
+        Expanded(
+          child: FilledButton(
+            onPressed: () {
+              if (isLast) {
+                _submitQuiz();
+              } else {
+                _pageController.nextPage(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                );
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF6F5AAA),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-          );
-        }
-
-        final q = _questions[index];
-        return _buildQuestionCard(index: index, q: q);
-      },
+            child: _isSubmitting && isLast
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(isLast ? 'Submit Quiz' : 'Next', style: const TextStyle(fontSize: 16)),
+          ),
+        ),
+      ],
     );
   }
 
@@ -405,23 +421,25 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE4DDEE)),
-            ),
-            child: Text(
-              q.question,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1C1B20),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE4DDEE)),
+              ),
+              child: Text(
+                q.question,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1C1B20),
+                ),
               ),
             ),
             const SizedBox(height: 12),

@@ -37,9 +37,9 @@ class _TeacherCreateQuestionScreenState
   static const _hint = Color(0xFF9A9499);
   static const _ink = Color(0xFF1C1B20);
 
-  static const _types = ['Multiple Choice'];
+  static const _types = ["Multiple Choice", "True/False"];
 
-  String _type = 'Multiple Choice';
+  String _type = "Multiple Choice";
   final _questionController = TextEditingController();
   late List<TextEditingController> _optionControllers;
   int _correctIndex = -1;
@@ -148,12 +148,21 @@ class _TeacherCreateQuestionScreenState
                     ),
                     const SizedBox(height: 12),
                     ..._optionControllers.asMap().entries.map(
+<<<<<<< HEAD
                       (entry) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _buildOptionCard(entry.key),
                       ),
                     ),
                     _buildAddOptionButton(),
+=======
+                          (entry) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildOptionCard(entry.key),
+                          ),
+                        ),
+                    if (_type != "True/False") _buildAddOptionButton(),
+>>>>>>> 001daf3041b92e611299c0eaa4c5a3af81cc6b33
                   ],
                 ),
               ),
@@ -274,7 +283,19 @@ class _TeacherCreateQuestionScreenState
               onChanged: locked
                   ? null
                   : (v) {
-                      if (v != null) setState(() => _type = v);
+                      if (v != null) {
+                        setState(() {
+                          _type = v;
+                          if (_type == "True/False") {
+                            // Reset options to True & False
+                            _optionControllers = [
+                              TextEditingController(text: "True"),
+                              TextEditingController(text: "False"),
+                            ];
+                            _correctIndex = -1;
+                          }
+                        });
+                      }
                     },
             ),
           ),
@@ -318,8 +339,9 @@ class _TeacherCreateQuestionScreenState
 
   Widget _buildOptionCard(int index) {
     final isCorrect = _correctIndex == index;
-    final canDelete = _optionControllers.length > 2;
-    final number = (index + 1).toString().padLeft(2, '0');
+    final isTrueFalse = _type == "True/False";
+    final canDelete = _optionControllers.length > 2 && !isTrueFalse;
+    final number = (index + 1).toString().padLeft(2, "0");
 
     return Container(
       width: double.infinity,
@@ -359,21 +381,31 @@ class _TeacherCreateQuestionScreenState
               Expanded(
                 child: TextField(
                   controller: _optionControllers[index],
-                  style: const TextStyle(fontSize: 15, color: _ink),
+                  enabled: !isTrueFalse, // Kunci teks jika True/False
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: _ink,
+                  ),
                   decoration: InputDecoration(
                     isDense: true,
-                    hintText: 'Option ${index + 1}',
+                    hintText: "Option ${index + 1}",
                     hintStyle: const TextStyle(color: _hint),
                     contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                    border: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF79747E)),
-                    ),
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF79747E)),
-                    ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: _purple, width: 2),
-                    ),
+                    border: isTrueFalse
+                        ? InputBorder.none
+                        : const UnderlineInputBorder(
+                            borderSide: BorderSide(color: Color(0xFF79747E)),
+                          ),
+                    enabledBorder: isTrueFalse
+                        ? InputBorder.none
+                        : const UnderlineInputBorder(
+                            borderSide: BorderSide(color: Color(0xFF79747E)),
+                          ),
+                    focusedBorder: isTrueFalse
+                        ? InputBorder.none
+                        : const UnderlineInputBorder(
+                            borderSide: BorderSide(color: _purple, width: 2),
+                          ),
                   ),
                 ),
               ),
@@ -384,18 +416,30 @@ class _TeacherCreateQuestionScreenState
             children: [
               _buildMarkAsAnswerButton(index, isCorrect),
               const Spacer(),
-              IconButton(
-                onPressed: canDelete ? () => _removeOption(index) : null,
-                icon: Icon(
-                  Icons.delete_outline,
-                  size: 20,
-                  color: canDelete ? Colors.red.shade400 : Colors.grey.shade300,
+              if (!isTrueFalse)
+                IconButton(
+                  onPressed: canDelete ? () => _removeOption(index) : null,
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 20,
+                    color: canDelete ? Colors.red.shade400 : Colors.grey.shade300,
+                  ),
+                  tooltip: canDelete ? "Delete option" : "Minimum 2 options",
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
+<<<<<<< HEAD
                 tooltip: canDelete ? 'Delete option' : 'Minimum 2 options',
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
+=======
+>>>>>>> 001daf3041b92e611299c0eaa4c5a3af81cc6b33
             ],
           ),
         ],

@@ -41,6 +41,8 @@ function getQuizFlow() {
     prompt: z.string(),
     count: z.number(),
     optionsCount: z.number(),
+    difficulty: z.string().optional(),
+    language: z.string().optional(),
   });
 
   _flow = ai.defineFlow(
@@ -49,7 +51,9 @@ function getQuizFlow() {
         inputSchema: InputSchema,
         outputSchema: QuizSchema,
       },
-      async ({prompt, count, optionsCount}) => {
+      async ({prompt, count, optionsCount, difficulty, language}) => {
+        const finalDifficulty = difficulty ?? "Medium";
+        const finalLanguage = language ?? "English";
         const {output} = await ai.generate({
           model: MODEL,
           system: `Anda adalah asisten pembuat kuis pendidikan yang ahli.
@@ -57,7 +61,9 @@ Tugas Anda adalah membuat soal pilihan ganda berdasarkan topik yang diminta.
 PERATURAN:
 1. "correctIndex" adalah angka (0-based index) jawaban benar.
 2. JUMLAH PILIHAN: Setiap soal harus memiliki tepat ${optionsCount} pilihan jawaban.
-3. KHUSUS 2 PILIHAN: Jika user meminta 2 pilihan, buatlah dalam format Benar/Salah (True/False).`,
+3. KHUSUS 2 PILIHAN: Jika user meminta 2 pilihan, buatlah dalam format Benar/Salah (True/False).
+4. TINGKAT KESULITAN: Buat soal pada level "${finalDifficulty}" — Easy (konsep dasar, recall langsung), Medium (aplikasi konsep ke skenario standar), Hard (penalaran multi-langkah, perbandingan, edge case), Expert (sintesis, analisis mendalam, skenario kompleks dunia nyata).
+5. BAHASA OUTPUT: Tulis SEMUA soal, pilihan jawaban, dan teks dalam bahasa "${finalLanguage}". Jangan campur bahasa.`,
           prompt: `Buatkan ${count} soal pilihan ganda dengan ${optionsCount} pilihan setiap soalnya, berdasarkan: ${prompt}`,
           output: {schema: QuizSchema},
         });
@@ -108,7 +114,7 @@ exports.generateQuizAI = onCall(
 
       await verifyIsTeacher(auth.uid);
 
-      const {prompt, count, optionsCount} = data ?? {};
+      const {prompt, count, optionsCount, difficulty, language} = data ?? {};
       if (!prompt || !count || !optionsCount) {
         throw new HttpsError(
             "invalid-argument",
@@ -118,7 +124,13 @@ exports.generateQuizAI = onCall(
 
       try {
         const flow = getQuizFlow();
-        const result = await flow({prompt, count, optionsCount});
+        const result = await flow({
+          prompt,
+          count,
+          optionsCount,
+          difficulty,
+          language,
+        });
         return {success: true, data: result};
       } catch (error) {
         if (error instanceof HttpsError) throw error;

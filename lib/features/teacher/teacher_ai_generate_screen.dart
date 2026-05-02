@@ -23,10 +23,10 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
   bool _isLoading = false;
 
   final List<String> _examples = [
-    "Linear Algebra dasar untuk Semester 1",
-    "Sejarah Kemerdekaan Indonesia tingkat SMA",
-    "Pemrograman Dasar Python: Loop & Function",
-    "Ekonomi Mikro: Hukum Permintaan & Penawaran",
+    "Basic Linear Algebra for Semester 1",
+    "Indonesian Independence History for high school",
+    "Python Basics: Loops & Functions",
+    "Microeconomics: Supply & Demand",
   ];
 
   @override
@@ -39,7 +39,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
     final prompt = _promptController.text.trim();
     if (prompt.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Tuliskan topik kuis terlebih dahulu")),
+        const SnackBar(content: Text("Please enter a quiz topic first")),
       );
       return;
     }
@@ -58,7 +58,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
       if (!mounted) return;
 
       final List<dynamic> rawList = result.data["data"];
-      
+
       final List<PendingQuestion> generatedQuestions = rawList.map((item) {
         return PendingQuestion(
           type: "Multiple Choice",
@@ -73,7 +73,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal generate kuis: $e")),
+        SnackBar(content: Text("Failed to generate quiz: $e")),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -104,28 +104,28 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "Berapa banyak soal yang ingin dibuat?",
+                  "How many questions do you want to create?",
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _label),
                 ),
                 const SizedBox(height: 12),
                 _buildQuestionCountSelector(),
                 const SizedBox(height: 24),
                 const Text(
-                  "Jumlah pilihan jawaban per soal",
+                  "Number of answer options per question",
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _label),
                 ),
                 const SizedBox(height: 12),
                 _buildOptionsCountSelector(),
                 const SizedBox(height: 24),
                 const Text(
-                  "Topik atau instruksi kuis",
+                  "Quiz topic or instruction",
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _label),
                 ),
                 const SizedBox(height: 12),
                 _buildPromptField(),
                 const SizedBox(height: 20),
                 const Text(
-                  "Contoh prompt:",
+                  "Example prompts:",
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _hint),
                 ),
                 const SizedBox(height: 8),
@@ -258,7 +258,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
         maxLength: 200,
         style: const TextStyle(fontSize: 15, color: _ink),
         decoration: InputDecoration(
-          hintText: "Misal: Buatkan soal tentang Teori Relativitas tingkat kesulitan menengah...",
+          hintText: "e.g., Create questions about Theory of Relativity at intermediate difficulty...",
           hintStyle: const TextStyle(color: _hint),
           contentPadding: const EdgeInsets.all(16),
           border: InputBorder.none,
@@ -309,12 +309,12 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
               CircularProgressIndicator(color: _purple),
               SizedBox(height: 20),
               Text(
-                "AI sedang menyusun soal...",
+                "AI is generating questions...",
                 style: TextStyle(fontWeight: FontWeight.bold, color: _ink),
               ),
               SizedBox(height: 8),
               Text(
-                "Mohon tunggu sebentar",
+                "Please wait...",
                 style: TextStyle(fontSize: 13, color: _hint),
               ),
             ],

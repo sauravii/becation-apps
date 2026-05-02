@@ -260,7 +260,6 @@ class QuizService {
     );
   }
 
-  /// Get the number of attempts the current student has made for a specific quiz.
   static Future<int> getStudentAttemptsCount(
     String classId,
     String quizId,
@@ -276,6 +275,42 @@ class QuizService {
         .get();
 
     return snap.count ?? 0;
+  }
+
+  static Future<List<QuestionModel>> getQuestionsFuture(
+    String classId,
+    String quizId,
+  ) async {
+    final snap = await _questionsRef(classId, quizId).orderBy('order').get();
+    return snap.docs.map((doc) => QuestionModel.fromFirestore(doc)).toList();
+  }
+
+  static Future<Map<String, dynamic>?> getLatestStudentAttempt(
+    String classId,
+    String quizId,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+
+    final snap = await _quizzesRef(classId)
+        .doc(quizId)
+        .collection('attempts')
+        .where('studentId', isEqualTo: user.uid)
+        .get();
+
+    if (snap.docs.isEmpty) return null;
+
+    final docs = snap.docs.toList();
+    docs.sort((a, b) {
+      final tA = a.data()['submittedAt'];
+      final tB = b.data()['submittedAt'];
+      if (tA is Timestamp && tB is Timestamp) {
+        return tB.compareTo(tA); // Descending
+      }
+      return 0;
+    });
+
+    return docs.first.data();
   }
 
   /// Total attempt count across all students for a quiz. Teacher-only.

@@ -16,6 +16,7 @@ class StudentQuizResultScreen extends StatelessWidget {
   final int correct;
   final int total;
   final bool passed;
+  final bool isFinalAttempt;
 
   const StudentQuizResultScreen({
     super.key,
@@ -27,20 +28,47 @@ class StudentQuizResultScreen extends StatelessWidget {
     required this.correct,
     required this.total,
     required this.passed,
+    this.isFinalAttempt = true,
   });
-
-  bool get _hasReview => correctAnswers.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F2FA),
       appBar: AppBar(
-        title: Text(quiz.title, style: const TextStyle(fontSize: 18)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1C1B20),
-        elevation: 1,
+        title: Text(quiz.title, style: const TextStyle(fontSize: 18, color: Colors.white)),
+        backgroundColor: const Color(0xFF6F5AAA),
+        foregroundColor: Colors.white,
+        elevation: 0,
         automaticallyImplyLeading: false,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6F5AAA),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(width: 4),
+                    Text(
+                      'Finished',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: ListView.builder(
         padding: EdgeInsets.fromLTRB(
@@ -49,13 +77,9 @@ class StudentQuizResultScreen extends StatelessWidget {
           16,
           16 + MediaQuery.of(context).padding.bottom,
         ),
-        itemCount: _hasReview ? questions.length + 2 : 3,
+        itemCount: questions.length + 2,
         itemBuilder: (context, index) {
           if (index == 0) return _buildResultBanner();
-          if (!_hasReview) {
-            if (index == 1) return _buildAnswersHiddenNotice();
-            return _buildDoneButton(context);
-          }
           if (index == questions.length + 1) {
             return _buildDoneButton(context);
           }
@@ -106,56 +130,10 @@ class StudentQuizResultScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '$correct / $total correct  ·  Passing grade ${quiz.passingGrade}%',
+            (quiz.showAnswer && isFinalAttempt)
+                ? '$correct / $total correct  ·  Passing grade ${quiz.passingGrade}%'
+                : 'Passing grade ${quiz.passingGrade}%',
             style: const TextStyle(fontSize: 13, color: Color(0xFF49454E)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAnswersHiddenNotice() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.visibility_off_outlined,
-            color: Color(0xFF6F5AAA),
-            size: 22,
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Answers hidden',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1C1B20),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Your teacher has hidden the correct answers for this quiz, so the per-question review is not shown.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF49454E),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -165,108 +143,141 @@ class StudentQuizResultScreen extends StatelessWidget {
   Widget _buildQuestionCard(int index, QuestionModel q) {
     final selected = userAnswers[q.id];
     final correctIndices = correctAnswers[q.id] ?? const <int>[];
+    final showStatus = quiz.showAnswer && isFinalAttempt;
 
-    return Card(
-      elevation: 0,
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
       ),
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${index + 1}. ${q.question}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Question ${index + 1}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1C1B20),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE4DDEE), width: 1.5),
+            ),
+            child: Text(
+              q.question,
               style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
                 color: Color(0xFF1C1B20),
               ),
             ),
-            const SizedBox(height: 12),
-            Column(
-              children: List.generate(q.options.length, (optIndex) {
-                final isCorrect = correctIndices.contains(optIndex);
-                final isSelected = selected == optIndex;
-                final isWrongPick = isSelected && !isCorrect;
-                Color? bg;
-                if (isCorrect) bg = Colors.green.shade50;
-                if (isWrongPick) bg = Colors.red.shade50;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: bg,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isCorrect
-                          ? Colors.green.shade300
-                          : isWrongPick
-                              ? Colors.red.shade300
-                              : Colors.grey.shade200,
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 1),
-                        child: Icon(
-                          isCorrect
-                              ? Icons.check_circle
-                              : isWrongPick
-                                  ? Icons.cancel
-                                  : Icons.radio_button_off,
-                          size: 18,
-                          color: isCorrect
-                              ? Colors.green
-                              : isWrongPick
-                                  ? Colors.red
-                                  : Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          q.options[optIndex].text,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: const Color(0xFF1C1B20),
-                            fontWeight:
-                                isCorrect ? FontWeight.w600 : FontWeight.w400,
-                          ),
-                        ),
-                      ),
-                      if (isSelected)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          margin: const EdgeInsets.only(left: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Your pick',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF49454E),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              }),
+          ),
+          const SizedBox(height: 22),
+          Column(
+            children: List.generate(q.options.length, (optIndex) {
+              final isCorrect = correctIndices.contains(optIndex);
+              final isSelected = selected == optIndex;
+              final isWrongPick = isSelected && !isCorrect;
+              return _buildOptionTile(
+                label: String.fromCharCode(65 + optIndex),
+                text: q.options[optIndex].text,
+                selected: isSelected,
+                correct: isCorrect,
+                wrongPick: isWrongPick,
+                showStatus: showStatus,
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOptionTile({
+    required String label,
+    required String text,
+    bool selected = false,
+    bool correct = false,
+    bool wrongPick = false,
+    bool showStatus = false,
+  }) {
+    Color borderColor = const Color(0xFFE4DDEE);
+    Color fillColor = Colors.white;
+    Color badgeColor = const Color(0xFF6F5AAA);
+    Color badgeText = Colors.white;
+
+    if (selected) {
+      borderColor = const Color(0xFF6F5AAA);
+      fillColor = const Color(0xFFF4F0FB);
+    }
+    if (showStatus) {
+      if (correct) {
+        borderColor = const Color(0xFF58B368);
+        fillColor = const Color(0xFFEAF6EE);
+        badgeColor = const Color(0xFF58B368);
+      } else if (wrongPick) {
+        borderColor = const Color(0xFFE06B6B);
+        fillColor = const Color(0xFFFCEDED);
+        badgeColor = const Color(0xFFE06B6B);
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: fillColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: badgeColor,
+              shape: BoxShape.circle,
             ),
-          ],
-        ),
+            child: Text(
+              label,
+              style: TextStyle(fontWeight: FontWeight.w700, color: badgeText),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF2B2633),
+              ),
+            ),
+          ),
+          if (showStatus && (correct || wrongPick))
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Icon(
+                correct ? Icons.check_circle : Icons.cancel,
+                color: correct
+                    ? const Color(0xFF58B368)
+                    : const Color(0xFFE06B6B),
+                size: 18,
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -12,6 +12,7 @@ class StudentQuizResultPage extends StatelessWidget {
   final int correct;
   final int total;
   final bool passed;
+  final bool isFinalAttempt;
 
   const StudentQuizResultPage({
     super.key,
@@ -23,10 +24,13 @@ class StudentQuizResultPage extends StatelessWidget {
     required this.correct,
     required this.total,
     required this.passed,
+    this.isFinalAttempt = true,
   });
 
   static const _primary = Color(0xFF5E4B8B);
   static const _bg = Color(0xFFF7F2FA);
+
+  bool get _hasReview => correctAnswers.isNotEmpty && quiz.showAnswer;
 
   @override
   Widget build(BuildContext context) {
@@ -56,12 +60,12 @@ class StudentQuizResultPage extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.arrow_back, color: Colors.white),
           ),
-          Expanded(
+          const Expanded(
             child: Text(
               'Quiz Result',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -92,28 +96,80 @@ class StudentQuizResultPage extends StatelessWidget {
           return _buildAttemptInfoCard(wrong: wrong);
         }
         if (index == questions.length + 2) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF6F5AAA),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Done', style: TextStyle(fontSize: 16)),
-              ),
-            ),
-          );
+          return _buildDoneButton(context);
         }
 
         final q = questions[index - 2];
         return _buildQuestionCard(index: index - 2, q: q);
       },
+    );
+  }
+
+  Widget _buildDoneButton(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF6F5AAA),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text('Done', style: TextStyle(fontSize: 16)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnswersHiddenNotice() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.visibility_off_outlined,
+            color: Color(0xFF6F5AAA),
+            size: 22,
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Answers hidden',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1C1B20),
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Your teacher has hidden the correct answers for this quiz, so the per-question review is not shown.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF49454E),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -157,7 +213,9 @@ class StudentQuizResultPage extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '$correct / $total correct  ·  Passing grade ${quiz.passingGrade}%',
+            (quiz.showAnswer && isFinalAttempt)
+                ? '$correct / $total correct  ·  Passing grade ${quiz.passingGrade}%'
+                : 'Passing grade ${quiz.passingGrade}%',
             style: const TextStyle(fontSize: 13, color: Color(0xFF49454E)),
           ),
         ],
@@ -184,7 +242,7 @@ class StudentQuizResultPage extends StatelessWidget {
               ),
             ),
           ),
-          if (quiz.showAnswer) ...[
+          if (quiz.showAnswer && isFinalAttempt) ...[
             _buildMiniStat(
               icon: Icons.check_circle,
               color: const Color(0xFF58B368),
@@ -229,7 +287,7 @@ class StudentQuizResultPage extends StatelessWidget {
   }) {
     final selected = answers[q.id];
     final correctIndices = correctAnswers[q.id] ?? const <int>[];
-    final showStatus = quiz.showAnswer;
+    final showStatus = quiz.showAnswer && isFinalAttempt;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -241,30 +299,27 @@ class StudentQuizResultPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Question number label
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              'Question ${index + 1}',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF6F5AAA),
-              ),
+          Text(
+            'Question ${index + 1}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1C1B20),
             ),
           ),
+          const SizedBox(height: 12),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE4DDEE)),
+              border: Border.all(color: const Color(0xFFE4DDEE), width: 1.5),
             ),
             child: Text(
               q.question,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF1C1B20),
               ),

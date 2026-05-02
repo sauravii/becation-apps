@@ -148,21 +148,12 @@ class _TeacherCreateQuestionScreenState
                     ),
                     const SizedBox(height: 12),
                     ..._optionControllers.asMap().entries.map(
-<<<<<<< HEAD
                       (entry) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _buildOptionCard(entry.key),
                       ),
                     ),
-                    _buildAddOptionButton(),
-=======
-                          (entry) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildOptionCard(entry.key),
-                          ),
-                        ),
                     if (_type != "True/False") _buildAddOptionButton(),
->>>>>>> 001daf3041b92e611299c0eaa4c5a3af81cc6b33
                   ],
                 ),
               ),
@@ -432,14 +423,7 @@ class _TeacherCreateQuestionScreenState
                     minHeight: 32,
                   ),
                 ),
-<<<<<<< HEAD
-                tooltip: canDelete ? 'Delete option' : 'Minimum 2 options',
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              ),
-=======
->>>>>>> 001daf3041b92e611299c0eaa4c5a3af81cc6b33
+
             ],
           ),
         ],

@@ -16,6 +16,7 @@ import '../../components/cards/topic_section.dart';
 import '../../components/navigation/nav_item.dart';
 import 'student_material_detail.dart';
 import 'student_quiz_intro_screen.dart';
+import 'student_quiz_result_page.dart';
 
 class StudentClassesDetail extends StatefulWidget {
   final String classId;
@@ -408,21 +409,114 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                           if (!context.mounted) return;
                           Navigator.pop(context); // close loading modal
 
-                          if (attempts >= q.attemptLimit) {
-                            showDialog(
+                          if (attempts > 0) {
+                            final bool reachedLimit = attempts >= q.attemptLimit;
+                            final proceed = await showDialog<String>(
                               context: context,
                               builder: (ctx) => AlertDialog(
-                                title: const Text('Access Denied'),
-                                content: Text('You have reached the maximum attempt limit (${q.attemptLimit}) for this quiz.'),
+                                title: Text(reachedLimit ? 'Attempt Limit Reached' : 'Quiz Attempt'),
+                                content: Text(
+                                  reachedLimit
+                                      ? 'You have reached the maximum attempt limit (${q.attemptLimit}) for this quiz.\nWould you like to review your last attempt?'
+                                      : 'You have made $attempts out of ${q.attemptLimit} attempts.\nWhat would you like to do?',
+                                ),
+                                actionsOverflowButtonSpacing: 10,
                                 actions: [
-                                  FilledButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: const Text('OK'),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, 'cancel'),
+                                    child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
                                   ),
+                                  FilledButton(
+                                    onPressed: () => Navigator.pop(ctx, 'check'),
+                                    style: FilledButton.styleFrom(
+                                        backgroundColor: const Color(0xFF6F5AAA)),
+                                    child: const Text('Check Answer'),
+                                  ),
+                                  if (!reachedLimit)
+                                    FilledButton(
+                                      onPressed: () => Navigator.pop(ctx, 'attempt'),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: const Color(0xFF6F5AAA),
+                                      ),
+                                      child: const Text('Attempt Again'),
+                                    ),
                                 ],
                               ),
                             );
-                            return;
+
+                            if (proceed == null || proceed == 'cancel') return;
+
+                            if (proceed == 'check') {
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) => const Center(
+                                    child: CircularProgressIndicator()),
+                              );
+                              try {
+                                final questionsSnap =
+                                    await QuizService.getQuestionsFuture(
+                                        widget.classId, q.id);
+                                final latestAttempt =
+                                    await QuizService.getLatestStudentAttempt(
+                                        widget.classId, q.id);
+
+                                if (!context.mounted) return;
+                                Navigator.pop(context); // close loading
+
+                                if (latestAttempt == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text('No attempt data found.')),
+                                  );
+                                  return;
+                                }
+
+                                final answersMap = (latestAttempt['answers'] as Map?)
+                                        ?.cast<String, int>() ?? {};
+                                final correctAnswersMap = <String, List<int>>{};
+                                final questionSnap = latestAttempt['questionSnapshot'] as List?;
+                                if (questionSnap != null) {
+                                  for (final qData in questionSnap) {
+                                    if (qData is Map) {
+                                      final id = qData['id']?.toString();
+                                      final indices = qData['correctIndices'];
+                                      if (id != null && indices is List) {
+                                        correctAnswersMap[id] = indices
+                                            .whereType<num>()
+                                            .map((n) => n.toInt())
+                                            .toList();
+                                      }
+                                    }
+                                  }
+                                }
+
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => StudentQuizResultPage(
+                                      quiz: q,
+                                      questions: questionsSnap,
+                                      answers: answersMap,
+                                      correctAnswers: correctAnswersMap,
+                                      score: (latestAttempt['score'] as num?)?.toInt() ?? 0,
+                                      correct: (latestAttempt['correct'] as num?)?.toInt() ?? 0,
+                                      total: (latestAttempt['total'] as num?)?.toInt() ?? 0,
+                                      passed: latestAttempt['passed'] == true,
+                                      isFinalAttempt: reachedLimit,
+                                    ),
+                                  ),
+                                );
+                              } catch (e) {
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e')),
+                                  );
+                                }
+                              }
+                              return;
+                            }
+                            // If 'attempt', it falls through to push StudentQuizIntroScreen
                           }
 
                           Navigator.of(context).push(

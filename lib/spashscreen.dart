@@ -41,20 +41,26 @@ class _SplashScreenState extends State<SplashScreen>
     if (user == null) {
       targetPage = const LoginPage();
     } else {
-      // Pastikan FirebaseAuth.displayName sudah sinkron dengan Firestore
-      // supaya dashboard langsung pakai nama, bukan fallback 'Student'.
-      await UserService.syncAuthDisplayNameFromFirestore(user);
+      final isRegistered = await UserService.isUserRegistered(user.uid);
+      if (!isRegistered) {
+        await FirebaseAuth.instance.signOut();
+        targetPage = const LoginPage();
+      } else {
+        // Pastikan FirebaseAuth.displayName sudah sinkron dengan Firestore
+        // supaya dashboard langsung pakai nama, bukan fallback 'Student'.
+        await UserService.syncAuthDisplayNameFromFirestore(user);
 
-      final role = await UserService.getUserRole(user.uid);
+        final role = await UserService.getUserRole(user.uid);
 
-      switch (role) {
-        case 'teacher':
-          targetPage = TeacherRootPage();
-          break;
-        case 'student':
-        default:
-          targetPage = const StudentRootPage();
-          break;
+        switch (role) {
+          case 'teacher':
+            targetPage = TeacherRootPage();
+            break;
+          case 'student':
+          default:
+            targetPage = const StudentRootPage();
+            break;
+        }
       }
     }
 

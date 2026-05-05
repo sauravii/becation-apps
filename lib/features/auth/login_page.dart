@@ -12,7 +12,8 @@ import '../../components/forms/auth_text_field.dart';
 import '../../components/buttons/auth_button.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final String? successMessage;
+  const LoginPage({super.key, this.successMessage});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -31,6 +32,24 @@ class _LoginPageState extends State<LoginPage> {
   String? generalError;
 
   static final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  @override
+  void initState() {
+    super.initState();
+    final msg = widget.successMessage;
+    if (msg != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -103,10 +122,22 @@ class _LoginPageState extends State<LoginPage> {
         password: passwordController.text,
       );
 
-      if (credential.user != null) {
-        await UserService.ensureUserDocument(credential.user!);
-        await _navigateByRole(credential.user!);
+      final user = credential.user;
+      if (user == null) return;
+
+      final isRegistered = await UserService.isUserRegistered(user.uid);
+      if (!isRegistered) {
+        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() {
+            generalError = "Account not registered. Please sign up first.";
+          });
+        }
+        return;
       }
+
+      await UserService.ensureUserDocument(user);
+      await _navigateByRole(user);
     } on FirebaseAuthException catch (e) {
       setState(() {
         switch (e.code) {
@@ -172,10 +203,32 @@ class _LoginPageState extends State<LoginPage> {
         credential,
       );
 
-      if (userCredential.user != null) {
-        await UserService.ensureUserDocument(userCredential.user!);
-        await _navigateByRole(userCredential.user!);
+      final user = userCredential.user;
+      if (user == null) return;
+
+      final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
+      final isRegistered = await UserService.isUserRegistered(user.uid);
+
+      if (!isRegistered) {
+        if (isNewUser) {
+          try {
+            await user.delete();
+          } catch (e, st) {
+            debugPrint('[GoogleSignIn] Failed to delete new auth user: $e\n$st');
+          }
+        }
+        await _googleSignIn.signOut();
+        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() {
+            generalError = "Account not registered. Please sign up first.";
+          });
+        }
+        return;
       }
+
+      await UserService.ensureUserDocument(user);
+      await _navigateByRole(user);
     } on FirebaseAuthException catch (e, st) {
       debugPrint('[GoogleSignIn] FirebaseAuthException code=${e.code} msg=${e.message}');
       debugPrint('$st');

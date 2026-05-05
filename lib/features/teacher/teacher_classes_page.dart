@@ -96,7 +96,6 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
       ],
     );
   }
-
 }
 
 class _Header extends StatelessWidget {
@@ -301,10 +300,14 @@ class _ClassCard extends StatelessWidget {
 
           return AlertDialog(
             title: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                // Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
                 SizedBox(width: 10),
-                Text('Delete Class'),
+                Text(
+                  'Delete Class',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ],
             ),
             content: Column(

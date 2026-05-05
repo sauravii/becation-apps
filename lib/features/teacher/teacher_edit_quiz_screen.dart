@@ -2,22 +2,102 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/question_model.dart';
+import '../../models/quiz_model.dart';
 import '../../services/quiz_service.dart';
-import "teacher_ai_generate_screen.dart";
-import "teacher_create_question_screen.dart";
+import 'teacher_create_question_screen.dart';
 import 'teacher_select_topic_screen.dart';
 
-class TeacherCreateQuizScreen extends StatefulWidget {
-  final String classId;
+/// One row in the editor list. Either an existing question (id != null) or a
+/// new draft (id == null). Both are fully editable. [dirty] tracks whether
+/// an existing question's content was modified — only dirty existing rows get
+/// rewritten on save (clean ones just get an order update).
+class _EditableQuestion {
+  final String? id;
+  String type;
+  String question;
+  List<String> options;
+  int correctIndex;
+  bool dirty = false;
 
-  const TeacherCreateQuizScreen({super.key, required this.classId});
+  _EditableQuestion({
+    required this.id,
+    required this.type,
+    required this.question,
+    required this.options,
+    required this.correctIndex,
+  });
 
-  @override
-  State<TeacherCreateQuizScreen> createState() =>
-      _TeacherCreateQuizScreenState();
+  bool get isExisting => id != null;
+
+  factory _EditableQuestion.fromExisting(QuestionModel q) {
+    return _EditableQuestion(
+      id: q.id,
+      type: q.type,
+      question: q.question,
+      options: q.options.map((o) => o.text).toList(),
+      correctIndex: q.options.indexWhere((o) => o.isCorrect),
+    );
+  }
+
+  factory _EditableQuestion.fromDraft(PendingQuestion p) {
+    return _EditableQuestion(
+      id: null,
+      type: _typeKeyFromDisplay(p.type),
+      question: p.question,
+      options: List.of(p.options),
+      correctIndex: p.correctIndex,
+    );
+  }
+
+  PendingQuestion toPending() {
+    return PendingQuestion(
+      type: _typeDisplayFromKey(type),
+      question: question,
+      options: List.of(options),
+      correctIndex: correctIndex,
+    );
+  }
+
+  /// Mutate from an editor result. Preserves [id]; sets [dirty]=true.
+  void updateFromPending(PendingQuestion p) {
+    type = _typeKeyFromDisplay(p.type);
+    question = p.question;
+    options = List.of(p.options);
+    correctIndex = p.correctIndex;
+    dirty = true;
+  }
 }
 
-class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
+String _typeKeyFromDisplay(String display) {
+  if (display == 'Multiple Choice') return 'multiple_choice';
+  return display.toLowerCase().replaceAll(' ', '_');
+}
+
+String _typeDisplayFromKey(String key) {
+  if (key == 'multiple_choice') return 'Multiple Choice';
+  return key
+      .split('_')
+      .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
+}
+
+class TeacherEditQuizScreen extends StatefulWidget {
+  final String classId;
+  final QuizModel quiz;
+  final List<QuestionModel> initialQuestions;
+
+  const TeacherEditQuizScreen({
+    super.key,
+    required this.classId,
+    required this.quiz,
+    required this.initialQuestions,
+  });
+
+  @override
+  State<TeacherEditQuizScreen> createState() => _TeacherEditQuizScreenState();
+}
+
+class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
   static const _purple = Color(0xFF6F5AAA);
   static const _bg = Color(0xFFF7F2FA);
   static const _label = Color(0xFF49454E);
@@ -31,13 +111,61 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   int? _passingGrade;
   int _attemptLimit = 1;
   bool _showAnswer = true;
-  final List<PendingQuestion> _questions = [];
-  bool _isPosting = false;
+  final List<_EditableQuestion> _questions = [];
+  late final Set<String> _initialIds;
+  bool _isSaving = false;
+  bool _hasChanges = false;
 
   @override
   void initState() {
     super.initState();
-    _titleController.addListener(() => setState(() {}));
+
+    final q = widget.quiz;
+    _titleController.text = q.title;
+    _topic = SelectedTopic(id: q.topicId, title: q.topicTitle);
+    _timeLimit = q.timeLimit;
+    _passingGrade = q.passingGrade;
+    _attemptLimit = q.attemptLimit;
+    _showAnswer = q.showAnswer;
+
+    _questions.addAll(
+      widget.initialQuestions.map(_EditableQuestion.fromExisting),
+    );
+    _initialIds = widget.initialQuestions.map((e) => e.id).toSet();
+
+    // Listener attached AFTER pre-fill so initial setText doesn't trip _hasChanges.
+    _titleController.addListener(() {
+      _hasChanges = true;
+      setState(() {});
+    });
+  }
+
+  void _markChanged() {
+    _hasChanges = true;
+  }
+
+  Future<bool> _confirmDiscard() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard changes?'),
+        content: const Text(
+          'Your unsaved edits to this quiz will be lost.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep editing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   @override
@@ -47,50 +175,62 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     super.dispose();
   }
 
-  bool get _canPublish =>
+  bool get _canSave =>
       _titleController.text.trim().isNotEmpty &&
-      _topic != null &&
+      _topic?.id != null &&
       _timeLimit != null &&
       _passingGrade != null &&
       _questions.isNotEmpty &&
-      !_isPosting;
+      !_isSaving;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTitleCard(),
-                    const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _buildTimeLimitCard()),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildPassingGradeCard()),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildAttemptLimitCard(),
-                    const SizedBox(height: 16),
-                    _buildShowAnswerToggle(),
-                    const SizedBox(height: 20),
-                    _buildQuestionsSection(),
-                  ],
+    return PopScope(
+      // Block system back when there are unsaved changes (or save in flight).
+      // Programmatic Navigator.pop() bypasses this, so post-save pop still works.
+      canPop: !_hasChanges && !_isSaving,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (_isSaving) return;
+        final navigator = Navigator.of(context);
+        final shouldDiscard = await _confirmDiscard();
+        if (shouldDiscard && mounted) navigator.pop();
+      },
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTitleCard(),
+                      const SizedBox(height: 12),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: _buildTimeLimitCard()),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildPassingGradeCard()),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildAttemptLimitCard(),
+                      const SizedBox(height: 16),
+                      _buildShowAnswerToggle(),
+                      const SizedBox(height: 20),
+                      _buildQuestionsSection(),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -99,16 +239,16 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(color: _bg),
+      decoration: const BoxDecoration(color: _bg),
       child: Row(
         children: [
           IconButton(
-            onPressed: _isPosting ? null : () => Navigator.of(context).pop(),
+            onPressed: _isSaving ? null : () => Navigator.maybePop(context),
             icon: const Icon(Icons.arrow_back, color: _ink),
           ),
           const Expanded(
             child: Text(
-              'Create Quiz',
+              'Edit Quiz',
               style: TextStyle(
                 color: _ink,
                 fontSize: 20,
@@ -116,23 +256,23 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
               ),
             ),
           ),
-          _buildPublishButton(),
+          _buildSaveButton(),
           const SizedBox(width: 8),
         ],
       ),
     );
   }
 
-  Widget _buildPublishButton() {
+  Widget _buildSaveButton() {
     return GestureDetector(
-      onTap: _canPublish ? _publish : null,
+      onTap: _canSave ? _save : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
         decoration: BoxDecoration(
-          color: _canPublish ? _purple : Colors.grey.shade300,
+          color: _canSave ? _purple : Colors.grey.shade300,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: _isPosting
+        child: _isSaving
             ? const SizedBox(
                 width: 16,
                 height: 16,
@@ -142,9 +282,9 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
                 ),
               )
             : Text(
-                'Publish',
+                'Save',
                 style: TextStyle(
-                  color: _canPublish ? Colors.white : Colors.grey.shade600,
+                  color: _canSave ? Colors.white : Colors.grey.shade600,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -226,31 +366,19 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   }
 
   Widget _buildTopicRow() {
-    if (_topic == null) {
+    if (_topic?.id == null) {
       return InkWell(
-        onTap: _isPosting ? null : _openSelectTopic,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: RichText(
-            text: const TextSpan(
-              text: 'Add topic',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: _purple,
-                decoration: TextDecoration.underline,
-                decorationColor: _purple,
-              ),
-              children: [
-                TextSpan(
-                  text: ' *',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.w700,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ],
+        onTap: _isSaving ? null : _openSelectTopic,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            'Add topic *',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: _purple,
+              decoration: TextDecoration.underline,
+              decorationColor: _purple,
             ),
           ),
         ),
@@ -260,7 +388,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     return Align(
       alignment: Alignment.centerLeft,
       child: GestureDetector(
-        onTap: _isPosting ? null : _openSelectTopic,
+        onTap: _isSaving ? null : _openSelectTopic,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
@@ -280,7 +408,12 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
               ),
               const SizedBox(width: 6),
               GestureDetector(
-                onTap: _isPosting ? null : () => setState(() => _topic = null),
+                onTap: _isSaving
+                    ? null
+                    : () {
+                        setState(() => _topic = null);
+                        _markChanged();
+                      },
                 child: const Icon(Icons.close, size: 16),
               ),
             ],
@@ -319,7 +452,6 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     required int? value,
     required int placeholder,
     required String suffix,
-    double valueWidth = 40,
   }) {
     final isSet = value != null;
     final displayValue = value ?? placeholder;
@@ -330,7 +462,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
       textBaseline: TextBaseline.alphabetic,
       children: [
         SizedBox(
-          width: valueWidth,
+          width: 40,
           child: Text(
             '$displayValue',
             textAlign: TextAlign.left,
@@ -357,7 +489,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   Widget _buildTimeLimitCard() {
     return InkWell(
       borderRadius: BorderRadius.circular(10),
-      onTap: _isPosting ? null : _openTimeLimitDialog,
+      onTap: _isSaving ? null : _openTimeLimitDialog,
       child: _buildCard(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
         child: Column(
@@ -379,7 +511,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   Widget _buildPassingGradeCard() {
     return InkWell(
       borderRadius: BorderRadius.circular(10),
-      onTap: _isPosting ? null : _openPassingGradeDialog,
+      onTap: _isSaving ? null : _openPassingGradeDialog,
       child: _buildCard(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
         child: Column(
@@ -442,7 +574,10 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
           _counterButton(
             icon: Icons.remove,
             onTap: _attemptLimit > 1
-                ? () => setState(() => _attemptLimit--)
+                ? () {
+                    setState(() => _attemptLimit--);
+                    _markChanged();
+                  }
                 : null,
           ),
           Padding(
@@ -459,7 +594,10 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
           _counterButton(
             icon: Icons.add,
             onTap: _attemptLimit < 99
-                ? () => setState(() => _attemptLimit++)
+                ? () {
+                    setState(() => _attemptLimit++);
+                    _markChanged();
+                  }
                 : null,
           ),
         ],
@@ -491,9 +629,12 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
           scaleY: 0.85,
           child: Switch(
             value: _showAnswer,
-            onChanged: _isPosting
+            onChanged: _isSaving
                 ? null
-                : (v) => setState(() => _showAnswer = v),
+                : (v) {
+                    setState(() => _showAnswer = v);
+                    _markChanged();
+                  },
             activeThumbColor: Colors.white,
             activeTrackColor: _purple,
             inactiveThumbColor: Colors.white,
@@ -515,12 +656,10 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   }
 
   Widget _buildQuestionsSection() {
-    final hasQuestions = _questions.isNotEmpty;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (hasQuestions) ...[
+        if (_questions.isNotEmpty) ...[
           Text(
             '${_questions.length} Question',
             style: const TextStyle(
@@ -530,186 +669,122 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            itemCount: _questions.length,
-            onReorder: _onReorderQuestions,
-            proxyDecorator: (child, index, animation) =>
-                Material(color: Colors.transparent, child: child),
-            itemBuilder: (context, index) => Padding(
-              key: ObjectKey(_questions[index]),
+          for (var i = 0; i < _questions.length; i++)
+            Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _buildQuestionCard(index, _questions[index]),
+              child: _buildQuestionCard(i, _questions[i]),
             ),
-          ),
-          _outlineActionButton(
-            icon: Icons.add,
-            label: 'Create question',
-            onTap: _isPosting ? null : _onCreateQuestion,
-          ),
-        ] else
-          _outlineActionButton(
-            icon: Icons.add,
-            label: 'Create question',
-            onTap: _isPosting ? null : _onCreateQuestion,
-          ),
-        const SizedBox(height: 16),
-        _buildOrDivider(),
-        const SizedBox(height: 16),
+        ],
         _outlineActionButton(
-          iconWidget: const Icon(Icons.auto_awesome, size: 18, color: _ink),
-          label: 'Generate with AI',
-          onTap: _isPosting ? null : _onGenerateWithAI,
+          icon: Icons.add,
+          label: 'Add question',
+          onTap: _isSaving ? null : _onAddQuestion,
         ),
       ],
     );
   }
 
-  Widget _buildQuestionCard(int index, PendingQuestion q) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFEAE3F2)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildQuestionCard(int index, _EditableQuestion q) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFEAE3F2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${(index + 1).toString().padLeft(2, '0')}   ${q.type.toUpperCase()}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _label,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _isPosting
-                        ? null
-                        : () => setState(() => _questions.removeAt(index)),
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    color: _ink,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  IconButton(
-                    onPressed: _isPosting ? null : () => _onEditQuestion(index),
-                    icon: const Icon(Icons.edit_outlined, size: 20),
-                    color: _ink,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
+              Expanded(
                 child: Text(
-                  q.question,
+                  '${(index + 1).toString().padLeft(2, '0')}   ${_typeDisplayFromKey(q.type).toUpperCase()}',
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _label,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              ...q.options.asMap().entries.map((e) {
-                final isCorrect = e.key == q.correctIndex;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 1),
-                        child: Icon(
-                          isCorrect
-                              ? Icons.check_circle
-                              : Icons.radio_button_off,
-                          size: 18,
-                          color: isCorrect ? Colors.green : Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          e.value,
-                          style: const TextStyle(fontSize: 14, color: _ink),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                  ),
-                );
-              }),
+              IconButton(
+                onPressed: _isSaving
+                    ? null
+                    : () {
+                        setState(() => _questions.removeAt(index));
+                        _markChanged();
+                      },
+                icon: const Icon(Icons.delete_outline, size: 20),
+                color: _ink,
+                visualDensity: VisualDensity.compact,
+              ),
+              IconButton(
+                onPressed: _isSaving ? null : () => _onEditQuestion(index),
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                color: _ink,
+                visualDensity: VisualDensity.compact,
+              ),
             ],
           ),
-        ),
-        Positioned(
-          top: -10,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: ReorderableDragStartListener(
-              index: index,
-              child: MouseRegion(
-                cursor: SystemMouseCursors.grab,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFEAE3F2)),
-                  ),
-                  child: const Icon(Icons.drag_handle, size: 14, color: _label),
-                ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(
+              q.question,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _ink,
               ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          ...q.options.asMap().entries.map((e) {
+            final isCorrect = e.key == q.correctIndex;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(
+                      isCorrect ? Icons.check_circle : Icons.radio_button_off,
+                      size: 18,
+                      color: isCorrect ? Colors.green : Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      e.value,
+                      style: const TextStyle(fontSize: 14, color: _ink),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
-  }
-
-  void _onReorderQuestions(int oldIndex, int newIndex) {
-    setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
-      final item = _questions.removeAt(oldIndex);
-      _questions.insert(newIndex, item);
-    });
   }
 
   Widget _outlineActionButton({
-    IconData? icon,
-    Widget? iconWidget,
+    required IconData icon,
     required String label,
     VoidCallback? onTap,
-    bool compact = false,
   }) {
     final disabled = onTap == null;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        width: compact ? null : double.infinity,
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 14 : 16,
-          vertical: compact ? 10 : 14,
-        ),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -717,19 +792,17 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
           children: [
-            iconWidget ??
-                Icon(
-                  icon,
-                  size: 18,
-                  color: disabled ? Colors.grey.shade400 : _ink,
-                ),
+            Icon(
+              icon,
+              size: 18,
+              color: disabled ? Colors.grey.shade400 : _ink,
+            ),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                fontSize: compact ? 13 : 14,
+                fontSize: 14,
                 fontWeight: FontWeight.w500,
                 color: disabled ? Colors.grey.shade400 : _ink,
               ),
@@ -740,38 +813,20 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     );
   }
 
-  Widget _buildOrDivider() {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: Color(0xFFCAC4CF), thickness: 1)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'OR',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey.shade600,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-        const Expanded(child: Divider(color: Color(0xFFCAC4CF), thickness: 1)),
-      ],
-    );
-  }
-
   // ===== Actions =====
 
   Future<void> _openSelectTopic() async {
     final result = await Navigator.of(context).push<SelectedTopic>(
       MaterialPageRoute(
-        builder: (_) =>
-            TeacherSelectTopicScreen(classId: widget.classId, initial: _topic),
+        builder: (_) => TeacherSelectTopicScreen(
+          classId: widget.classId,
+          initial: _topic,
+        ),
       ),
     );
     if (result != null) {
       setState(() => _topic = result);
+      _markChanged();
     }
   }
 
@@ -783,6 +838,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     );
     if (result != null) {
       setState(() => _timeLimit = result);
+      _markChanged();
     }
   }
 
@@ -795,6 +851,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     );
     if (result != null) {
       setState(() => _passingGrade = result);
+      _markChanged();
     }
   }
 
@@ -916,26 +973,22 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     );
   }
 
-  Future<void> _onCreateQuestion() async {
+  Future<void> _onAddQuestion() async {
     FocusManager.instance.primaryFocus?.unfocus();
 
     final result = await Navigator.of(context).push<PendingQuestion>(
-      MaterialPageRoute(builder: (_) => const TeacherCreateQuestionScreen()),
+      MaterialPageRoute(
+        builder: (_) => const TeacherCreateQuestionScreen(lockType: true),
+      ),
     );
     if (!mounted) return;
-
-    // Defeat Flutter's focus restoration after pop — without this, the
-    // title TextField regains focus and auto-scrolls itself into view,
-    // racing with our animateTo to the new question.
     FocusManager.instance.primaryFocus?.unfocus();
 
     if (result == null) return;
-    setState(() => _questions.add(result));
+    setState(() => _questions.add(_EditableQuestion.fromDraft(result)));
+    _markChanged();
 
-    // Two frames: first lets the new card lay out (ReorderableListView
-    // shrinkwrap), second computes the correct maxScrollExtent.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Re-assert unfocus in case anything tries to take focus back.
       FocusManager.instance.primaryFocus?.unfocus();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients) return;
@@ -949,85 +1002,81 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   }
 
   Future<void> _onEditQuestion(int index) async {
+    final q = _questions[index];
+
     FocusManager.instance.primaryFocus?.unfocus();
 
     final result = await Navigator.of(context).push<PendingQuestion>(
       MaterialPageRoute(
-        builder: (_) => TeacherCreateQuestionScreen(initial: _questions[index]),
+        builder: (_) => TeacherCreateQuestionScreen(
+          initial: q.toPending(),
+          lockType: true,
+        ),
       ),
     );
     if (!mounted) return;
     FocusManager.instance.primaryFocus?.unfocus();
 
     if (result != null) {
-      setState(() => _questions[index] = result);
-    }
-  }
-
-  Future<void> _onGenerateWithAI() async {
-    final result = await Navigator.of(context).push<List<PendingQuestion>>(
-      MaterialPageRoute(
-        builder: (_) => const TeacherAiGenerateScreen(),
-        fullscreenDialog: true,
-      ),
-    );
-
-    if (result != null && result.isNotEmpty) {
       setState(() {
-        _questions.addAll(result);
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("${result.length} questions generated by AI!"),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      // Scroll ke bawah untuk melihat soal baru
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeOut,
-          );
+        if (q.isExisting) {
+          // Mutate in place to preserve id; mark dirty so save rewrites it.
+          q.updateFromPending(result);
+        } else {
+          // New draft: replace with fresh instance.
+          _questions[index] = _EditableQuestion.fromDraft(result);
         }
       });
+      _markChanged();
     }
   }
 
-  Future<void> _publish() async {
-    if (!_canPublish) return;
+  QuizDraftQuestion _toDraft(_EditableQuestion q) {
+    return QuizDraftQuestion(
+      type: q.type,
+      question: q.question,
+      options: q.options
+          .asMap()
+          .entries
+          .map(
+            (e) => QuestionOption(
+              text: e.value,
+              isCorrect: e.key == q.correctIndex,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Future<void> _save() async {
+    if (!_canSave) return;
 
     final topic = _topic!;
     final timeLimit = _timeLimit!;
     final passingGrade = _passingGrade!;
 
-    setState(() => _isPosting = true);
+    final kept = <QuizKeptQuestion>[];
+    final newDrafts = <QuizDraftQuestion>[];
+    for (final q in _questions) {
+      if (q.isExisting) {
+        kept.add(QuizKeptQuestion(
+          id: q.id!,
+          edited: q.dirty ? _toDraft(q) : null,
+        ));
+      } else {
+        newDrafts.add(_toDraft(q));
+      }
+    }
+    final keptIdSet = {for (final k in kept) k.id};
+    final removedIds =
+        _initialIds.where((id) => !keptIdSet.contains(id)).toList();
+
+    setState(() => _isSaving = true);
 
     try {
-      final drafts = _questions
-          .map(
-            (q) => QuizDraftQuestion(
-              type: _questionTypeKey(q.type),
-              question: q.question,
-              options: q.options
-                  .asMap()
-                  .entries
-                  .map(
-                    (e) => QuestionOption(
-                      text: e.value,
-                      isCorrect: e.key == q.correctIndex,
-                    ),
-                  )
-                  .toList(),
-            ),
-          )
-          .toList();
-
-      await QuizService.createQuiz(
+      await QuizService.updateQuizFull(
         classId: widget.classId,
+        quizId: widget.quiz.id,
         title: _titleController.text.trim(),
         topicId: topic.id ?? '',
         topicTitle: topic.title ?? '',
@@ -1035,35 +1084,28 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
         passingGrade: passingGrade,
         attemptLimit: _attemptLimit,
         showAnswer: _showAnswer,
-        questions: drafts,
+        keptOrdered: kept,
+        removedQuestionIds: removedIds,
+        newQuestions: newDrafts,
       );
 
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Quiz published!'),
+          content: Text('Quiz updated'),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isPosting = false);
+      setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to publish: $e'),
+          content: Text('Failed to save: $e'),
           backgroundColor: Colors.red,
         ),
       );
-    }
-  }
-
-  String _questionTypeKey(String displayType) {
-    switch (displayType) {
-      case 'Multiple Choice':
-        return 'multiple_choice';
-      default:
-        return displayType.toLowerCase().replaceAll(' ', '_');
     }
   }
 }

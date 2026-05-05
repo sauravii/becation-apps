@@ -400,6 +400,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                       shadowColor: const Color(0xFF5A4A8A),
                       icon: 'assets/icons/class_material.png',
                       onTap: () => _handleMaterialTap(m),
+                      createdAt: m.createdAt?.toDate(),
                     ),
                   );
                 }
@@ -414,11 +415,18 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                       shadowColor: const Color(0xFF8A4A5D),
                       icon: 'assets/icons/class_quiz.png',
                       onTap: () => _handleQuizTap(q),
+                      createdAt: q.createdAt?.toDate(),
                     ),
                   );
                 }
 
-                nodes.sort((a, b) => a.id.compareTo(b.id));
+                // Sort nodes by timestamp (oldest first)
+                nodes.sort((a, b) {
+                  if (a.createdAt == null && b.createdAt == null) return 0;
+                  if (a.createdAt == null) return 1;
+                  if (b.createdAt == null) return -1;
+                  return a.createdAt!.compareTo(b.createdAt!);
+                });
 
                 learningTopics.add(
                   LearningTopic(
@@ -453,6 +461,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                       shadowColor: const Color(0xFF5A4A8A),
                       icon: 'assets/icons/class_material.png',
                       onTap: () => _handleMaterialTap(m),
+                      createdAt: m.createdAt?.toDate(),
                     ),
                   );
                 }
@@ -467,11 +476,18 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                       shadowColor: const Color(0xFF8A4A5D),
                       icon: 'assets/icons/class_quiz.png',
                       onTap: () => _handleQuizTap(q),
+                      createdAt: q.createdAt?.toDate(),
                     ),
                   );
                 }
 
-                nodes.sort((a, b) => a.id.compareTo(b.id));
+                // Sort nodes by timestamp (oldest first)
+                nodes.sort((a, b) {
+                  if (a.createdAt == null && b.createdAt == null) return 0;
+                  if (a.createdAt == null) return 1;
+                  if (b.createdAt == null) return -1;
+                  return a.createdAt!.compareTo(b.createdAt!);
+                });
 
                 learningTopics.add(
                   LearningTopic(

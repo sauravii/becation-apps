@@ -13,6 +13,8 @@ class LearningNode {
   final String icon;
   final VoidCallback onTap;
 
+  final DateTime? createdAt;
+
   LearningNode({
     required this.id,
     required this.title,
@@ -21,6 +23,7 @@ class LearningNode {
     required this.shadowColor,
     required this.icon,
     required this.onTap,
+    this.createdAt,
   });
 }
 
@@ -91,7 +94,6 @@ class _LearningMapState extends State<LearningMap> {
       );
     }
 
-    int globalNodeIndex = 0;
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Container(
@@ -122,6 +124,13 @@ class _LearningMapState extends State<LearningMap> {
             ),
           ),
 
+          // PATH PAINTER (Ultra-smooth "S" curve)
+          Positioned.fill(
+            child: CustomPaint(
+              painter: PathPainter(topics: widget.topics),
+            ),
+          ),
+
           ListView.builder(
             reverse: true,
             shrinkWrap: true,
@@ -130,7 +139,6 @@ class _LearningMapState extends State<LearningMap> {
             itemBuilder: (context, topicIndex) {
               final topic = widget.topics[topicIndex];
               
-              // FIXED: Calculate startGlobalIndex properly based on previous topics
               int startGlobalIndex = 0;
               for (int i = 0; i < topicIndex; i++) {
                 startGlobalIndex += widget.topics[i].nodes.length;
@@ -146,23 +154,22 @@ class _LearningMapState extends State<LearningMap> {
                       final int absoluteIndex = startGlobalIndex + localIndex;
                       final LearningNode node = entry.value;
 
-                      // Custom pattern logic (Reset every 8 nodes)
                       double currentX = 0.0;
                       final patternPos = absoluteIndex % 8;
                       
                       switch (patternPos) {
-                        case 0: currentX = 0.0; break;    // 1: Tengah (0)
-                        case 1: currentX = 0.35; break;   // 2: Kanan (+0.35)
-                        case 2: currentX = 0.65; break;    // 3: Kanan Pol (+0.7)
-                        case 3: currentX = 0.35; break;   // 4: Kanan Balik (+0.35)
-                        case 4: currentX = 0.0; break;    // 5: Tengah (0)
-                        case 5: currentX = -0.35; break;  // 6: Kiri (-0.35)
-                        case 6: currentX = -0.65; break;   // 7: Kiri Pol (-0.7)
-                        case 7: currentX = -0.35; break;  // 8: Kiri Balik (-0.35)
+                        case 0: currentX = 0.0; break;
+                        case 1: currentX = 0.35; break;
+                        case 2: currentX = 0.55; break;
+                        case 3: currentX = 0.35; break;
+                        case 4: currentX = 0.0; break;
+                        case 5: currentX = -0.35; break;
+                        case 6: currentX = -0.55; break;
+                        case 7: currentX = -0.35; break;
                       }
 
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 50, top: 20),
+                        padding: const EdgeInsets.only(bottom: 80, top: 30),
                         child: Align(
                           alignment: Alignment(currentX, 0),
                           child: GestureDetector(
@@ -171,12 +178,12 @@ class _LearningMapState extends State<LearningMap> {
                           ),
                         ),
                       );
-                    }).toList().reversed.toList(), // FIXED: Reverse to start from bottom
+                    }).toList().reversed.toList(),
                   ),
 
-                  // Topic Header with Glassmorphism Effect
+                  // Topic Header
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 60),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(20),
                       child: BackdropFilter(
@@ -236,7 +243,6 @@ class _LearningMapState extends State<LearningMap> {
         Stack(
           alignment: Alignment.center,
           children: [
-            // Shadow under the coin
             Transform.translate(
               offset: const Offset(0, 4),
               child: Container(
@@ -252,8 +258,6 @@ class _LearningMapState extends State<LearningMap> {
                 ),
               ),
             ),
-
-            // The Coin Image
             SizedBox(
               width: 60,
               height: 60,
@@ -282,24 +286,16 @@ class MirroredBackgroundPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final double imgWidth = image.width.toDouble();
     final double imgHeight = image.height.toDouble();
-    
-    // Calculate how much to scale the image to fit the width
     final double scale = size.width / imgWidth;
     final double scaledHeight = imgHeight * scale;
-    
     int tileCount = (size.height / scaledHeight).ceil();
-    
     for (int i = 0; i < tileCount; i++) {
       final double yPos = i * scaledHeight;
       final bool isOdd = i % 2 != 0;
-      
       canvas.save();
-      
       if (isOdd) {
-        // MIRROR EFFECT: Move to bottom of tile, then scale -1 on Y axis
         canvas.translate(0, yPos + scaledHeight);
         canvas.scale(1, -1);
-        // Draw at origin (which is now the inverted bottom)
         canvas.drawImageRect(
           image,
           Rect.fromLTWH(0, 0, imgWidth, imgHeight),
@@ -307,7 +303,6 @@ class MirroredBackgroundPainter extends CustomPainter {
           Paint(),
         );
       } else {
-        // NORMAL DRAW
         canvas.translate(0, yPos);
         canvas.drawImageRect(
           image,
@@ -316,13 +311,85 @@ class MirroredBackgroundPainter extends CustomPainter {
           Paint(),
         );
       }
-      
       canvas.restore();
     }
   }
 
   @override
-  bool shouldRepaint(covariant MirroredBackgroundPainter oldDelegate) {
-    return oldDelegate.image != image;
+  bool shouldRepaint(covariant MirroredBackgroundPainter oldDelegate) => oldDelegate.image != image;
+}
+
+class PathPainter extends CustomPainter {
+  final List<LearningTopic> topics;
+
+  PathPainter({required this.topics});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (topics.isEmpty) return;
+
+    final pathPaint = Paint()
+      ..color = const Color(0xFFFFF0DF).withValues(alpha: 0.75)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 35
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+
+    final List<Offset> points = [];
+    int globalIndex = 0;
+    double currentY = size.height;
+    
+    for (int i = 0; i < topics.length; i++) {
+      final topic = topics[i];
+      currentY -= (20 + 48 + 60); 
+      for (int j = 0; j < topic.nodes.length; j++) {
+        final int absoluteIndex = globalIndex + j;
+        double xFactor = 0.0;
+        final patternPos = absoluteIndex % 8;
+        switch (patternPos) {
+          case 0: xFactor = 0.0; break;
+          case 1: xFactor = 0.3; break;
+          case 2: xFactor = 0.5; break;
+          case 3: xFactor = 0.3; break;
+          case 4: xFactor = 0.0; break;
+          case 5: xFactor = -0.3; break;
+          case 6: xFactor = -0.5; break;
+          case 7: xFactor = -0.3; break;
+        }
+        final double x = size.width / 2 + (xFactor * (size.width / 2));
+        points.add(Offset(x, currentY - 80 - 30));
+        currentY -= (80 + 60 + 30); 
+      }
+      globalIndex += topic.nodes.length;
+    }
+
+    if (points.length < 2) return;
+
+    final path = Path();
+    path.moveTo(points[0].dx, points[0].dy);
+
+    // PERFECT SYMMETRICAL S-CURVE (Design Match)
+    // To achieve the perfect curve from your design screenshot:
+    // 1. Control points must be vertically mirrored.
+    // 2. Control points MUST have the SAME X-coordinate as the nodes they belong to.
+    // 3. The vertical distance of control points (0.5 dy) ensures a natural S-flow.
+    for (int i = 0; i < points.length - 1; i++) {
+      final p0 = points[i];
+      final p1 = points[i + 1];
+      
+      final double dy = (p1.dy - p0.dy).abs();
+      
+      // Balanced tension (0.5) for a smooth S-curve
+      path.cubicTo(
+        p0.dx, p0.dy - (dy * 0.08), 
+        p1.dx, p1.dy + (dy * 0.08), 
+        p1.dx, p1.dy
+      );
+    }
+
+    canvas.drawPath(path, pathPaint);
   }
+
+  @override
+  bool shouldRepaint(covariant PathPainter oldDelegate) => true;
 }

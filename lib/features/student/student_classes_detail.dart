@@ -242,98 +242,98 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
         final classData = snapshot.data;
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.zero,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Class Detail Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Subject badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: widget.classColor,
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Text(
-                        classData?.subject ?? '...',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Teacher
-                    Row(
-                      children: [
-                        const Icon(Icons.person, size: 18, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(
-                          classData?.teacherName.isNotEmpty == true
-                              ? classData!.teacherName
-                              : 'Teacher',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF1C1B20),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    // Student count
-                    Row(
-                      children: [
-                        const Icon(Icons.groups_2_outlined,
-                            size: 18, color: Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${classData?.studentCount ?? 0} Students',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF1C1B20),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (classData?.description.isNotEmpty == true) ...[
-                      const SizedBox(height: 16),
-                      const Divider(height: 1),
-                      const SizedBox(height: 16),
-                      Text(
-                        classData!.description,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+              // Container(
+              //   width: double.infinity,
+              //   padding: const EdgeInsets.all(20),
+              //   decoration: BoxDecoration(
+              //     color: Colors.white,
+              //     borderRadius: BorderRadius.circular(16),
+              //     border: Border.all(color: Colors.grey.shade200),
+              //   ),
+              //   child: Column(
+              //     crossAxisAlignment: CrossAxisAlignment.start,
+              //     children: [
+              //       // Subject badge
+              //       Container(
+              //         padding: const EdgeInsets.symmetric(
+              //           horizontal: 12,
+              //           vertical: 6,
+              //         ),
+              //         decoration: BoxDecoration(
+              //           color: widget.classColor,
+              //           borderRadius: BorderRadius.circular(30),
+              //         ),
+              //         child: Text(
+              //           classData?.subject ?? '...',
+              //           style: const TextStyle(
+              //             color: Colors.white,
+              //             fontSize: 12,
+              //             fontWeight: FontWeight.w500,
+              //           ),
+              //         ),
+              //       ),
+              //       const SizedBox(height: 16),
+              //       // Teacher
+              //       Row(
+              //         children: [
+              //           const Icon(Icons.person, size: 18, color: Colors.grey),
+              //           const SizedBox(width: 8),
+              //           Text(
+              //             classData?.teacherName.isNotEmpty == true
+              //                 ? classData!.teacherName
+              //                 : 'Teacher',
+              //             style: const TextStyle(
+              //               fontSize: 15,
+              //               fontWeight: FontWeight.w500,
+              //               color: Color(0xFF1C1B20),
+              //             ),
+              //           ),
+              //         ],
+              //       ),
+              //       const SizedBox(height: 10),
+              //       // Student count
+              //       Row(
+              //         children: [
+              //           const Icon(Icons.groups_2_outlined,
+              //               size: 18, color: Colors.grey),
+              //           const SizedBox(width: 8),
+              //           Text(
+              //             '${classData?.studentCount ?? 0} Students',
+              //             style: const TextStyle(
+              //               fontSize: 14,
+              //               color: Color(0xFF1C1B20),
+              //             ),
+              //           ),
+              //         ],
+              //       ),
+              //       if (classData?.description.isNotEmpty == true) ...[
+              //         const SizedBox(height: 16),
+              //         const Divider(height: 1),
+              //         const SizedBox(height: 16),
+              //         Text(
+              //           classData!.description,
+              //           style: const TextStyle(
+              //             fontSize: 14,
+              //             color: Colors.grey,
+              //             height: 1.5,
+              //           ),
+              //         ),
+              //       ],
+              //     ],
+              //   ),
+              // ),
               const SizedBox(height: 24),
 
-              // Learning Path Section
-              _buildSectionHeader('Learning Path'),
-              const Divider(
-                  color: Color(0xFF49454E), thickness: 1, height: 20),
-              const SizedBox(height: 10),
+              // // Learning Path Section
+              // _buildSectionHeader('Learning Path'),
+              // const Divider(
+              //     color: Color(0xFF49454E), thickness: 1, height: 20),
+              // const SizedBox(height: 10),
               _buildLearningMap(),
             ],
           ),
@@ -849,8 +849,8 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
             },
           ),
           NavItem(
-            icon: Icons.assignment_rounded,
-            label: 'Classwork',
+            icon: Icons.leaderboard,  
+            label: 'Leaderboard',
             active: _selectedIndex == 1,
             onTap: () {
               setState(() {

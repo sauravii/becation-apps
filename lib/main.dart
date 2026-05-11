@@ -17,27 +17,56 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(402, 874),
-      minTextAdapt: true,
-      splitScreenMode: true,
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Becation Apps',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      ),
       builder: (context, child) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'Becation Apps',
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        return Container(
+          color: Colors.grey[100], // Background luar HP
+          alignment: Alignment.center,
+          child: FittedBox(
+            fit: BoxFit.contain, // Skalakan keseluruhan HP seperti gambar agar muat di layar
+            child: Container(
+              width: 402,
+              height: 874,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: MediaQuery(
+                // PAKSA MediaQuery agar selalu berukuran 402x874 apapun ukuran browsernya.
+                data: MediaQuery.of(context).copyWith(
+                  size: const Size(402, 874),
+                ),
+                child: ScreenUtilInit(
+                  designSize: const Size(402, 874),
+                  minTextAdapt: true,
+                  splitScreenMode: true,
+                  useInheritedMediaQuery: true,
+                  builder: (context, widget) {
+                    return GestureDetector(
+                      onTap: () => FocusScope.of(context).unfocus(),
+                      child: widget,
+                    );
+                  },
+                  child: child,
+                ),
+              ),
+            ),
           ),
-          // Tap di area kosong mana pun akan menutup keyboard.
-          builder: (context, child) {
-            return GestureDetector(
-              onTap: () => FocusScope.of(context).unfocus(),
-              child: child,
-            );
-          },
-          home: const SplashScreen(),
         );
       },
+      home: const SplashScreen(),
     );
   }
 }

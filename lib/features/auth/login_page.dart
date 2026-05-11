@@ -214,7 +214,9 @@ class _LoginPageState extends State<LoginPage> {
           try {
             await user.delete();
           } catch (e, st) {
-            debugPrint('[GoogleSignIn] Failed to delete new auth user: $e\n$st');
+            debugPrint(
+              '[GoogleSignIn] Failed to delete new auth user: $e\n$st',
+            );
           }
         }
         await _googleSignIn.signOut();
@@ -230,7 +232,9 @@ class _LoginPageState extends State<LoginPage> {
       await UserService.ensureUserDocument(user);
       await _navigateByRole(user);
     } on FirebaseAuthException catch (e, st) {
-      debugPrint('[GoogleSignIn] FirebaseAuthException code=${e.code} msg=${e.message}');
+      debugPrint(
+        '[GoogleSignIn] FirebaseAuthException code=${e.code} msg=${e.message}',
+      );
       debugPrint('$st');
       setState(() {
         generalError = 'Google sign in failed: ${e.message}';
@@ -270,7 +274,7 @@ class _LoginPageState extends State<LoginPage> {
                           child: Column(
                             children: [
                               Text(
-                                "Welcome back",
+                                "Welcome Back",
                                 style: TextStyle(
                                   fontSize: 28.sp,
                                   fontWeight: FontWeight.bold,
@@ -328,7 +332,7 @@ class _LoginPageState extends State<LoginPage> {
                             },
                             child: Text(
                               "Forgot Password",
-                              style: TextStyle(fontSize: 14.sp),
+                              style: TextStyle(fontSize: 10.sp),
                             ),
                           ),
                         ),

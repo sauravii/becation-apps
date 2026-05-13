@@ -1,3 +1,5 @@
+import "dart:math";
+
 import "package:flutter/material.dart";
 import "package:cloud_functions/cloud_functions.dart";
 
@@ -17,17 +19,91 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
   static const _hint = Color(0xFF9A9499);
   static const _ink = Color(0xFF1C1B20);
 
+  static const _difficulties = ["Easy", "Medium", "Hard", "Expert"];
+  static const _languages = ["English", "Bahasa Indonesia"];
+
+  static const int _examplesShown = 3;
+
+  // Pool besar contoh prompt — di-shuffle setiap initState supaya guru lihat
+  // varian berbeda saat buka layar. Tiap prompt ditulis untuk demonstrasiin
+  // template yang baik: subject + audience/level + scope/focus.
+  static const List<_PromptExample> _examplesPool = [
+    _PromptExample(
+      "Indonesian Independence (High School)",
+      "Indonesian Independence history focusing on key events 1942-1945. For grade 10-12 students. Include questions on important figures and significant dates.",
+    ),
+    _PromptExample(
+      "Python Basics: Loops & Functions",
+      "Python programming basics for first-year computer science students. Focus on for/while loops and function definitions. Include code reading scenarios.",
+    ),
+    _PromptExample(
+      "Linear Algebra Foundations",
+      "Linear Algebra foundations for first-semester university: vectors, matrices, basic linear equations. Mix of conceptual understanding and simple computation.",
+    ),
+    _PromptExample(
+      "Microeconomics: Supply & Demand",
+      "Microeconomics fundamentals for grade 11: supply and demand, equilibrium price, market mechanisms. Focus on conceptual understanding, not heavy calculation.",
+    ),
+    _PromptExample(
+      "Photosynthesis (Middle School)",
+      "Photosynthesis process for grade 7-8 biology: components, stages, and factors affecting it. Include real-world applications and observation-based questions.",
+    ),
+    _PromptExample(
+      "English Tenses Review",
+      "English grammar tenses review for grade 10-11: simple, continuous, perfect forms. Mix of usage scenarios and error identification questions.",
+    ),
+    _PromptExample(
+      "Newton's Laws of Motion",
+      "Newton's three laws of motion for grade 10 physics. Include real-world examples and scenarios applying each law. Mix conceptual and simple calculation.",
+    ),
+    _PromptExample(
+      "Periodic Table Basics",
+      "Periodic table fundamentals for grade 9 chemistry: groups, periods, atomic structure, and trends. Focus on understanding patterns rather than memorization.",
+    ),
+    _PromptExample(
+      "Cell Biology: Structure & Function",
+      "Cell biology for grade 10: organelles structure and function, prokaryotic vs eukaryotic differences. Include diagram-based identification questions.",
+    ),
+    _PromptExample(
+      "Indonesian Geography (Junior High)",
+      "Indonesian geography for grade 7-9: provinces, islands, climate zones, and natural resources. Focus on Indonesian-specific facts and regional understanding.",
+    ),
+    _PromptExample(
+      "World War II Major Events",
+      "World War II major events for high school history: causes, key battles, and outcomes 1939-1945. Include questions on impact to Asia-Pacific region.",
+    ),
+    _PromptExample(
+      "Statistics: Mean, Median, Mode",
+      "Statistics measures of central tendency for grade 8: mean, median, mode calculations and interpretation. Include scenarios choosing the appropriate measure.",
+    ),
+    _PromptExample(
+      "Climate Change Basics",
+      "Climate change fundamentals for high school: greenhouse effect, human impacts, mitigation strategies. Mix scientific concepts and policy considerations.",
+    ),
+    _PromptExample(
+      "Shakespeare's Macbeth (Literature)",
+      "Shakespeare's Macbeth for grade 11-12 literature: themes, characters, plot points, and famous quotes. Include analysis of character motivations.",
+    ),
+    _PromptExample(
+      "Database SQL Queries",
+      "Basic SQL queries for college intro database course: SELECT, WHERE, JOIN, GROUP BY. Include reading queries and identifying expected output.",
+    ),
+  ];
+
   final _promptController = TextEditingController();
   int _questionCount = 5;
   int _optionsCount = 4;
+  String _difficulty = "Medium";
+  String _language = "English";
   bool _isLoading = false;
+  late final List<_PromptExample> _displayedExamples;
 
-  final List<String> _examples = [
-    "Linear Algebra dasar untuk Semester 1",
-    "Sejarah Kemerdekaan Indonesia tingkat SMA",
-    "Pemrograman Dasar Python: Loop & Function",
-    "Ekonomi Mikro: Hukum Permintaan & Penawaran",
-  ];
+  @override
+  void initState() {
+    super.initState();
+    final shuffled = [..._examplesPool]..shuffle(Random());
+    _displayedExamples = shuffled.take(_examplesShown).toList();
+  }
 
   @override
   void dispose() {
@@ -39,7 +115,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
     final prompt = _promptController.text.trim();
     if (prompt.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Tuliskan topik kuis terlebih dahulu")),
+        const SnackBar(content: Text("Please enter a quiz topic first")),
       );
       return;
     }
@@ -53,12 +129,14 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
         "prompt": prompt,
         "count": _questionCount,
         "optionsCount": _optionsCount,
+        "difficulty": _difficulty,
+        "language": _language,
       });
 
       if (!mounted) return;
 
       final List<dynamic> rawList = result.data["data"];
-      
+
       final List<PendingQuestion> generatedQuestions = rawList.map((item) {
         return PendingQuestion(
           type: "Multiple Choice",
@@ -73,7 +151,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal generate kuis: $e")),
+        SnackBar(content: Text("Failed to generate quiz: $e")),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -104,28 +182,42 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "Berapa banyak soal yang ingin dibuat?",
+                  "How many questions do you want to create?",
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _label),
                 ),
                 const SizedBox(height: 12),
                 _buildQuestionCountSelector(),
                 const SizedBox(height: 24),
                 const Text(
-                  "Jumlah pilihan jawaban per soal",
+                  "Number of answer options per question",
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _label),
                 ),
                 const SizedBox(height: 12),
                 _buildOptionsCountSelector(),
                 const SizedBox(height: 24),
                 const Text(
-                  "Topik atau instruksi kuis",
+                  "Difficulty level",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _label),
+                ),
+                const SizedBox(height: 12),
+                _buildDifficultySelector(),
+                const SizedBox(height: 24),
+                const Text(
+                  "Quiz language",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _label),
+                ),
+                const SizedBox(height: 12),
+                _buildLanguageSelector(),
+                const SizedBox(height: 24),
+                const Text(
+                  "Quiz topic or instruction",
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _label),
                 ),
                 const SizedBox(height: 12),
                 _buildPromptField(),
                 const SizedBox(height: 20),
                 const Text(
-                  "Contoh prompt:",
+                  "Example prompts (tap to use):",
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _hint),
                 ),
                 const SizedBox(height: 8),
@@ -228,15 +320,95 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  if (c == 2)
-                    Text(
-                      "T/F",
-                      style: TextStyle(
-                        color: isSelected ? Colors.white70 : _hint,
-                        fontSize: 10,
-                      ),
+                  // Selalu render Text dengan font 10 supaya semua tombol tinggi
+                  // sama. Untuk c==2 isinya "T/F", lainnya space agar konsisten.
+                  Text(
+                    c == 2 ? "T/F" : " ",
+                    style: TextStyle(
+                      color: isSelected ? Colors.white70 : _hint,
+                      fontSize: 10,
                     ),
+                  ),
                 ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildDifficultySelector() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: _difficulties.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final d = entry.value;
+        final isSelected = _difficulty == d;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() => _difficulty = d),
+            child: Container(
+              margin: EdgeInsets.only(
+                left: idx == 0 ? 0 : 4,
+                right: idx == _difficulties.length - 1 ? 0 : 4,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected ? _purple : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected ? _purple : const Color(0xFFEAE3F2),
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  d,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : _ink,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildLanguageSelector() {
+    return Row(
+      children: _languages.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final lang = entry.value;
+        final isSelected = _language == lang;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() => _language = lang),
+            child: Container(
+              margin: EdgeInsets.only(
+                left: idx == 0 ? 0 : 4,
+                right: idx == _languages.length - 1 ? 0 : 4,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected ? _purple : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected ? _purple : const Color(0xFFEAE3F2),
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  lang,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : _ink,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ),
           ),
@@ -258,7 +430,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
         maxLength: 200,
         style: const TextStyle(fontSize: 15, color: _ink),
         decoration: InputDecoration(
-          hintText: "Misal: Buatkan soal tentang Teori Relativitas tingkat kesulitan menengah...",
+          hintText: "e.g., Create questions about Theory of Relativity at intermediate difficulty...",
           hintStyle: const TextStyle(color: _hint),
           contentPadding: const EdgeInsets.all(16),
           border: InputBorder.none,
@@ -272,9 +444,9 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: _examples.map((ex) {
+      children: _displayedExamples.map((ex) {
         return InkWell(
-          onTap: () => setState(() => _promptController.text = ex),
+          onTap: () => setState(() => _promptController.text = ex.prompt),
           borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -284,7 +456,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
               border: Border.all(color: const Color(0xFFE7DFF8)),
             ),
             child: Text(
-              ex,
+              ex.label,
               style: const TextStyle(fontSize: 12, color: _purple, fontWeight: FontWeight.w500),
             ),
           ),
@@ -309,12 +481,12 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
               CircularProgressIndicator(color: _purple),
               SizedBox(height: 20),
               Text(
-                "AI sedang menyusun soal...",
+                "AI is generating questions...",
                 style: TextStyle(fontWeight: FontWeight.bold, color: _ink),
               ),
               SizedBox(height: 8),
               Text(
-                "Mohon tunggu sebentar",
+                "Please wait...",
                 style: TextStyle(fontSize: 13, color: _hint),
               ),
             ],
@@ -323,4 +495,10 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
       ),
     );
   }
+}
+
+class _PromptExample {
+  final String label;
+  final String prompt;
+  const _PromptExample(this.label, this.prompt);
 }

@@ -49,3 +49,6 @@ app.*.map.json
 
 # Internal notes (not committed)
 docs/CHANGELOG.md
+docs/planning.md
+docs/tutorial.md
+docs/endpoints.md

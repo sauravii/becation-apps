@@ -461,16 +461,13 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        SizedBox(
-          width: 40,
-          child: Text(
-            '$displayValue',
-            textAlign: TextAlign.left,
-            style: TextStyle(
-              fontSize: isSet ? 20 : 18,
-              fontWeight: isSet ? FontWeight.w700 : FontWeight.w600,
-              color: valueColor,
-            ),
+        Text(
+          '$displayValue',
+          textAlign: TextAlign.left,
+          style: TextStyle(
+            fontSize: isSet ? 20 : 18,
+            fontWeight: isSet ? FontWeight.w700 : FontWeight.w600,
+            color: valueColor,
           ),
         ),
         const SizedBox(width: 8),

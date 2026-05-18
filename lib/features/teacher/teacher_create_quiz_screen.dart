@@ -319,7 +319,6 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     required int? value,
     required int placeholder,
     required String suffix,
-    double valueWidth = 40,
   }) {
     final isSet = value != null;
     final displayValue = value ?? placeholder;
@@ -329,16 +328,13 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        SizedBox(
-          width: valueWidth,
-          child: Text(
-            '$displayValue',
-            textAlign: TextAlign.left,
-            style: TextStyle(
-              fontSize: isSet ? 20 : 18,
-              fontWeight: isSet ? FontWeight.w700 : FontWeight.w600,
-              color: valueColor,
-            ),
+        Text(
+          '$displayValue',
+          textAlign: TextAlign.left,
+          style: TextStyle(
+            fontSize: isSet ? 20 : 18,
+            fontWeight: isSet ? FontWeight.w700 : FontWeight.w600,
+            color: valueColor,
           ),
         ),
         const SizedBox(width: 8),

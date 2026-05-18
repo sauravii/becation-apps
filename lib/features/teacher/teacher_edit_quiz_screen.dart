@@ -18,6 +18,7 @@ class _EditableQuestion {
   List<String> options;
   int correctIndex;
   bool dirty = false;
+  bool markedForDeletion = false;
 
   _EditableQuestion({
     required this.id,
@@ -113,6 +114,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
   bool _showAnswer = true;
   final List<_EditableQuestion> _questions = [];
   late final Set<String> _initialIds;
+  late final List<String> _initialOrderIds;
   bool _isSaving = false;
   bool _hasChanges = false;
 
@@ -132,6 +134,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
       widget.initialQuestions.map(_EditableQuestion.fromExisting),
     );
     _initialIds = widget.initialQuestions.map((e) => e.id).toSet();
+    _initialOrderIds = widget.initialQuestions.map((e) => e.id).toList();
 
     // Listener attached AFTER pre-fill so initial setText doesn't trip _hasChanges.
     _titleController.addListener(() {
@@ -144,13 +147,96 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     _hasChanges = true;
   }
 
+  void _toggleMarked(int index) {
+    setState(() {
+      _questions[index].markedForDeletion =
+          !_questions[index].markedForDeletion;
+    });
+    _markChanged();
+  }
+
+  ({int edited, int added, int deleted, bool reordered}) _computeChanges() {
+    int edited = 0;
+    int added = 0;
+    int deleted = 0;
+    for (final q in _questions) {
+      if (q.markedForDeletion) {
+        if (q.isExisting) deleted++;
+        continue;
+      }
+      if (!q.isExisting) {
+        added++;
+      } else if (q.dirty) {
+        edited++;
+      }
+    }
+    final currentExistingIds = _questions
+        .where((q) => q.isExisting && !q.markedForDeletion)
+        .map((q) => q.id!)
+        .toList();
+    final survivingInitialIds = _initialOrderIds
+        .where((id) => currentExistingIds.contains(id))
+        .toList();
+    bool reordered = currentExistingIds.length != survivingInitialIds.length;
+    if (!reordered) {
+      for (var i = 0; i < currentExistingIds.length; i++) {
+        if (currentExistingIds[i] != survivingInitialIds[i]) {
+          reordered = true;
+          break;
+        }
+      }
+    }
+    return (
+      edited: edited,
+      added: added,
+      deleted: deleted,
+      reordered: reordered,
+    );
+  }
+
+  List<Widget> _summaryBullets(
+      ({int edited, int added, int deleted, bool reordered}) c) {
+    final bullets = <String>[];
+    if (c.edited > 0) {
+      bullets.add('${c.edited} question${c.edited == 1 ? '' : 's'} edited');
+    }
+    if (c.added > 0) {
+      bullets.add('${c.added} question${c.added == 1 ? '' : 's'} added');
+    }
+    if (c.deleted > 0) {
+      bullets.add(
+          '${c.deleted} question${c.deleted == 1 ? '' : 's'} will be deleted');
+    }
+    if (c.reordered) {
+      bullets.add('Question order changed');
+    }
+    return bullets
+        .map((b) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text('• $b', style: const TextStyle(fontSize: 14)),
+            ))
+        .toList();
+  }
+
   Future<bool> _confirmDiscard() async {
+    final changes = _computeChanges();
+    final bullets = _summaryBullets(changes);
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Discard changes?'),
-        content: const Text(
-          'Your unsaved edits to this quiz will be lost.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (bullets.isEmpty)
+              const Text('Your unsaved edits to this quiz will be lost.')
+            else ...[
+              const Text('The following changes will be lost:'),
+              const SizedBox(height: 8),
+              ...bullets,
+            ],
+          ],
         ),
         actions: [
           TextButton(
@@ -161,6 +247,40 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<bool> _confirmSave() async {
+    final changes = _computeChanges();
+    final bullets = _summaryBullets(changes);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save changes?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: bullets.isEmpty
+              ? const [Text('Save quiz?')]
+              : [
+                  const Text('Summary of changes:'),
+                  const SizedBox(height: 8),
+                  ...bullets,
+                ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: _purple),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -180,7 +300,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
       _topic?.id != null &&
       _timeLimit != null &&
       _passingGrade != null &&
-      _questions.isNotEmpty &&
+      _questions.any((q) => !q.markedForDeletion) &&
       !_isSaving;
 
   @override
@@ -657,14 +777,25 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_questions.isNotEmpty) ...[
-          Text(
-            '${_questions.length} Question',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: _ink,
-            ),
-          ),
+          Builder(builder: (_) {
+            final active =
+                _questions.where((q) => !q.markedForDeletion).length;
+            final marked =
+                _questions.where((q) => q.markedForDeletion).length;
+            final base =
+                '$active Question${active == 1 ? '' : 's'}';
+            final suffix = marked > 0
+                ? ' (+$marked marked for deletion)'
+                : '';
+            return Text(
+              '$base$suffix',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: _ink,
+              ),
+            );
+          }),
           const SizedBox(height: 12),
           for (var i = 0; i < _questions.length; i++)
             Padding(
@@ -682,90 +813,103 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
   }
 
   Widget _buildQuestionCard(int index, _EditableQuestion q) {
+    final isMarked = q.markedForDeletion;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isMarked ? const Color(0xFFF0F0F0) : Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFEAE3F2)),
+        border: Border.all(
+          color: isMarked ? Colors.grey.shade400 : const Color(0xFFEAE3F2),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${(index + 1).toString().padLeft(2, '0')}   ${_typeDisplayFromKey(q.type).toUpperCase()}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _label,
-                    letterSpacing: 0.5,
+      child: Opacity(
+        opacity: isMarked ? 0.6 : 1.0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${(index + 1).toString().padLeft(2, '0')}   ${_typeDisplayFromKey(q.type).toUpperCase()}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _label,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                onPressed: _isSaving
-                    ? null
-                    : () {
-                        setState(() => _questions.removeAt(index));
-                        _markChanged();
-                      },
-                icon: const Icon(Icons.delete_outline, size: 20),
-                color: _ink,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                onPressed: _isSaving ? null : () => _onEditQuestion(index),
-                icon: const Icon(Icons.edit_outlined, size: 20),
-                color: _ink,
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Text(
-              q.question,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: _ink,
+                IconButton(
+                  onPressed: _isSaving ? null : () => _toggleMarked(index),
+                  tooltip: isMarked ? 'Restore' : 'Mark for delete',
+                  icon: Icon(
+                    isMarked ? Icons.restore_from_trash : Icons.delete_outline,
+                    size: 20,
+                  ),
+                  color: isMarked ? const Color(0xFFFF7B54) : _ink,
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  onPressed: (_isSaving || isMarked)
+                      ? null
+                      : () => _onEditQuestion(index),
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  color: _ink,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                q.question,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                  decoration: isMarked ? TextDecoration.lineThrough : null,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          ...q.options.asMap().entries.map((e) {
-            final isCorrect = e.key == q.correctIndex;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 1),
-                    child: Icon(
-                      isCorrect ? Icons.check_circle : Icons.radio_button_off,
-                      size: 18,
-                      color: isCorrect ? Colors.green : Colors.grey,
+            const SizedBox(height: 8),
+            ...q.options.asMap().entries.map((e) {
+              final isCorrect = e.key == q.correctIndex;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Icon(
+                        isCorrect ? Icons.check_circle : Icons.radio_button_off,
+                        size: 18,
+                        color: isCorrect ? Colors.green : Colors.grey,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      e.value,
-                      style: const TextStyle(fontSize: 14, color: _ink),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        e.value,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _ink,
+                          decoration:
+                              isMarked ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ),
-            );
-          }),
-        ],
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }
@@ -1055,6 +1199,9 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
   Future<void> _save() async {
     if (!_canSave) return;
 
+    final confirmed = await _confirmSave();
+    if (!confirmed || !mounted) return;
+
     final topic = _topic!;
     final timeLimit = _timeLimit!;
     final passingGrade = _passingGrade!;
@@ -1062,6 +1209,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     final kept = <QuizKeptQuestion>[];
     final newDrafts = <QuizDraftQuestion>[];
     for (final q in _questions) {
+      if (q.markedForDeletion) continue;
       if (q.isExisting) {
         kept.add(QuizKeptQuestion(
           id: q.id!,

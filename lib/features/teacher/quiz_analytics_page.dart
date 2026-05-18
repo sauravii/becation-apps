@@ -8,14 +8,12 @@ class QuizAnalyticsPage extends StatefulWidget {
   final String classId;
   final String quizId;
   final String quizTitle;
-  final Color classColor;
 
   const QuizAnalyticsPage({
     super.key,
     required this.classId,
     required this.quizId,
     required this.quizTitle,
-    this.classColor = const Color(0xFF6F5AAA),
   });
 
   @override
@@ -24,6 +22,9 @@ class QuizAnalyticsPage extends StatefulWidget {
 
 class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     with SingleTickerProviderStateMixin {
+  // App theme purple — keeps analytics page consistent regardless of class color.
+  static const _purple = Color(0xFF6F5AAA);
+
   late final TabController _tabController;
 
   AnalyticsSummary? _summary;
@@ -139,7 +140,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     return Scaffold(
       backgroundColor: const Color(0xFFF7F2FA),
       appBar: AppBar(
-        backgroundColor: widget.classColor,
+        backgroundColor: _purple,
         foregroundColor: Colors.white,
         title: Text(
           widget.quizTitle,
@@ -291,7 +292,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
                 barRods: [
                   BarChartRodData(
                     toY: buckets[i].count.toDouble(),
-                    color: widget.classColor,
+                    color: _purple,
                     width: 24,
                     borderRadius: BorderRadius.circular(4),
                   ),
@@ -540,13 +541,13 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: widget.classColor.withValues(alpha: 0.15),
+            backgroundColor: _purple.withValues(alpha: 0.15),
             child: Text(
               a.studentName.isNotEmpty
                   ? a.studentName[0].toUpperCase()
                   : '?',
               style: TextStyle(
-                color: widget.classColor,
+                color: _purple,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -619,7 +620,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: widget.classColor,
+        color: _purple,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

@@ -158,7 +158,6 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
                   classId: widget.classId,
                   quizId: widget.quizId,
                   quizTitle: quiz.title,
-                  classColor: widget.classColor,
                 ),
               ),
             );

@@ -60,11 +60,17 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 **Kuis & Evaluasi**
 
 - **AI Quiz Generator**: Membuat kuis otomatis dalam hitungan detik menggunakan **Gemini 2.0 Flash**.
-- Konfigurasi AI: Pilih jumlah soal (5-20), jumlah pilihan jawaban (2-5), dan masukkan prompt topik kuis.
+- Konfigurasi AI: Pilih jumlah soal (5-20), jumlah pilihan jawaban (2-5), **tingkat kesulitan** (Easy / Medium / Hard / Expert), **bahasa output** (English / Bahasa Indonesia), dan masukkan prompt topik kuis.
 - **Tipe Soal True/False**: Mendukung pembuatan soal Benar/Salah baik secara manual maupun otomatis via AI.
 - **Kuis Manual**: Susun soal pilihan ganda sendiri dengan kontrol penuh atas pilihan jawaban.
-- Pengaturan Kuis: Judul kuis, batas waktu (time limit), nilai kelulusan (passing grade), dan batas percobaan (attempt limit).
-- **Preview & Edit**: Guru bisa meninjau, mengubah urutan (reorder), dan mengedit soal hasil AI sebelum dipublikasikan.
+- Pengaturan Kuis: Judul kuis, batas waktu (1-1440 menit / 24 jam), nilai kelulusan (passing grade 0-100%), dan batas percobaan (1-10 attempts).
+- **Preview & Edit**: Guru bisa meninjau, mengubah urutan (reorder, hanya saat create), dan mengedit soal hasil AI sebelum dipublikasikan.
+- **Soft-delete dengan undo**: Tap delete pada soal akan menandai (grey-out + strike-through) bukan menghapus langsung. Tap restore untuk batalkan. Save/Publish menampilkan ringkasan perubahan sebelum commit.
+- **Quiz Analytics** (teacher-only): dashboard per-quiz dengan 3 tab:
+  - **Summary**: total attempts, average / min / max score, pass rate, distribusi skor (bar chart).
+  - **Per-Question**: correct rate per soal, distribusi pemilihan jawaban (donut chart).
+  - **Attempts**: list paginated semua attempt siswa (sort by submitted date atau score).
+  - Dibangun di atas Express REST API yang melakukan agregasi server-side (lebih hemat bandwidth dibanding query mentah dari client).
 
 **Settings**
 
@@ -119,6 +125,7 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - **Real-time sync** — perubahan dari guru langsung muncul di perangkat siswa tanpa refresh
 - **Offline-aware** — Firestore cache otomatis menyimpan data terakhir
 - **Secure Backend** — Logika krusial (seperti penilaian kuis) dijalankan di Node.js via Firebase Functions.
+- **REST API selektif** — Express dipakai khusus untuk fitur yang butuh agregasi server-side (Quiz Analytics). Fitur lain tetap pakai Direct Firestore Stream (realtime) atau HTTPS Callable (action-based) sesuai fit-nya.
 - **Responsive design** — menyesuaikan berbagai ukuran layar (flutter_screenutil)
 - **Role-based access** — siswa tidak bisa modifikasi materi, hanya guru pemilik kelas
 - **Atomic operations** — pembuatan kelas, join, dan leave dijalankan sebagai batch transaction
@@ -135,12 +142,15 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 | Language     | Dart, Node.js (Backend)                                       |
 | AI Model     | Gemini 3.1 Flash-Lite Preview (AI Studio)                     |
 | AI Framework | Genkit + Firebase Genkit Monitoring                           |
-| Backend      | Node.js on Firebase Cloud Functions                           |
+| Backend      | Node.js on Firebase Cloud Functions (Gen 2)                   |
+| REST API     | Express + cors (mounted as HTTPS function `api`)              |
 | Auth         | Firebase Authentication                                       |
 | Database     | Cloud Firestore                                               |
 | Storage      | Firebase Storage (file upload)                                |
 | State        | StreamBuilder + Firestore Streams                             |
-| UI Helper    | flutter_screenutil, flutter_svg                               |
+| Charts       | fl_chart (bar chart, donut chart untuk Quiz Analytics)        |
+| HTTP Client  | http (REST calls ke Express API dengan Bearer ID token)       |
+| UI Helper    | flutter_screenutil, flutter_svg, intl                         |
 | Utility      | url_launcher, google_sign_in, file_picker, permission_handler |
 
 ---
@@ -163,7 +173,8 @@ lib/
 ├── services/              # Business logic & Firebase operations
 │   ├── user_service.dart
 │   ├── class_service.dart
-│   ├── quiz_service.dart  # Logika kuis & integrasi AI
+│   ├── quiz_service.dart           # Logika kuis & integrasi AI
+│   ├── quiz_analytics_service.dart # REST client untuk endpoint Express analytics
 │   ├── topic_service.dart
 │   ├── material_service.dart
 │   └── attachment_service.dart
@@ -174,11 +185,16 @@ lib/
 │   ├── material_model.dart
 │   ├── attachment_model.dart
 │   └── member_model.dart
-functions/                 # Backend (Node.js + Genkit on Firebase Functions)
-├── src/                   # Logika modular
-│   ├── quiz_ai.js         # Genkit flow: AI Studio Gemini integration
-│   └── quiz_scoring.js    # Penilaian kuis aman
-├── index.js               # Entry point Cloud Functions
+functions/                 # Backend (Node.js + Genkit on Firebase Functions Gen 2)
+├── src/
+│   ├── quiz_ai.js                  # Genkit flow: AI Studio Gemini integration
+│   ├── quiz_scoring.js             # Penilaian kuis aman (callable)
+│   └── api/                        # Express REST API skeleton
+│       ├── index.js                # Express app factory (cors, json, auth, error)
+│       ├── middleware/             # auth (Firebase ID token), logger, error
+│       ├── helpers/                # authorize (teacher-of-class check)
+│       └── routes/                 # health, quiz_analytics (3 GET endpoints)
+├── index.js                        # Entry point Cloud Functions
 docs/
 ├── FIREBASE_RULES_GUIDE.md  # Dokumentasi Firestore & Storage rules
 └── CHANGELOG.md             # Catatan perubahan versi aplikasi

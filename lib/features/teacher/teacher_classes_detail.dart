@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'teacher_material_detail.dart';
 import 'teacher_quiz_detail.dart';
 import 'teacher_classes_dialogs.dart';
+import 'quiz_analytics_page.dart';
 import '../../models/class_model.dart';
 import '../../models/member_model.dart';
 import '../../models/topic_model.dart';
@@ -356,6 +357,25 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
                           ),
                         );
                       },
+                      trailing: IconButton(
+                        tooltip: 'Analytics',
+                        icon: const Icon(
+                          Icons.insights,
+                          color: Color(0xFFFF7B54),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => QuizAnalyticsPage(
+                                classId: widget.classId,
+                                quizId: q.id,
+                                quizTitle: q.title,
+                                classColor: widget.classColor,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ))
               .toList(),

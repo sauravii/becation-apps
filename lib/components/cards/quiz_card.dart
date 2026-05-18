@@ -7,6 +7,7 @@ class QuizCard extends StatelessWidget {
   final int passingGrade;
   final String topicTitle;
   final VoidCallback? onTap;
+  final Widget? trailing;
 
   const QuizCard({
     super.key,
@@ -16,6 +17,7 @@ class QuizCard extends StatelessWidget {
     required this.passingGrade,
     this.topicTitle = '',
     this.onTap,
+    this.trailing,
   });
 
   @override
@@ -95,6 +97,7 @@ class QuizCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (trailing != null) trailing!,
             ],
           ),
         ),

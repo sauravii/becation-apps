@@ -114,7 +114,6 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
   bool _showAnswer = true;
   final List<_EditableQuestion> _questions = [];
   late final Set<String> _initialIds;
-  late final List<String> _initialOrderIds;
   bool _isSaving = false;
   bool _hasChanges = false;
 
@@ -134,7 +133,6 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
       widget.initialQuestions.map(_EditableQuestion.fromExisting),
     );
     _initialIds = widget.initialQuestions.map((e) => e.id).toSet();
-    _initialOrderIds = widget.initialQuestions.map((e) => e.id).toList();
 
     // Listener attached AFTER pre-fill so initial setText doesn't trip _hasChanges.
     _titleController.addListener(() {
@@ -155,7 +153,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     _markChanged();
   }
 
-  ({int edited, int added, int deleted, bool reordered}) _computeChanges() {
+  ({int edited, int added, int deleted}) _computeChanges() {
     int edited = 0;
     int added = 0;
     int deleted = 0;
@@ -170,32 +168,10 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
         edited++;
       }
     }
-    final currentExistingIds = _questions
-        .where((q) => q.isExisting && !q.markedForDeletion)
-        .map((q) => q.id!)
-        .toList();
-    final survivingInitialIds = _initialOrderIds
-        .where((id) => currentExistingIds.contains(id))
-        .toList();
-    bool reordered = currentExistingIds.length != survivingInitialIds.length;
-    if (!reordered) {
-      for (var i = 0; i < currentExistingIds.length; i++) {
-        if (currentExistingIds[i] != survivingInitialIds[i]) {
-          reordered = true;
-          break;
-        }
-      }
-    }
-    return (
-      edited: edited,
-      added: added,
-      deleted: deleted,
-      reordered: reordered,
-    );
+    return (edited: edited, added: added, deleted: deleted);
   }
 
-  List<Widget> _summaryBullets(
-      ({int edited, int added, int deleted, bool reordered}) c) {
+  List<Widget> _summaryBullets(({int edited, int added, int deleted}) c) {
     final bullets = <String>[];
     if (c.edited > 0) {
       bullets.add('${c.edited} question${c.edited == 1 ? '' : 's'} edited');
@@ -206,9 +182,6 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     if (c.deleted > 0) {
       bullets.add(
           '${c.deleted} question${c.deleted == 1 ? '' : 's'} will be deleted');
-    }
-    if (c.reordered) {
-      bullets.add('Question order changed');
     }
     return bullets
         .map((b) => Padding(

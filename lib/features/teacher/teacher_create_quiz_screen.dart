@@ -458,7 +458,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
           ),
           _counterButton(
             icon: Icons.add,
-            onTap: _attemptLimit < 99
+            onTap: _attemptLimit < 10
                 ? () => setState(() => _attemptLimit++)
                 : null,
           ),
@@ -778,8 +778,10 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
   Future<void> _openTimeLimitDialog() async {
     final result = await _showIntDialog(
       title: 'Choose time limit',
-      label: 'Time limit',
+      label: 'Time limit (minutes)',
       hint: '60',
+      minValue: 1,
+      maxValue: 1440,
     );
     if (result != null) {
       setState(() => _timeLimit = result);
@@ -802,6 +804,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
     required String title,
     required String label,
     required String hint,
+    int? minValue,
     int? maxValue,
   }) {
     final controller = TextEditingController();
@@ -895,6 +898,10 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
                   final parsed = int.tryParse(raw);
                   if (parsed == null) {
                     setDialogState(() => errorText = 'Must be a number');
+                    return;
+                  }
+                  if (minValue != null && parsed < minValue) {
+                    setDialogState(() => errorText = 'Min value is $minValue');
                     return;
                   }
                   if (maxValue != null && parsed > maxValue) {

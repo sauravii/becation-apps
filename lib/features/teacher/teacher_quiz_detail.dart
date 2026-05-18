@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
 import '../../services/quiz_service.dart';
+import 'quiz_analytics_page.dart';
 import 'teacher_classes_dialogs.dart';
 import 'teacher_edit_quiz_screen.dart';
 
@@ -137,8 +138,59 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
               ),
             ),
           ),
+          if (quiz != null) _buildAnalyticsCapsule(quiz),
           if (quiz != null) _buildOverflowMenu(quiz),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsCapsule(QuizModel quiz) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => QuizAnalyticsPage(
+                  classId: widget.classId,
+                  quizId: widget.quizId,
+                  quizTitle: quiz.title,
+                  classColor: widget.classColor,
+                ),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFE9D6),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFFF7B54),
+                width: 1,
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.insights, size: 16, color: Color(0xFFFF7B54)),
+                SizedBox(width: 6),
+                Text(
+                  'Analytics',
+                  style: TextStyle(
+                    color: Color(0xFFFF7B54),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -6,6 +6,7 @@ const loggerMiddleware = require("./middleware/logger");
 const errorHandler = require("./middleware/error");
 
 const healthRouter = require("./routes/health");
+const quizAnalyticsRouter = require("./routes/quiz_analytics");
 
 const app = express();
 
@@ -22,8 +23,7 @@ app.use("/health", healthRouter);
 // Semua route setelah ini wajib login (verify Firebase ID token).
 app.use(authMiddleware);
 
-// Route protected akan didaftarkan di sini saat Step 2 (Quiz Analytics).
-// app.use("/classes", quizAnalyticsRouter);
+app.use("/classes", quizAnalyticsRouter);
 
 // Centralized error handler harus terdaftar paling akhir.
 app.use(errorHandler);

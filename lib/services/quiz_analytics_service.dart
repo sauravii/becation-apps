@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -59,10 +60,42 @@ class QuizAnalyticsService {
     int limit = 20,
     String sort = 'submittedAt',
   }) async {
-    final data = await _get(
-      '/classes/$classId/quizzes/$quizId/attempts?page=$page&limit=$limit&sort=$sort',
+    final sortField = sort == 'score' ? 'score' : 'completedAt';
+    final query = FirebaseFirestore.instance
+        .collection('classes')
+        .doc(classId)
+        .collection('quizzes')
+        .doc(quizId)
+        .collection('attempts')
+        .orderBy(sortField, descending: true);
+
+    final totalSnap = await query.count().get();
+    final total = totalSnap.count ?? 0;
+
+    final offset = (page - 1) * limit;
+    final snap = await query.limit(offset + limit).get();
+    
+    // Manual offset since Firestore doesn't have native offset efficiently without startAfter
+    final docs = snap.docs.skip(offset).take(limit).toList();
+
+    final items = docs.map((doc) {
+      final d = doc.data();
+      return AttemptItem(
+        attemptId: doc.id,
+        studentId: d['studentId'] ?? '',
+        studentName: d['studentName'] ?? '',
+        score: (d['score'] as num?)?.toInt() ?? 0,
+        submittedAt: (d['completedAt'] as Timestamp?)?.toDate(),
+        passed: d['passed'] == true,
+        attemptNumber: (d['attemptNumber'] as num?)?.toInt() ?? 1,
+      );
+    }).toList();
+
+    return AttemptsPage(
+      items: items,
+      hasMore: offset + items.length < total,
+      total: total,
     );
-    return AttemptsPage.fromJson(data);
   }
 }
 
@@ -116,12 +149,16 @@ class QuestionAnalytics {
   final String question;
   final double correctRate;
   final List<OptionDistribution> optionDistribution;
+  int? correctOptionIndex;
+  final double? averageTimeSeconds;
 
   QuestionAnalytics({
     required this.questionId,
     required this.question,
     required this.correctRate,
     required this.optionDistribution,
+    this.correctOptionIndex,
+    this.averageTimeSeconds,
   });
 
   factory QuestionAnalytics.fromJson(Map<String, dynamic> json) {
@@ -135,6 +172,8 @@ class QuestionAnalytics {
           .map((m) =>
               OptionDistribution.fromJson(Map<String, dynamic>.from(m)))
           .toList(),
+      correctOptionIndex: (json['correctOptionIndex'] as num?)?.toInt(),
+      averageTimeSeconds: (json['averageTimeSeconds'] as num?)?.toDouble(),
     );
   }
 }
@@ -191,6 +230,8 @@ class AttemptItem {
   final String studentName;
   final int score;
   final DateTime? submittedAt;
+  final bool passed;
+  final int attemptNumber;
 
   AttemptItem({
     required this.attemptId,
@@ -198,6 +239,8 @@ class AttemptItem {
     required this.studentName,
     required this.score,
     required this.submittedAt,
+    this.passed = false,
+    this.attemptNumber = 1,
   });
 
   factory AttemptItem.fromJson(Map<String, dynamic> json) {
@@ -208,6 +251,8 @@ class AttemptItem {
       studentName: json['studentName'] ?? '',
       score: (json['score'] as num?)?.toInt() ?? 0,
       submittedAt: ts is String ? DateTime.tryParse(ts) : null,
+      passed: json['passed'] == true,
+      attemptNumber: (json['attemptNumber'] as num?)?.toInt() ?? 1,
     );
   }
 }

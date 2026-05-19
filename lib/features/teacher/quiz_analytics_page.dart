@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/quiz_analytics_service.dart';
+import '../../services/quiz_service.dart';
 
 class QuizAnalyticsPage extends StatefulWidget {
   final String classId;
@@ -22,7 +23,6 @@ class QuizAnalyticsPage extends StatefulWidget {
 
 class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     with SingleTickerProviderStateMixin {
-  // App theme purple — keeps analytics page consistent regardless of class color.
   static const _purple = Color(0xFF6F5AAA);
 
   late final TabController _tabController;
@@ -96,6 +96,22 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
         widget.classId,
         widget.quizId,
       );
+
+      try {
+        final keys = await QuizService.fetchAnswerKeys(
+          widget.classId,
+          widget.quizId,
+        );
+        for (var q in result) {
+          final indices = keys[q.questionId];
+          if (indices != null && indices.isNotEmpty) {
+            q.correctOptionIndex = indices.first;
+          }
+        }
+      } catch (_) {
+        // Silently ignore if we fail to fetch keys, we just won't show correct answers.
+      }
+
       if (!mounted) return;
       setState(() {
         _perQuestion = result;
@@ -338,6 +354,20 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
 
   Widget _questionCard(QuestionAnalytics q, int number) {
     final correctPercent = (q.correctRate * 100).round();
+
+    OptionDistribution? mostChosenWrong;
+    if (q.correctOptionIndex != null) {
+      final wrongOptions = q.optionDistribution
+          .where((o) => o.index != q.correctOptionIndex)
+          .toList();
+      if (wrongOptions.isNotEmpty) {
+        wrongOptions.sort((a, b) => b.count.compareTo(a.count));
+        if (wrongOptions.first.count > 0) {
+          mostChosenWrong = wrongOptions.first;
+        }
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -354,12 +384,43 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(Icons.check_circle, size: 16, color: Colors.green.shade600),
-              const SizedBox(width: 6),
-              Text(
-                'Correct: $correctPercent%',
-                style: const TextStyle(fontSize: 13),
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: 16,
+                      color: Colors.green.shade600,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Correct Rate: $correctPercent%',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              if (q.averageTimeSeconds != null)
+                Row(
+                  children: [
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${q.averageTimeSeconds!.toStringAsFixed(1)}s avg time',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 6),
@@ -372,14 +433,49 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
               valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade400),
             ),
           ),
+          if (mostChosenWrong != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.red.shade100),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 16,
+                    color: Colors.red.shade600,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Most Chosen Wrong: ${mostChosenWrong.text} (${mostChosenWrong.count} votes)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
-          _optionDistributionDonut(q.optionDistribution),
+          _optionDistributionDonut(q.optionDistribution, q.correctOptionIndex),
         ],
       ),
     );
   }
 
-  Widget _optionDistributionDonut(List<OptionDistribution> options) {
+  Widget _optionDistributionDonut(
+    List<OptionDistribution> options,
+    int? correctOptionIndex,
+  ) {
     final palette = <Color>[
       const Color(0xFF6F5AAA),
       const Color(0xFFFF7B54),
@@ -450,9 +546,26 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
                           options[i].text,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: options[i].index == correctOptionIndex
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: options[i].index == correctOptionIndex
+                                ? Colors.green.shade700
+                                : null,
+                          ),
                         ),
                       ),
+                      if (options[i].index == correctOptionIndex)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            Icons.check_circle,
+                            size: 14,
+                            color: Colors.green.shade600,
+                          ),
+                        ),
                       Text(
                         '${options[i].count} (${(options[i].percentage * 100).round()}%)',
                         style: TextStyle(
@@ -549,7 +662,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
             backgroundColor: _purple.withValues(alpha: 0.15),
             child: Text(
               a.studentName.isNotEmpty ? a.studentName[0].toUpperCase() : '?',
-              style: TextStyle(color: _purple, fontWeight: FontWeight.w600),
+              style: const TextStyle(color: _purple, fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(width: 12),
@@ -557,16 +670,39 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  a.studentName.isNotEmpty ? a.studentName : '(no name)',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      a.studentName.isNotEmpty ? a.studentName : '(no name)',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: a.passed ? Colors.green.shade50 : Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: a.passed ? Colors.green.shade200 : Colors.red.shade200,
+                        ),
+                      ),
+                      child: Text(
+                        a.passed ? 'PASS' : 'FAIL',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: a.passed ? Colors.green.shade700 : Colors.red.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
-                  dateStr,
+                  'Attempt #${a.attemptNumber} • $dateStr',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
               ],

@@ -1,50 +1,20 @@
-import 'dart:convert';
-
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
+import 'api_client.dart';
 
 /// Client untuk Express API quiz analytics.
-/// Base URL hardcoded ke project `becation-eac04` region `us-central1`.
 class QuizAnalyticsService {
-  static const String _baseUrl =
-      'https://us-central1-becation-eac04.cloudfunctions.net/api';
-
-  static Future<Map<String, dynamic>> _get(String path) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('Not signed in');
-    }
-    final token = await user.getIdToken();
-
-    final res = await http.get(
-      Uri.parse('$_baseUrl$path'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-
-    if (res.statusCode >= 400) {
-      String msg = 'HTTP ${res.statusCode}';
-      try {
-        final body = jsonDecode(res.body);
-        if (body is Map && body['error'] is String) {
-          msg = body['error'] as String;
-        }
-      } catch (_) {}
-      throw Exception(msg);
-    }
-    return jsonDecode(res.body) as Map<String, dynamic>;
-  }
-
   static Future<AnalyticsSummary> fetchSummary(
       String classId, String quizId) async {
-    final data =
-        await _get('/classes/$classId/quizzes/$quizId/analytics');
+    final data = await ApiClient.get(
+      '/classes/$classId/quizzes/$quizId/analytics',
+    ) as Map<String, dynamic>;
     return AnalyticsSummary.fromJson(data);
   }
 
   static Future<List<QuestionAnalytics>> fetchPerQuestion(
       String classId, String quizId) async {
-    final data = await _get(
-        '/classes/$classId/quizzes/$quizId/analytics/per-question');
+    final data = await ApiClient.get(
+      '/classes/$classId/quizzes/$quizId/analytics/per-question',
+    ) as Map<String, dynamic>;
     final raw = (data['questions'] as List?) ?? const [];
     return raw
         .whereType<Map>()
@@ -59,9 +29,9 @@ class QuizAnalyticsService {
     int limit = 20,
     String sort = 'submittedAt',
   }) async {
-    final data = await _get(
+    final data = await ApiClient.get(
       '/classes/$classId/quizzes/$quizId/attempts?page=$page&limit=$limit&sort=$sort',
-    );
+    ) as Map<String, dynamic>;
     return AttemptsPage.fromJson(data);
   }
 }

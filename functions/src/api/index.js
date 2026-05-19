@@ -14,6 +14,7 @@ const attachmentsRouter = require("./routes/attachments");
 const classesRouter = require("./routes/classes");
 const {joinRouter, memberRouter} = require("./routes/memberships");
 const quizzesRouter = require("./routes/quizzes");
+const quizAiRouter = require("./routes/quiz_ai");
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use("/classes", classesRouter);
 app.use("/classes", memberRouter);
 app.use("/memberships", joinRouter);
 app.use("/users", usersRouter);
+app.use("/quizzes", quizAiRouter);
 
 // Centralized error handler harus terdaftar paling akhir.
 app.use(errorHandler);

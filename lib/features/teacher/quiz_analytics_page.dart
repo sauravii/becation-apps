@@ -210,16 +210,32 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     if (s.totalAttempts == 0) {
       return const _EmptyView(
         icon: Icons.bar_chart,
-        message: 'Belum ada attempt untuk quiz ini',
+        message: 'No attempts for this quiz yet',
       );
     }
+
+    QuestionAnalytics? easiestQuestion;
+    QuestionAnalytics? hardestQuestion;
+
+    if (_perQuestion != null && _perQuestion!.isNotEmpty) {
+      final sortedQuestions = List<QuestionAnalytics>.from(_perQuestion!);
+      sortedQuestions.sort((a, b) => a.correctRate.compareTo(b.correctRate));
+      hardestQuestion = sortedQuestions.first;
+      easiestQuestion = sortedQuestions.last;
+    }
+
+    final pendingStudents = s.totalStudents - s.uniqueParticipants;
+
     return RefreshIndicator(
       onRefresh: _loadSummary,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _bigStat('Total Attempts', s.totalAttempts.toString()),
-          const SizedBox(height: 12),
+          _bigStat(
+            'Participation Rate',
+            '${s.uniqueParticipants} / ${s.totalStudents} Students',
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(child: _statCard('Average Score', '${s.avgScore}')),
@@ -237,10 +253,123 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
               Expanded(child: _statCard('Highest Score', '${s.maxScore}')),
             ],
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _statCard('Passing Grade', '${s.passingGrade}')),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _statCard('Failed Students', '${s.failedParticipants}'),
+              ),
+            ],
+          ),
+          if (pendingStudents > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange.shade800),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '$pendingStudents students have not taken this quiz yet.',
+                      style: TextStyle(
+                        color: Colors.orange.shade900,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           _sectionTitle('Score Distribution'),
           const SizedBox(height: 8),
           _scoreDistributionChart(s.scoreDistribution),
+          if (hardestQuestion != null && easiestQuestion != null) ...[
+            const SizedBox(height: 24),
+            _sectionTitle('Question Insights'),
+            const SizedBox(height: 12),
+            _insightCard(
+              title: 'Hardest Question',
+              question: hardestQuestion.question,
+              correctRate: hardestQuestion.correctRate,
+              color: Colors.red.shade50,
+              iconColor: Colors.red.shade700,
+              icon: Icons.trending_down,
+            ),
+            const SizedBox(height: 12),
+            _insightCard(
+              title: 'Easiest Question',
+              question: easiestQuestion.question,
+              correctRate: easiestQuestion.correctRate,
+              color: Colors.green.shade50,
+              iconColor: Colors.green.shade700,
+              icon: Icons.trending_up,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _insightCard({
+    required String title,
+    required String question,
+    required double correctRate,
+    required Color color,
+    required Color iconColor,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: iconColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: iconColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  question,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Correct: ${(correctRate * 100).round()}%',
+                  style: TextStyle(
+                    color: iconColor.withValues(alpha: 0.8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -261,7 +390,13 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
           maxY: yMax,
-          gridData: const FlGridData(show: false),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: 1,
+            getDrawingHorizontalLine: (value) =>
+                FlLine(color: _purple.withValues(alpha: 0.1), strokeWidth: 1),
+          ),
           borderData: FlBorderData(show: false),
           titlesData: FlTitlesData(
             leftTitles: AxisTitles(
@@ -338,7 +473,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     if (qs.isEmpty) {
       return const _EmptyView(
         icon: Icons.help_outline,
-        message: 'Quiz belum punya question',
+        message: 'This quiz has no questions yet',
       );
     }
     return RefreshIndicator(
@@ -492,7 +627,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
         padding: const EdgeInsets.symmetric(vertical: 12),
         alignment: Alignment.center,
         child: const Text(
-          'Belum ada jawaban',
+          'No answers yet',
           style: TextStyle(color: Colors.grey, fontSize: 12),
         ),
       );
@@ -628,7 +763,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
           child: page.items.isEmpty
               ? const _EmptyView(
                   icon: Icons.list_alt,
-                  message: 'Belum ada attempt',
+                  message: 'No attempts yet',
                 )
               : RefreshIndicator(
                   onRefresh: () => _loadAttempts(),
@@ -662,7 +797,10 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
             backgroundColor: _purple.withValues(alpha: 0.15),
             child: Text(
               a.studentName.isNotEmpty ? a.studentName[0].toUpperCase() : '?',
-              style: const TextStyle(color: _purple, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                color: _purple,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -681,12 +819,19 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: a.passed ? Colors.green.shade50 : Colors.red.shade50,
+                        color: a.passed
+                            ? Colors.green.shade50
+                            : Colors.red.shade50,
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                          color: a.passed ? Colors.green.shade200 : Colors.red.shade200,
+                          color: a.passed
+                              ? Colors.green.shade200
+                              : Colors.red.shade200,
                         ),
                       ),
                       child: Text(
@@ -694,7 +839,9 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: a.passed ? Colors.green.shade700 : Colors.red.shade700,
+                          color: a.passed
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
                         ),
                       ),
                     ),

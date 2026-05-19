@@ -37,9 +37,97 @@ class QuizAnalyticsService {
 
   static Future<AnalyticsSummary> fetchSummary(
       String classId, String quizId) async {
-    final data =
-        await _get('/classes/$classId/quizzes/$quizId/analytics');
-    return AnalyticsSummary.fromJson(data);
+    final db = FirebaseFirestore.instance;
+    
+    // 1. Get total students
+    final membersSnap = await db.collection('classes').doc(classId).collection('members').where('role', isEqualTo: 'student').get();
+    final totalStudents = membersSnap.size;
+
+    // 2. Get quiz details
+    final quizSnap = await db.collection('classes').doc(classId).collection('quizzes').doc(quizId).get();
+    final passingGrade = (quizSnap.data()?['passingGrade'] as num?)?.toInt() ?? 0;
+
+    // 3. Get all attempts
+    final attemptsSnap = await db.collection('classes').doc(classId).collection('quizzes').doc(quizId).collection('attempts').get();
+    final totalAttempts = attemptsSnap.size;
+
+    final emptyBuckets = [
+      ScoreBucket(bucket: '0-20', count: 0),
+      ScoreBucket(bucket: '21-40', count: 0),
+      ScoreBucket(bucket: '41-60', count: 0),
+      ScoreBucket(bucket: '61-80', count: 0),
+      ScoreBucket(bucket: '81-100', count: 0),
+    ];
+
+    if (totalAttempts == 0) {
+      return AnalyticsSummary(
+        totalAttempts: 0,
+        avgScore: 0,
+        minScore: 0,
+        maxScore: 0,
+        passRate: 0,
+        scoreDistribution: emptyBuckets,
+        totalStudents: totalStudents,
+        passingGrade: passingGrade,
+        uniqueParticipants: 0,
+        failedParticipants: 0,
+      );
+    }
+
+    int sum = 0;
+    int minScore = 999999;
+    int maxScore = -999999;
+    int passedCount = 0;
+    List<int> bucketCounts = [0, 0, 0, 0, 0];
+    
+    Map<String, int> bestScores = {};
+
+    for (var doc in attemptsSnap.docs) {
+      final data = doc.data();
+      final score = (data['score'] as num?)?.toInt() ?? 0;
+      final studentId = data['studentId'] as String?;
+      
+      sum += score;
+      if (score < minScore) minScore = score;
+      if (score > maxScore) maxScore = score;
+      if (score >= passingGrade) passedCount++;
+
+      if (score <= 20) bucketCounts[0]++;
+      else if (score <= 40) bucketCounts[1]++;
+      else if (score <= 60) bucketCounts[2]++;
+      else if (score <= 80) bucketCounts[3]++;
+      else bucketCounts[4]++;
+
+      if (studentId != null) {
+        if (!bestScores.containsKey(studentId) || bestScores[studentId]! < score) {
+          bestScores[studentId] = score;
+        }
+      }
+    }
+
+    int failedParticipants = 0;
+    for (var score in bestScores.values) {
+      if (score < passingGrade) failedParticipants++;
+    }
+
+    return AnalyticsSummary(
+      totalAttempts: totalAttempts,
+      avgScore: (sum / totalAttempts).round(),
+      minScore: minScore == 999999 ? 0 : minScore,
+      maxScore: maxScore == -999999 ? 0 : maxScore,
+      passRate: passedCount / totalAttempts,
+      scoreDistribution: [
+        ScoreBucket(bucket: '0-20', count: bucketCounts[0]),
+        ScoreBucket(bucket: '21-40', count: bucketCounts[1]),
+        ScoreBucket(bucket: '41-60', count: bucketCounts[2]),
+        ScoreBucket(bucket: '61-80', count: bucketCounts[3]),
+        ScoreBucket(bucket: '81-100', count: bucketCounts[4]),
+      ],
+      totalStudents: totalStudents,
+      passingGrade: passingGrade,
+      uniqueParticipants: bestScores.length,
+      failedParticipants: failedParticipants,
+    );
   }
 
   static Future<List<QuestionAnalytics>> fetchPerQuestion(
@@ -106,6 +194,11 @@ class AnalyticsSummary {
   final int maxScore;
   final double passRate;
   final List<ScoreBucket> scoreDistribution;
+  
+  final int totalStudents;
+  final int passingGrade;
+  final int uniqueParticipants;
+  final int failedParticipants;
 
   AnalyticsSummary({
     required this.totalAttempts,
@@ -114,6 +207,10 @@ class AnalyticsSummary {
     required this.maxScore,
     required this.passRate,
     required this.scoreDistribution,
+    this.totalStudents = 0,
+    this.passingGrade = 0,
+    this.uniqueParticipants = 0,
+    this.failedParticipants = 0,
   });
 
   factory AnalyticsSummary.fromJson(Map<String, dynamic> json) {

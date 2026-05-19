@@ -868,7 +868,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           NavItem(
-            icon: Icons.class_rounded,
+            icon: Icons.map_rounded, // Changed to map icon to perfectly represent Roadmap
             label: 'Roadmap',
             active: _selectedIndex == 0,
             onTap: () {

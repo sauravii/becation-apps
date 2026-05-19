@@ -110,12 +110,14 @@ class _LearningMapState extends State<LearningMap> {
 
           // Background Overlay for better readability
           Positioned.fill(
-            child: Container(color: Colors.black.withValues(alpha: 0.05)),
+            child: Container(color: Colors.black.withOpacity(0.05)),
           ),
 
-          // PATH PAINTER (Ultra-smooth "S" curve)
+          // BEAUTIFUL 3D ROAD PATH
           Positioned.fill(
-            child: CustomPaint(painter: PathPainter(topics: widget.topics)),
+            child: ClipRect(
+              child: CustomPaint(painter: PathPainter(topics: widget.topics)),
+            ),
           ),
 
           ListView.builder(
@@ -175,13 +177,16 @@ class _LearningMapState extends State<LearningMap> {
                               break;
                           }
 
+                          final screenWidth = MediaQuery.of(context).size.width;
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 80, top: 30),
-                            child: Align(
-                              alignment: Alignment(currentX, 0),
-                              child: GestureDetector(
-                                onTap: node.onTap,
-                                child: _buildNodeIcon(node),
+                            child: Center(
+                              child: Transform.translate(
+                                offset: Offset(currentX * (screenWidth / 2), 0),
+                                child: GestureDetector(
+                                  onTap: node.onTap,
+                                  child: _buildNodeIcon(node),
+                                ),
                               ),
                             ),
                           );
@@ -191,47 +196,43 @@ class _LearningMapState extends State<LearningMap> {
                         .toList(),
                   ),
 
-                  // Topic Header
+                  // Topic Header (Clean Glassmorphism)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 60),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2),
+                    child: Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24, // Enough padding to look balanced
+                              vertical: 12,
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  topic.title.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    letterSpacing: 1.2,
-                                    shadows: [
-                                      Shadow(
-                                        blurRadius: 4,
-                                        color: Colors.black26,
-                                        offset: Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
                               ),
-                            ],
+                            ),
+                            child: Text(
+                              topic.title.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                letterSpacing: 1.2,
+                                shadows: [
+                                  Shadow(
+                                    blurRadius: 4,
+                                    color: Colors.black26,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -247,42 +248,86 @@ class _LearningMapState extends State<LearningMap> {
   }
 
   Widget _buildNodeIcon(LearningNode node) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            Transform.translate(
-              offset: const Offset(0, 4),
-              child: Container(
-                width: 50,
-                height: 15,
-                decoration: BoxDecoration(
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 10,
+    return SizedBox(
+      height: 98,
+      width: 160, // Constrain width so long text will wrap instead of overflowing horizontally
+      child: Stack(
+        clipBehavior: Clip.none, // Allow text to safely expand downward if it wraps to 2 lines
+        alignment: Alignment.topCenter,
+        children: [
+          // Icon stack mathematically locked to the top (prevents path drifting)
+          Positioned(
+            top: 0,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Transform.translate(
+                  offset: const Offset(0, 4),
+                  child: Container(
+                    width: 50,
+                    height: 15,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 10,
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            SizedBox(
-              width: 60,
-              height: 60,
-              child: Center(
-                child: Image.asset(
-                  node.icon,
+                SizedBox(
                   width: 60,
                   height: 60,
-                  fit: BoxFit.contain,
+                  child: Center(
+                    child: Image.asset(
+                      node.icon,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Clean Translucent Pill Container positioned exactly below the icon
+          Positioned(
+            top: 68, // 60px icon + 8px spacing
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.white.withOpacity(0.0),
+                    Colors.white.withOpacity(0.50),
+                    Colors.white.withOpacity(0.0),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                node.title,
+                textAlign: TextAlign.center,
+                maxLines: 2, // Allow up to 2 lines of text
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF1E1A27), // Deep premium obsidian black
+                  fontSize: 11, // Slightly smaller to look beautiful on 2 lines
+                  fontWeight: FontWeight.w800, // S-Tier gamified extra-bold weight
+                  letterSpacing: 0.4,
+                  height: 1.1, // Tighter line height
                 ),
               ),
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -339,12 +384,13 @@ class PathPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (topics.isEmpty) return;
 
+    // Single glowing magical path
     final pathPaint = Paint()
-      ..color = const Color(0xFFFFF0DF).withValues(alpha: 0.75)
+      ..color = const Color(0xFFFFF0DF) // Beautiful glowing color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 35
+      ..strokeWidth = 30
       ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
 
     final List<Offset> points = [];
     int globalIndex = 0;
@@ -352,42 +398,35 @@ class PathPainter extends CustomPainter {
 
     for (int i = 0; i < topics.length; i++) {
       final topic = topics[i];
-      currentY -= (20 + 48 + 60);
+      currentY -= 123.0; // Restored exactly to original Topic Header height
+
       for (int j = 0; j < topic.nodes.length; j++) {
         final int absoluteIndex = globalIndex + j;
         double xFactor = 0.0;
         final patternPos = absoluteIndex % 8;
         switch (patternPos) {
-          case 0:
-            xFactor = 0.0;
-            break;
-          case 1:
-            xFactor = 0.3;
-            break;
-          case 2:
-            xFactor = 0.5;
-            break;
-          case 3:
-            xFactor = 0.3;
-            break;
-          case 4:
-            xFactor = 0.0;
-            break;
-          case 5:
-            xFactor = -0.3;
-            break;
-          case 6:
-            xFactor = -0.5;
-            break;
-          case 7:
-            xFactor = -0.3;
-            break;
+          case 0: xFactor = 0.0; break;
+          case 1: xFactor = 0.35; break;
+          case 2: xFactor = 0.55; break;
+          case 3: xFactor = 0.35; break;
+          case 4: xFactor = 0.0; break;
+          case 5: xFactor = -0.35; break;
+          case 6: xFactor = -0.55; break;
+          case 7: xFactor = -0.35; break;
         }
         final double x = size.width / 2 + (xFactor * (size.width / 2));
-        points.add(Offset(x, currentY - 80 - 30));
-        currentY -= (80 + 60 + 30);
+        
+        points.add(Offset(x, currentY - 148.0));
+        currentY -= 208.0; // Restored perfectly to original node height
       }
       globalIndex += topic.nodes.length;
+    }
+
+    // Extend the path to the very bottom edge of the screen
+    if (points.isNotEmpty) {
+      points.insert(0, Offset(points.first.dx, size.height + 100));
+      // Extend the path to the very top edge of the screen
+      points.add(Offset(points.last.dx, -100));
     }
 
     if (points.length < 2) return;
@@ -395,31 +434,26 @@ class PathPainter extends CustomPainter {
     final path = Path();
     path.moveTo(points[0].dx, points[0].dy);
 
-    // PERFECT SYMMETRICAL S-CURVE (Design Match)
-    // To achieve the perfect curve from your design screenshot:
-    // 1. Control points must be vertically mirrored.
-    // 2. Control points MUST have the SAME X-coordinate as the nodes they belong to.
-    // 3. The vertical distance of control points (0.5 dy) ensures a natural S-flow.
     for (int i = 0; i < points.length - 1; i++) {
       final p0 = points[i];
       final p1 = points[i + 1];
-
       final double dy = (p1.dy - p0.dy).abs();
 
-      // Balanced tension (0.5) for a smooth S-curve
       path.cubicTo(
         p0.dx,
-        p0.dy - (dy * 0.08),
+        p0.dy - (dy * 0.5),
         p1.dx,
-        p1.dy + (dy * 0.08),
+        p1.dy + (dy * 0.5),
         p1.dx,
         p1.dy,
       );
     }
 
-    canvas.drawPath(path, pathPaint);
+    canvas.drawPath(path, pathPaint); // Glowing beam
   }
 
   @override
   bool shouldRepaint(covariant PathPainter oldDelegate) => true;
 }
+
+

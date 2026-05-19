@@ -170,10 +170,19 @@ class LeaderboardContent extends StatefulWidget {
   State<LeaderboardContent> createState() => _LeaderboardContentState();
 }
 
-class _LeaderboardContentState extends State<LeaderboardContent> with SingleTickerProviderStateMixin {
+class _LeaderboardContentState extends State<LeaderboardContent> with TickerProviderStateMixin {
   double _sheetFraction = 0.48; // Initial height fraction (52% of parent height)
   late AnimationController _animationController;
   Animation<double>? _fractionAnimation;
+
+  // Staggered podium entry animations
+  late AnimationController _entryController;
+  late Animation<Offset> _firstPlaceOffset;
+  late Animation<Offset> _secondPlaceOffset;
+  late Animation<Offset> _thirdPlaceOffset;
+  late Animation<double> _firstPlaceOpacity;
+  late Animation<double> _secondPlaceOpacity;
+  late Animation<double> _thirdPlaceOpacity;
 
   @override
   void initState() {
@@ -189,11 +198,79 @@ class _LeaderboardContentState extends State<LeaderboardContent> with SingleTick
         });
       }
     });
+
+    // Initialize podium entry animation controller (1 second duration)
+    _entryController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+
+    // Staggered slide up & fade animations using fine-tuned easing
+    _secondPlaceOffset = Tween<Offset>(
+      begin: const Offset(0.0, 0.4),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: const Interval(0.0, 0.7, curve: Curves.easeOutBack),
+      ),
+    );
+    _secondPlaceOpacity = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: const Interval(0.0, 0.4, curve: Curves.easeIn),
+      ),
+    );
+
+    _firstPlaceOffset = Tween<Offset>(
+      begin: const Offset(0.0, 0.4),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: const Interval(0.15, 0.85, curve: Curves.easeOutBack),
+      ),
+    );
+    _firstPlaceOpacity = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: const Interval(0.15, 0.55, curve: Curves.easeIn),
+      ),
+    );
+
+    _thirdPlaceOffset = Tween<Offset>(
+      begin: const Offset(0.0, 0.4),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeOutBack),
+      ),
+    );
+    _thirdPlaceOpacity = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: const Interval(0.3, 0.7, curve: Curves.easeIn),
+      ),
+    );
+
+    // Trigger the entrance animations on load
+    _entryController.forward();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _entryController.dispose();
     super.dispose();
   }
 
@@ -291,33 +368,51 @@ class _LeaderboardContentState extends State<LeaderboardContent> with SingleTick
         children: [
           // 2nd Place Column
           if (second != null)
-            _buildPodiumColumn(
-              item: second,
-              height: 230, // Lowered for a more balanced and compact layout
-              avatarSize: 72, // Mathematically flush (68 + 5 pink + 7 purple = 80 width)
-              columnColor: const Color(0xFFD6C7FF).withOpacity(0.85),
+            FadeTransition(
+              opacity: _secondPlaceOpacity,
+              child: SlideTransition(
+                position: _secondPlaceOffset,
+                child: _buildPodiumColumn(
+                  item: second,
+                  height: 230, // Lowered for a more balanced and compact layout
+                  avatarSize: 72, // Mathematically flush (68 + 5 pink + 7 purple = 80 width)
+                  columnColor: const Color(0xFFD6C7FF).withOpacity(0.85),
+                ),
+              ),
             )
           else
             const SizedBox(width: 80), // Matched to new column width 80
 
           // 1st Place Column
           if (first != null)
-            _buildPodiumColumn(
-              item: first,
-              height: 260, // Lowered for a more balanced and compact layout
-              avatarSize: 72, // Mathematically flush (68 + 5 pink + 7 purple = 80 width)
-              columnColor: const Color(0xFFE2D9FF),
+            FadeTransition(
+              opacity: _firstPlaceOpacity,
+              child: SlideTransition(
+                position: _firstPlaceOffset,
+                child: _buildPodiumColumn(
+                  item: first,
+                  height: 260, // Lowered for a more balanced and compact layout
+                  avatarSize: 72, // Mathematically flush (68 + 5 pink + 7 purple = 80 width)
+                  columnColor: const Color(0xFFE2D9FF),
+                ),
+              ),
             )
           else
             const SizedBox(width: 80), // Matched to new column width 80
 
           // 3rd Place Column
           if (third != null)
-            _buildPodiumColumn(
-              item: third,
-              height: 210, // Lowered for a more balanced and compact layout
-              avatarSize: 72, // Mathematically flush (68 + 5 pink + 7 purple = 80 width)
-              columnColor: const Color(0xFFD6C7FF).withOpacity(0.65),
+            FadeTransition(
+              opacity: _thirdPlaceOpacity,
+              child: SlideTransition(
+                position: _thirdPlaceOffset,
+                child: _buildPodiumColumn(
+                  item: third,
+                  height: 210, // Lowered for a more balanced and compact layout
+                  avatarSize: 72, // Mathematically flush (68 + 5 pink + 7 purple = 80 width)
+                  columnColor: const Color(0xFFD6C7FF).withOpacity(0.65),
+                ),
+              ),
             )
           else
             const SizedBox(width: 80), // Matched to new column width 80

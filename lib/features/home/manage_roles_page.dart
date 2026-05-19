@@ -27,10 +27,10 @@ class _ManageRolesPageState extends State<ManageRolesPage> {
     super.dispose();
   }
 
-  // Ambil semua user dari Firestore.
+  // Ambil semua user via Express REST API.
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
-    final users = await UserService.getAllUsers();
+    final users = await UserService.listUsersApi();
     if (!mounted) return;
     setState(() {
       _users = users;
@@ -38,7 +38,7 @@ class _ManageRolesPageState extends State<ManageRolesPage> {
     });
   }
 
-  // Cari user berdasarkan email. Kalau kosong, tampilkan semua.
+  // Cari user berdasarkan email via Express. Kalau kosong, tampilkan semua.
   Future<void> _searchByEmail() async {
     final email = _searchController.text.trim();
     if (email.isEmpty) {
@@ -47,7 +47,7 @@ class _ManageRolesPageState extends State<ManageRolesPage> {
     }
 
     setState(() => _isLoading = true);
-    final users = await UserService.searchUsersByEmail(email);
+    final users = await UserService.listUsersApi(email: email);
     if (!mounted) return;
     setState(() {
       _users = users;
@@ -77,7 +77,7 @@ class _ManageRolesPageState extends State<ManageRolesPage> {
     );
 
     if (confirm == true) {
-      await UserService.updateUserRole(uid, newRole);
+      await UserService.updateUserRoleApi(uid, newRole);
       _searchController.text.trim().isEmpty ? _loadUsers() : _searchByEmail();
     }
   }

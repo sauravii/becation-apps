@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/class_model.dart';
+import 'api_client.dart';
 
 class ClassService {
   static final _firestore = FirebaseFirestore.instance;
@@ -262,5 +263,112 @@ class ClassService {
               data['uid'] = doc.id;
               return data;
             }).toList());
+  }
+
+  // === REST API counterparts (Class CRUD via Express) ===
+
+  /// GET /api/classes/teaching — kelas current user sebagai teacher.
+  static Future<List<Map<String, dynamic>>> listTeachingClassesApi() async {
+    final data =
+        await ApiClient.get('/classes/teaching') as Map<String, dynamic>;
+    final raw = (data['classes'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+  }
+
+  /// GET /api/classes/enrolled — kelas current user sebagai student.
+  static Future<List<Map<String, dynamic>>> listEnrolledClassesApi() async {
+    final data =
+        await ApiClient.get('/classes/enrolled') as Map<String, dynamic>;
+    final raw = (data['classes'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+  }
+
+  /// GET /api/classes/:cid — detail kelas.
+  static Future<Map<String, dynamic>?> getClassApi(String classId) async {
+    try {
+      return await ApiClient.get('/classes/$classId') as Map<String, dynamic>;
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// POST /api/classes — create kelas + member (teacher) + class_code atomic.
+  /// Return class id.
+  static Future<String> createClassApi({
+    required String title,
+    required String subject,
+    required String description,
+    required int colorValue,
+  }) async {
+    final data = await ApiClient.post('/classes', {
+      'title': title,
+      'subject': subject,
+      'description': description,
+      'colorValue': colorValue,
+    }) as Map<String, dynamic>;
+    return data['id'] as String;
+  }
+
+  /// PATCH /api/classes/:cid — update kelas (title/subject/description).
+  static Future<void> updateClassApi({
+    required String classId,
+    required String title,
+    required String subject,
+    required String description,
+  }) async {
+    await ApiClient.patch('/classes/$classId', {
+      'title': title,
+      'subject': subject,
+      'description': description,
+    });
+  }
+
+  /// DELETE /api/classes/:cid — cascade delete kelas + members + topics +
+  /// materials + attachments + quizzes + subcollections + class_code.
+  static Future<void> deleteClassWithContentsApi(String classId) async {
+    await ApiClient.delete('/classes/$classId');
+  }
+
+  // === Membership endpoints via Express ===
+
+  /// POST /api/memberships/join — student join class by code.
+  /// Return class id.
+  static Future<String> joinClassByCodeApi({required String classCode}) async {
+    final data = await ApiClient.post('/memberships/join', {
+      'classCode': classCode,
+    }) as Map<String, dynamic>;
+    return data['classId'] as String;
+  }
+
+  /// DELETE /api/classes/:cid/members/me — leave class (self).
+  static Future<void> leaveClassApi(String classId) async {
+    await ApiClient.delete('/classes/$classId/members/me');
+  }
+
+  /// GET /api/classes/:cid/members — list members.
+  static Future<List<Map<String, dynamic>>> listClassMembersApi(
+      String classId) async {
+    final data = await ApiClient.get('/classes/$classId/members')
+        as Map<String, dynamic>;
+    final raw = (data['members'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+  }
+
+  /// POST /api/classes/:cid/members/remove — teacher bulk-remove students.
+  static Future<void> removeStudentsApi(
+      String classId, List<String> studentUids) async {
+    await ApiClient.post('/classes/$classId/members/remove', {
+      'uids': studentUids,
+    });
   }
 }

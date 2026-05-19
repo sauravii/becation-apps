@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/attachment_model.dart';
+import 'api_client.dart';
 
 class AttachmentService {
   static final _firestore = FirebaseFirestore.instance;
@@ -144,5 +145,112 @@ class AttachmentService {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  // === REST API counterparts (metadata-only; bytes upload tetap Storage SDK) ===
+
+  /// GET /api/classes/:cid/materials/:mid/attachments
+  static Future<List<Map<String, dynamic>>> listAttachmentsApi(
+    String classId,
+    String materialId,
+  ) async {
+    final data = await ApiClient.get(
+      '/classes/$classId/materials/$materialId/attachments',
+    ) as Map<String, dynamic>;
+    final raw = (data['attachments'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+  }
+
+  /// POST /api/classes/:cid/materials/:mid/attachments
+  /// Metadata-only — dipakai untuk link external atau setelah upload file
+  /// selesai (storagePath + url sudah didapat dari Storage SDK).
+  static Future<String> addAttachmentApi({
+    required String classId,
+    required String materialId,
+    required String title,
+    required String type,
+    required String url,
+    String fileSize = '',
+    String? fileExtension,
+    String? storagePath,
+  }) async {
+    final body = <String, dynamic>{
+      'title': title,
+      'type': type,
+      'url': url,
+      'fileSize': fileSize,
+    };
+    if (fileExtension != null) body['fileExtension'] = fileExtension;
+    if (storagePath != null) body['storagePath'] = storagePath;
+
+    final data = await ApiClient.post(
+      '/classes/$classId/materials/$materialId/attachments',
+      body,
+    ) as Map<String, dynamic>;
+    return data['id'] as String;
+  }
+
+  /// PATCH /api/classes/:cid/materials/:mid/attachments/:aid
+  static Future<void> updateAttachmentTitleApi(
+    String classId,
+    String materialId,
+    String attachmentId,
+    String newTitle,
+  ) async {
+    await ApiClient.patch(
+      '/classes/$classId/materials/$materialId/attachments/$attachmentId',
+      {'title': newTitle},
+    );
+  }
+
+  /// DELETE /api/classes/:cid/materials/:mid/attachments/:aid
+  /// Server juga akan hapus file di Storage kalau `storagePath` ada di doc.
+  static Future<void> deleteAttachmentApi(
+    String classId,
+    String materialId,
+    String attachmentId,
+  ) async {
+    await ApiClient.delete(
+      '/classes/$classId/materials/$materialId/attachments/$attachmentId',
+    );
+  }
+
+  /// Upload bytes via Storage SDK (native — Functions 32MB limit), lalu
+  /// register metadata via Express POST. Hybrid by design.
+  static Future<String> uploadFileAttachmentApi({
+    required String classId,
+    required String materialId,
+    required String title,
+    required String type,
+    required File file,
+    required String fileName,
+  }) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final storagePath =
+        'classes/$classId/materials/$materialId/${timestamp}_$fileName';
+    final ref = _storage.ref(storagePath);
+
+    debugPrint('[AttachmentService] (api) Uploading file: $storagePath');
+
+    final uploadTask = await ref.putFile(file);
+    final downloadUrl = await uploadTask.ref.getDownloadURL();
+    final fileSize = _formatFileSize(file.lengthSync());
+    final ext = fileName.contains('.')
+        ? fileName.split('.').last.toLowerCase()
+        : '';
+
+    return addAttachmentApi(
+      classId: classId,
+      materialId: materialId,
+      title: title,
+      type: type,
+      url: downloadUrl,
+      fileSize: fileSize,
+      fileExtension: ext,
+      storagePath: storagePath,
+    );
   }
 }

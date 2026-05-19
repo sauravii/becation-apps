@@ -1217,7 +1217,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
           )
           .toList();
 
-      await QuizService.createQuiz(
+      await QuizService.createQuizApi(
         classId: widget.classId,
         title: _titleController.text.trim(),
         topicId: topic.id ?? '',

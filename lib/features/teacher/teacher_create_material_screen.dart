@@ -377,7 +377,7 @@ class _TeacherCreateMaterialScreenState
     setState(() => _isPosting = true);
 
     try {
-      final materialId = await MaterialService.createMaterial(
+      final materialId = await MaterialService.createMaterialApi(
         classId: widget.classId,
         topicId: topic.id!,
         topicTitle: topic.title ?? '',
@@ -387,7 +387,7 @@ class _TeacherCreateMaterialScreenState
 
       for (final a in _attachments) {
         if (a.type == 'link') {
-          await AttachmentService.addAttachment(
+          await AttachmentService.addAttachmentApi(
             classId: widget.classId,
             materialId: materialId,
             title: a.title,
@@ -396,7 +396,7 @@ class _TeacherCreateMaterialScreenState
             fileSize: 'Web Link',
           );
         } else {
-          await AttachmentService.uploadFileAttachment(
+          await AttachmentService.uploadFileAttachmentApi(
             classId: widget.classId,
             materialId: materialId,
             title: a.title,

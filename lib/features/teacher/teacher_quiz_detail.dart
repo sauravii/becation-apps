@@ -46,7 +46,7 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
 
   Future<void> _fetchAnswerKeys() async {
     try {
-      final keys = await QuizService.fetchAnswerKeys(
+      final keys = await QuizService.fetchAnswerKeysApi(
         widget.classId,
         widget.quizId,
       );
@@ -244,7 +244,7 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
     Map<String, List<int>> keys = _answerKeys;
     if (_loadingKeys) {
       try {
-        keys = await QuizService.fetchAnswerKeys(
+        keys = await QuizService.fetchAnswerKeysApi(
           widget.classId,
           widget.quizId,
         );

@@ -1199,7 +1199,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
     setState(() => _isSaving = true);
 
     try {
-      await QuizService.updateQuizFull(
+      await QuizService.updateQuizFullApi(
         classId: widget.classId,
         quizId: widget.quiz.id,
         title: _titleController.text.trim(),

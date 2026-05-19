@@ -226,7 +226,7 @@ class _ClassCard extends StatelessWidget {
                       setDialogState(() => isLoading = true);
 
                       try {
-                        await ClassService.updateClass(
+                        await ClassService.updateClassApi(
                           classId: item.id,
                           title: title,
                           subject: subject,
@@ -359,7 +359,7 @@ class _ClassCard extends StatelessWidget {
                         setDialogState(() => isDeleting = true);
 
                         try {
-                          await ClassService.deleteClassWithContents(item.id);
+                          await ClassService.deleteClassWithContentsApi(item.id);
 
                           timer?.cancel();
                           if (dialogContext.mounted) {

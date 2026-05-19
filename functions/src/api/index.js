@@ -7,6 +7,13 @@ const errorHandler = require("./middleware/error");
 
 const healthRouter = require("./routes/health");
 const quizAnalyticsRouter = require("./routes/quiz_analytics");
+const usersRouter = require("./routes/users");
+const topicsRouter = require("./routes/topics");
+const materialsRouter = require("./routes/materials");
+const attachmentsRouter = require("./routes/attachments");
+const classesRouter = require("./routes/classes");
+const {joinRouter, memberRouter} = require("./routes/memberships");
+const quizzesRouter = require("./routes/quizzes");
 
 const app = express();
 
@@ -24,6 +31,14 @@ app.use("/health", healthRouter);
 app.use(authMiddleware);
 
 app.use("/classes", quizAnalyticsRouter);
+app.use("/classes", topicsRouter);
+app.use("/classes", materialsRouter);
+app.use("/classes", attachmentsRouter);
+app.use("/classes", quizzesRouter);
+app.use("/classes", classesRouter);
+app.use("/classes", memberRouter);
+app.use("/memberships", joinRouter);
+app.use("/users", usersRouter);
 
 // Centralized error handler harus terdaftar paling akhir.
 app.use(errorHandler);

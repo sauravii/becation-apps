@@ -1,6 +1,6 @@
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 
-const {getBadgeDef} = require("../shared/badge_definitions");
+const {getBadgeDef} = require("./badge_definitions");
 
 /**
  * Award badge ke user. Schema unified untuk semua badge:

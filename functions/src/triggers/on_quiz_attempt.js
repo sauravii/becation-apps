@@ -3,8 +3,8 @@ const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 
 const {quizScoreReward, BADGE_THRESHOLDS} =
     require("../shared/point_rules");
-const {awardBadge} = require("./_badge_award");
-const {recordTopicProgress} = require("./_topic_progress");
+const {awardBadge} = require("../shared/badge_award");
+const {recordTopicProgress} = require("../shared/topic_progress");
 
 /**
  * Firestore Trigger: classes/{cid}/quizzes/{qid}/attempts/{aid}

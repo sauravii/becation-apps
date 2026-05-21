@@ -14,7 +14,7 @@ const {getFirestore, FieldValue} = require("firebase-admin/firestore");
  *
  * Dipanggil dari:
  *  - on_quiz_attempt trigger (kalau attempt.passed === true)
- *  - material completion endpoint (Phase C)
+ *  - material attachment-access endpoint (saat material complete)
  *
  * Return:
  *  {

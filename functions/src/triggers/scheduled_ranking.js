@@ -2,7 +2,7 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {getFirestore, FieldValue, Timestamp} =
     require("firebase-admin/firestore");
 
-const {awardBadge} = require("./_badge_award");
+const {awardBadge} = require("../shared/badge_award");
 
 /**
  * Cron jobs untuk ranking & semester close.

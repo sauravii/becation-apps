@@ -65,7 +65,7 @@ joinRouter.post("/join", async (req, res, next) => {
     });
     batch.update(classRef, {
       studentCount: FieldValue.increment(1),
-      memberIds: FieldValue.arrayUnion([req.user.uid]),
+      memberIds: FieldValue.arrayUnion(req.user.uid),
     });
     await batch.commit();
 
@@ -113,7 +113,7 @@ memberRouter.delete("/:cid/members/me", async (req, res, next) => {
     batch.delete(memberRef);
     batch.update(classRef, {
       studentCount: FieldValue.increment(-1),
-      memberIds: FieldValue.arrayRemove([req.user.uid]),
+      memberIds: FieldValue.arrayRemove(req.user.uid),
     });
     await batch.commit();
 
@@ -153,7 +153,7 @@ memberRouter.post("/:cid/members/remove", async (req, res, next) => {
     }
     batch.update(classRef, {
       studentCount: FieldValue.increment(-uids.length),
-      memberIds: FieldValue.arrayRemove(uids),
+      memberIds: FieldValue.arrayRemove(...uids),
     });
     await batch.commit();
 

@@ -25,6 +25,7 @@ isOwner(userId)   — Cek apakah UID user yang request == userId
 getUserRole()     — Ambil role user dari Firestore doc /users/{uid}
 isClassMember()   — Cek apakah user punya doc di /classes/{id}/members/{uid}
 isClassTeacher()  — Cek apakah user adalah teacher di kelas tersebut
+isAdmin()         — Cek apakah role user di /users/{uid} == "admin" (v1.4.0)
 ```
 
 ### Rules per Collection
@@ -35,6 +36,42 @@ isClassTeacher()  — Cek apakah user adalah teacher di kelas tersebut
 | **read** | Semua user login | Untuk cek role, search user by email |
 | **create** | Pemilik UID | User hanya bisa buat doc sendiri (saat register) |
 | **update** | Pemilik ATAU teacher | User update profile sendiri, teacher bisa update role user lain |
+
+#### `/users/{userId}/badges/{badgeId}` (v1.4.0)
+| Operasi | Siapa yang boleh | Penjelasan |
+|---|---|---|
+| **read** | Semua user login | Publik dalam app — supaya bisa tampil di leaderboard / profile orang lain |
+| **write** | **No one** (Cloud Functions only) | Award badge dilakukan via trigger / endpoint, admin SDK bypass rules |
+
+#### `/users/{userId}/points_log/{logId}` (v1.4.0)
+| Operasi | Siapa yang boleh | Penjelasan |
+|---|---|---|
+| **read** | Pemilik ATAU admin | Audit trail point — sensitif, jangan publik |
+| **write** | **No one** | Cloud Functions only |
+
+#### `/users/{userId}/material_completion/{materialId}` (v1.4.0)
+| Operasi | Siapa yang boleh | Penjelasan |
+|---|---|---|
+| **read** | Pemilik saja | Internal cache untuk track attachment yang sudah di-click |
+| **write** | **No one** | Cloud Functions only (via endpoint `attachments/:aid/access`) |
+
+#### `/users/{userId}/material_access/{logId}` (v1.4.0)
+| Operasi | Siapa yang boleh | Penjelasan |
+|---|---|---|
+| **read** | Pemilik saja | Log akses material (untuk badge Studyaholic) |
+| **write** | **No one** | Cloud Functions only |
+
+#### `/users/{userId}/topic_progress/{progressKey}` (v1.4.0)
+| Operasi | Siapa yang boleh | Penjelasan |
+|---|---|---|
+| **read** | Pemilik saja | Internal cache progress topic (untuk badge Flash) |
+| **write** | **No one** | Cloud Functions only |
+
+#### `/users/{userId}/quiz_streaks/{classId}` (v1.4.0)
+| Operasi | Siapa yang boleh | Penjelasan |
+|---|---|---|
+| **read** | Pemilik saja | Cache 3 quiz terakhir (untuk badge Straight-A Crusader) |
+| **write** | **No one** | Cloud Functions only |
 
 #### `/classes/{classId}`
 | Operasi | Siapa yang boleh | Penjelasan |
@@ -77,6 +114,18 @@ Ini mengizinkan student yang **sedang join** untuk update `memberIds` dan `stude
 | **read** | Member kelas | Semua anggota bisa lihat & download attachments |
 | **write** | Teacher saja | Hanya teacher yang bisa tambah/hapus attachment |
 
+#### `/classes/{classId}/rank_snapshots/{snapshotId}` (v1.4.0)
+| Operasi | Siapa yang boleh | Penjelasan |
+|---|---|---|
+| **read** | Member kelas | Audit ranking snapshot mingguan, untuk transparency |
+| **write** | **No one** (Cloud Functions only) | Cron `weeklyRankSnapshot` yg menulis |
+
+#### `/badge_definitions/{badgeId}` (v1.4.0)
+| Operasi | Siapa yang boleh | Penjelasan |
+|---|---|---|
+| **read** | Semua user login | Metadata badge global (name, description, iconUrl) — perlu untuk display |
+| **write** | **No one** (admin SDK only) | Di-seed via `functions/scripts/seed_badge_definitions.js` |
+
 #### `/class_codes/{code}`
 | Operasi | Siapa yang boleh | Penjelasan |
 |---|---|---|
@@ -92,18 +141,28 @@ File: `storage.rules`
 
 ### Path Structure
 ```
-/classes/{classId}/materials/{materialId}/{timestamp}_{filename}
+/classes/{classId}/materials/{materialId}/{timestamp}_{filename}    — material attachments
+/badges/{badgeId}.png                                                 — badge icons (v1.4.0)
 ```
 
 ### Rules
+
+#### `/classes/{classId}/materials/{materialId}/**`
 | Operasi | Siapa yang boleh | Batasan |
 |---|---|---|
 | **read** | Semua user login | Bisa download/lihat file |
 | **write** | Semua user login | Max 25MB per file |
 
+#### `/badges/{badgeFile}` (v1.4.0)
+| Operasi | Siapa yang boleh | Batasan |
+|---|---|---|
+| **read** | **Public** (no auth required) | Supaya `Image.network(iconUrl)` di Flutter bisa load tanpa header |
+| **write** | **No one** | Upload manual via Firebase Console / Storage SDK admin |
+
 ### Catatan
-- Saat ini rules belum membatasi write ke teacher saja (semua user login bisa upload). Ini bisa diperketat nanti jika diperlukan, tapi membutuhkan cross-service rules yang lebih kompleks.
+- Material attachments: write belum dibatasi ke teacher saja (semua user login bisa upload). Bisa diperketat nanti jika diperlukan, tapi membutuhkan cross-service rules yang lebih kompleks.
 - Limit 25MB per file sudah cukup untuk dokumen, presentasi, dan gambar. Untuk video perlu dinaikkan.
+- Badge icons: public read aman karena hanya gambar metadata (tidak sensitif). Seed script `seed_badge_definitions.js` construct URL pattern `https://firebasestorage.googleapis.com/v0/b/{bucket}/o/badges%2F{id}.png?alt=media`.
 
 ---
 

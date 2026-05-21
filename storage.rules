@@ -9,5 +9,13 @@ service firebase.storage {
       allow write: if request.auth != null
                    && request.resource.size < 25 * 1024 * 1024;
     }
+
+    // Badge icons (v1.4.0) disimpan di path: badges/{badgeId}.png
+    // Public read — supaya Flutter Image.network bisa load tanpa auth header.
+    // Write hanya via Firebase Console / admin SDK (deny semua client write).
+    match /badges/{badgeFile} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

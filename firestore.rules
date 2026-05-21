@@ -22,11 +22,51 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/classes/$(classId)/members/$(request.auth.uid)).data.role == 'teacher';
     }
 
+    function isAdmin() {
+      return isAuth() && getUserRole() == 'admin';
+    }
+
     // USERS
     match /users/{userId} {
       allow read: if isAuth();
       allow create: if isAuth() && isOwner(userId);
       allow update: if isAuth() && (isOwner(userId) || getUserRole() == 'teacher');
+
+      // BADGES (v1.4.0) — public read (leaderboard/profile), Cloud Functions only write
+      match /badges/{badgeId} {
+        allow read: if isAuth();
+        allow write: if false;
+      }
+
+      // POINTS LOG (v1.4.0) — audit trail, self atau admin
+      match /points_log/{logId} {
+        allow read: if isAuth() && (isOwner(userId) || isAdmin());
+        allow write: if false;
+      }
+
+      // MATERIAL COMPLETION CACHE (v1.4.0) — self only
+      match /material_completion/{materialId} {
+        allow read: if isAuth() && isOwner(userId);
+        allow write: if false;
+      }
+
+      // MATERIAL ACCESS LOG (v1.4.0) — self only (untuk badge Studyaholic)
+      match /material_access/{logId} {
+        allow read: if isAuth() && isOwner(userId);
+        allow write: if false;
+      }
+
+      // TOPIC PROGRESS CACHE (v1.4.0) — self only (untuk badge Flash)
+      match /topic_progress/{progressKey} {
+        allow read: if isAuth() && isOwner(userId);
+        allow write: if false;
+      }
+
+      // QUIZ STREAK CACHE (v1.4.0) — self only (untuk badge Straight-A)
+      match /quiz_streaks/{classId} {
+        allow read: if isAuth() && isOwner(userId);
+        allow write: if false;
+      }
     }
 
     // CLASSES
@@ -103,6 +143,18 @@ service cloud.firestore {
           allow delete: if isAuth() && isClassTeacher(classId);
         }
       }
+
+      // RANK SNAPSHOTS (v1.4.0) — class members only, Cloud Functions only write
+      match /rank_snapshots/{snapshotId} {
+        allow read: if isAuth() && isClassMember(classId);
+        allow write: if false;
+      }
+    }
+
+    // BADGE DEFINITIONS (v1.4.0) — global metadata, any auth read, admin SDK only write
+    match /badge_definitions/{badgeId} {
+      allow read: if isAuth();
+      allow write: if false;
     }
 
     // CLASS_CODES (lookup for joining)

@@ -26,7 +26,7 @@ const {getStorage} = require("firebase-admin/storage");
 
 const STORAGE_BUCKET =
     process.env.STORAGE_BUCKET ||
-    "becation-showcase.firebasestorage.app";
+    "becation-eac04.firebasestorage.app";
 
 initializeApp({
   credential: applicationDefault(),

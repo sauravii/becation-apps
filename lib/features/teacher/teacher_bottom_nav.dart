@@ -34,8 +34,8 @@ class TeacherBottomNavBar extends StatelessWidget {
             onTap: () => onItemSelected(1),
           ),
           _TeacherNavItem(
-            icon: Icons.settings_rounded,
-            label: 'Settings',
+            icon: Icons.person_rounded,
+            label: 'Profile',
             active: activeIndex == 2,
             onTap: () => onItemSelected(2),
           ),

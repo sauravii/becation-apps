@@ -121,7 +121,9 @@ router.get(
             count: 0,
             percentage: 0,
           }));
-          const correctSet = new Set(keys[qDoc.id] ?? []);
+          const correctIndices = keys[qDoc.id] ?? [];
+          const correctOptionIndex = correctIndices.length > 0 ? correctIndices[0] : null;
+          const correctSet = new Set(correctIndices);
           let correctCount = 0;
 
           attemptsSnap.docs.forEach((aDoc) => {
@@ -141,6 +143,7 @@ router.get(
             question: q.question ?? "",
             correctRate: totalAttempts > 0 ? correctCount / totalAttempts : 0,
             optionDistribution: options,
+            correctOptionIndex: correctOptionIndex,
           };
         });
 

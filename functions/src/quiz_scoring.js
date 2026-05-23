@@ -87,7 +87,19 @@ exports.submitQuizAttempt = onCall(
 
       const studentName =
         memberSnap.data().displayName ?? auth.token?.name ?? "";
-      await quizRef.collection("attempts").add({
+      
+      // Calculate previous highest score for this quiz to only increment XP for new records
+      let maxPreviousScore = 0;
+      existing.docs.forEach((doc) => {
+        const s = doc.data().score ?? 0;
+        if (s > maxPreviousScore) maxPreviousScore = s;
+      });
+
+      const isNewHighest = score > maxPreviousScore;
+      const batch = db.batch();
+
+      const attemptRef = quizRef.collection("attempts").doc();
+      batch.set(attemptRef, {
         studentId,
         studentName,
         answers,
@@ -99,6 +111,16 @@ exports.submitQuizAttempt = onCall(
         questionSnapshot,
         completedAt: FieldValue.serverTimestamp(),
       });
+
+      // Update the member's XP inside classes/{classId}/members/{studentId} if there is a new highest score
+      if (isNewHighest) {
+        const xpDiff = score - maxPreviousScore;
+        batch.update(memberRef, {
+          xp: FieldValue.increment(xpDiff),
+        });
+      }
+
+      await batch.commit();
 
       const response = {score, correct, total, passed, attemptNumber};
       if (quiz.showAnswer === true) {

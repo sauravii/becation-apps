@@ -44,6 +44,11 @@ class AnalyticsSummary {
   final double passRate;
   final List<ScoreBucket> scoreDistribution;
 
+  final int totalStudents;
+  final int passingGrade;
+  final int uniqueParticipants;
+  final int failedParticipants;
+
   AnalyticsSummary({
     required this.totalAttempts,
     required this.avgScore,
@@ -51,6 +56,10 @@ class AnalyticsSummary {
     required this.maxScore,
     required this.passRate,
     required this.scoreDistribution,
+    this.totalStudents = 0,
+    this.passingGrade = 0,
+    this.uniqueParticipants = 0,
+    this.failedParticipants = 0,
   });
 
   factory AnalyticsSummary.fromJson(Map<String, dynamic> json) {
@@ -65,6 +74,12 @@ class AnalyticsSummary {
           .whereType<Map>()
           .map((m) => ScoreBucket.fromJson(Map<String, dynamic>.from(m)))
           .toList(),
+      totalStudents: (json['totalStudents'] as num?)?.toInt() ?? 0,
+      passingGrade: (json['passingGrade'] as num?)?.toInt() ?? 0,
+      uniqueParticipants:
+          (json['uniqueParticipants'] as num?)?.toInt() ?? 0,
+      failedParticipants:
+          (json['failedParticipants'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -86,12 +101,16 @@ class QuestionAnalytics {
   final String question;
   final double correctRate;
   final List<OptionDistribution> optionDistribution;
+  int? correctOptionIndex;
+  final double? averageTimeSeconds;
 
   QuestionAnalytics({
     required this.questionId,
     required this.question,
     required this.correctRate,
     required this.optionDistribution,
+    this.correctOptionIndex,
+    this.averageTimeSeconds,
   });
 
   factory QuestionAnalytics.fromJson(Map<String, dynamic> json) {
@@ -105,6 +124,8 @@ class QuestionAnalytics {
           .map((m) =>
               OptionDistribution.fromJson(Map<String, dynamic>.from(m)))
           .toList(),
+      correctOptionIndex: (json['correctOptionIndex'] as num?)?.toInt(),
+      averageTimeSeconds: (json['averageTimeSeconds'] as num?)?.toDouble(),
     );
   }
 }
@@ -161,6 +182,8 @@ class AttemptItem {
   final String studentName;
   final int score;
   final DateTime? submittedAt;
+  final bool passed;
+  final int attemptNumber;
 
   AttemptItem({
     required this.attemptId,
@@ -168,6 +191,8 @@ class AttemptItem {
     required this.studentName,
     required this.score,
     required this.submittedAt,
+    this.passed = false,
+    this.attemptNumber = 1,
   });
 
   factory AttemptItem.fromJson(Map<String, dynamic> json) {
@@ -178,6 +203,8 @@ class AttemptItem {
       studentName: json['studentName'] ?? '',
       score: (json['score'] as num?)?.toInt() ?? 0,
       submittedAt: ts is String ? DateTime.tryParse(ts) : null,
+      passed: json['passed'] == true,
+      attemptNumber: (json['attemptNumber'] as num?)?.toInt() ?? 1,
     );
   }
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'teacherdashboard_page.dart';
 import 'teacher_classes_page.dart';
-import 'teacher_settings_page.dart';
+import 'teacher_profile_page.dart';
 import 'teacher_bottom_nav.dart';
 
 class TeacherRootPage extends StatefulWidget {
@@ -50,7 +50,7 @@ class _TeacherRootPageState extends State<TeacherRootPage> {
                 children: [
                   TeacherDashboard(onTabRequested: _onRequestTab),
                   TeacherClassesPage(onTabRequested: _onRequestTab),
-                  TeacherSettingsPage(onTabRequested: _onRequestTab),
+                  TeacherProfilePage(onTabRequested: _onRequestTab),
                 ],
               ),
             ),

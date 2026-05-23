@@ -18,7 +18,7 @@ const BADGES = [
   {
     id: "straight_a",
     name: "Straight-A Crusader",
-    description: "Dapat nilai 90+ di 3 quiz berbeda berturut-turut.",
+    description: "Score 90+ on 3 different quizzes in a row.",
     tier: "hardest",
     iconPath: "badges/Straight-A-Crusader.png",
     pointReward: 25,
@@ -29,7 +29,7 @@ const BADGES = [
   {
     id: "studyaholic",
     name: "The Studyaholic",
-    description: "Si lembur. Akses materi 5x setelah jam 22:00.",
+    description: "Night owl. Access learning materials 5 times after 10:00 PM.",
     tier: "hard",
     iconPath: "badges/The-Studyholic.png",
     pointReward: 20,
@@ -41,8 +41,8 @@ const BADGES = [
     id: "flash",
     name: "The Flash",
     description:
-        "Student pertama yang menyelesaikan semua materi + pass semua quiz " +
-        "di sebuah topic.",
+        "Be the first student to complete every material and pass every " +
+        "quiz in a topic.",
     tier: "medium",
     iconPath: "badges/The-Flash.png",
     pointReward: 15,
@@ -54,7 +54,8 @@ const BADGES = [
     id: "overachiever",
     name: "The Overachiever",
     description:
-        "Login streak 28 hari (re-earn setiap kelipatan 28: day 56, 84, ...).",
+        "Maintain a 28-day login streak (re-earned every multiple of 28: " +
+        "day 56, 84, ...).",
     tier: "easy",
     iconPath: "badges/The-Overachiever.png",
     pointReward: 10,
@@ -66,7 +67,7 @@ const BADGES = [
     id: "comeback_kid",
     name: "Comeback Kid",
     description:
-        "Pernah gagal sebuah quiz, lalu lulus saat attempt berikutnya.",
+        "Fail a quiz, then pass it on your next attempt.",
     tier: "easiest",
     iconPath: "badges/Comeback-Kid.png",
     pointReward: 5,
@@ -77,7 +78,7 @@ const BADGES = [
   {
     id: "top_of_world",
     name: "Top of the World",
-    description: "Juara 1 leaderboard kelas di akhir semester.",
+    description: "Finish #1 on the class leaderboard at the end of the semester.",
     tier: "reward",
     iconPath: "badges/Top-Of-The-World.png",
     pointReward: 0,
@@ -89,7 +90,7 @@ const BADGES = [
   {
     id: "almost",
     name: "Almost!",
-    description: "Juara 2 leaderboard kelas di akhir semester.",
+    description: "Finish #2 on the class leaderboard at the end of the semester.",
     tier: "reward",
     iconPath: "badges/Almost!.png",
     pointReward: 0,
@@ -101,7 +102,7 @@ const BADGES = [
   {
     id: "close_enough",
     name: "Close Enough!",
-    description: "Juara 3 leaderboard kelas di akhir semester.",
+    description: "Finish #3 on the class leaderboard at the end of the semester.",
     tier: "reward",
     iconPath: "badges/Close-Enough!.png",
     pointReward: 0,

@@ -32,20 +32,23 @@ router.get("/:uid/badges", async (req, res, next) => {
       earned[d.id] = d.data();
     });
 
-    // Secret badges hidden kalau belum earned.
-    const visible = BADGES.filter((b) => earned[b.id] || !b.isSecret);
-    const badges = visible.map((b) => {
+    // Tampilkan SEMUA badge. Secret yang belum earned di-mask supaya criteria
+    // tidak bocor (name='?????', description='', iconPath=''). Client harus
+    // render dengan ? icon + label "Secret" kalau isSecret && !earned.
+    const badges = BADGES.map((b) => {
       const e = earned[b.id];
+      const isLockedSecret = b.isSecret && !e;
+
       const base = {
         id: b.id,
-        name: b.name,
-        description: b.description,
-        tier: b.tier,
-        iconPath: b.iconPath,
-        pointReward: b.pointReward,
+        name: isLockedSecret ? "?????" : b.name,
+        description: isLockedSecret ? "" : b.description,
+        tier: isLockedSecret ? "" : b.tier,
+        iconPath: isLockedSecret ? "" : b.iconPath,
+        pointReward: isLockedSecret ? 0 : b.pointReward,
         isSecret: b.isSecret,
-        repeatable: b.repeatable,
-        criteriaType: b.criteriaType,
+        repeatable: isLockedSecret ? false : b.repeatable,
+        criteriaType: isLockedSecret ? "" : b.criteriaType,
         earned: Boolean(e),
       };
       if (!e) return base;

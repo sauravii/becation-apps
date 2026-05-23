@@ -1,11 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../../models/member_model.dart';
-import '../../services/class_service.dart';
+import '../../services/api_client.dart';
+import '../../services/leaderboard_service.dart';
 
-class StudentLeaderboard extends StatelessWidget {
+class StudentLeaderboard extends StatefulWidget {
   final String classId;
   final Color classColor;
 
@@ -16,11 +15,30 @@ class StudentLeaderboard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  State<StudentLeaderboard> createState() => _StudentLeaderboardState();
+}
 
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: ClassService.classMembersStream(classId),
+class _StudentLeaderboardState extends State<StudentLeaderboard> {
+  late Future<LeaderboardData> _future;
+  late final String _currentUid;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    _future = LeaderboardService.getLeaderboard(widget.classId);
+  }
+
+  void _refresh() {
+    setState(() {
+      _future = LeaderboardService.getLeaderboard(widget.classId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<LeaderboardData>(
+      future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -29,69 +47,53 @@ class StudentLeaderboard extends StatelessWidget {
         }
 
         if (snapshot.hasError) {
+          final err = snapshot.error;
+          final msg = err is ApiException ? err.message : err.toString();
           return Center(
-            child: Text(
-              'Error: ${snapshot.error}',
-              style: const TextStyle(color: Colors.white),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline,
+                      color: Colors.white70, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    msg,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: _refresh,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
             ),
           );
         }
 
-        final membersData = snapshot.data ?? [];
-        final students = membersData
-            .map((m) => MemberModel.fromMap(m))
-            .where((m) => !m.isTeacher)
-            .toList();
+        final data = snapshot.data!;
+        final entries = data.ranking;
 
-        if (students.isEmpty) {
+        if (entries.isEmpty) {
           return _buildEmptyState(context);
         }
 
-        // Sort students by XP descending
-        students.sort((a, b) => b.xp.compareTo(a.xp));
+        final leaderboardList = entries
+            .map((e) => LeaderboardItem(
+                  uid: e.uid,
+                  displayName: e.displayName,
+                  xp: e.point,
+                  rank: e.rank,
+                  isCurrentUser: e.uid == _currentUid,
+                ))
+            .toList();
 
-        // Check if we need to seed XP for demo purposes (if all are 0)
-        final bool needSeeding = students.every((s) => s.xp == 0);
-        final List<LeaderboardItem> leaderboardList = [];
-
-        for (int i = 0; i < students.length; i++) {
-          final student = students[i];
-          int displayXp = student.xp;
-
-          if (needSeeding) {
-            // Seed beautiful, realistic XP values so it looks premium immediately
-            if (i == 0) {
-              displayXp = 150;
-            } else if (i == 1) {
-              displayXp = 120;
-            } else if (i == 2) {
-              displayXp = 95;
-            } else if (i == 3) {
-              displayXp = 69;
-            } else {
-              displayXp = (69 - (i - 3) * 12).clamp(10, 69);
-            }
-          }
-
-          leaderboardList.add(LeaderboardItem(
-            student: student,
-            xp: displayXp,
-            rank: i + 1,
-            isCurrentUser: student.uid == currentUserId,
-          ));
-        }
-
-        // Re-sort by display XP just in case
-        leaderboardList.sort((a, b) => b.xp.compareTo(a.xp));
-        // Re-assign ranks based on sorted XP
-        for (int i = 0; i < leaderboardList.length; i++) {
-          leaderboardList[i] = leaderboardList[i].copyWith(rank: i + 1);
-        }
-
-        // Extract Top 3 for Podium
         final top3 = leaderboardList.take(3).toList();
 
-        // Pass clean data to stateful content component to avoid stream rebuilding/reloading on drag
+        // Pass clean data ke stateful content widget biar drag tidak trigger rebuild.
         return LeaderboardContent(
           leaderboardList: leaderboardList,
           top3: top3,
@@ -475,8 +477,8 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     child: Text(
-                      item.student.displayName.isNotEmpty
-                          ? item.student.displayName
+                      item.displayName.isNotEmpty
+                          ? item.displayName
                           : 'Username',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -521,8 +523,8 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
                     radius: avatarSize / 2,
                     backgroundColor: Colors.white,
                     child: Text(
-                      item.student.displayName.isNotEmpty
-                          ? item.student.displayName[0].toUpperCase()
+                      item.displayName.isNotEmpty
+                          ? item.displayName[0].toUpperCase()
                           : 'S',
                       style: TextStyle(
                         color: const Color(0xFF6F5AAA),
@@ -659,8 +661,8 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
             radius: 20,
             backgroundColor: const Color(0xFFE9DFF0),
             child: Text(
-              item.student.displayName.isNotEmpty
-                  ? item.student.displayName[0].toUpperCase()
+              item.displayName.isNotEmpty
+                  ? item.displayName[0].toUpperCase()
                   : 'S',
               style: const TextStyle(
                 color: Color(0xFF6F5AAA),
@@ -673,8 +675,8 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
           // Display Name
           Expanded(
             child: Text(
-              item.student.displayName.isNotEmpty
-                  ? item.student.displayName
+              item.displayName.isNotEmpty
+                  ? item.displayName
                   : 'Username',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -702,26 +704,30 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
 }
 
 class LeaderboardItem {
-  final MemberModel student;
+  final String uid;
+  final String displayName;
   final int xp;
   final int rank;
   final bool isCurrentUser;
 
   LeaderboardItem({
-    required this.student,
+    required this.uid,
+    required this.displayName,
     required this.xp,
     required this.rank,
     required this.isCurrentUser,
   });
 
   LeaderboardItem copyWith({
-    MemberModel? student,
+    String? uid,
+    String? displayName,
     int? xp,
     int? rank,
     bool? isCurrentUser,
   }) {
     return LeaderboardItem(
-      student: student ?? this.student,
+      uid: uid ?? this.uid,
+      displayName: displayName ?? this.displayName,
       xp: xp ?? this.xp,
       rank: rank ?? this.rank,
       isCurrentUser: isCurrentUser ?? this.isCurrentUser,

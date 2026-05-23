@@ -126,6 +126,18 @@ class UserService {
     }
   }
 
+  // Count materials yang sudah complete (completedAt != null) di
+  // users/{uid}/material_completion subcollection. Dipakai di profile Statistics.
+  static Future<int> materialsCompletedCount(String uid) async {
+    final agg = await _usersRef
+        .doc(uid)
+        .collection('material_completion')
+        .where('completedAt', isNull: false)
+        .count()
+        .get();
+    return agg.count ?? 0;
+  }
+
   // Upload foto profile ke Storage di path users/{uid}/profile.{ext},
   // lalu update photoUrl di Firestore + FirebaseAuth. Return download URL.
   // Max size 5MB di-enforce di storage.rules.

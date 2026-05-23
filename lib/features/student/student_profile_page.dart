@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 
+import '../../components/gamification/badges_grid.dart';
 import '../../models/class_model.dart';
+import '../../services/badges_service.dart';
 import '../../services/class_service.dart';
 import '../../services/user_service.dart';
 import '../auth/login_page.dart';
@@ -136,45 +138,7 @@ class StudentProfilePage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                StreamBuilder<List<ClassModel>>(
-                  stream: user != null 
-                      ? ClassService.studentClassesStream(user.uid)
-                      : Stream.value([]),
-                  builder: (context, snapshot) {
-                    final joinedClassesCount = snapshot.data?.length ?? 0;
-                    
-                    return GridView.count(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      childAspectRatio: 2.3,
-                      children: [
-                        _buildStatCard(
-                          icon: Icons.local_fire_department,
-                          value: '0',
-                          label: 'Day streak',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.star_rounded,
-                          value: '6967',
-                          label: 'Total XP',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.people_alt,
-                          value: joinedClassesCount.toString(),
-                          label: 'Class Joined',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.assignment,
-                          value: '23',
-                          label: 'Materials completed',
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                _StudentStatsGrid(uid: user?.uid),
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 16),
@@ -187,28 +151,9 @@ class StudentProfilePage extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 16),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: 6,
-                  itemBuilder: (context, index) {
-                    return const CircleAvatar(
-                      backgroundColor: Color(0xFFE9DFF0),
-                      child: Icon(
-                        Icons.add,
-                        color: Color(0xFF6F5AAA),
-                        size: 30,
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                _EarnedBadgesGrid(uid: user?.uid),
+                const SizedBox(height: 12),
                 const Divider(),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -224,7 +169,7 @@ class StudentProfilePage extends StatelessWidget {
                       ),
                     ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
+                      backgroundColor: const Color(0xFF8B2C2C),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -242,7 +187,94 @@ class StudentProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard({
+}
+
+/// Stats grid student — wire ke:
+/// - userStream → point + streak.current
+/// - studentClassesStream → joined classes count
+/// - materialsCompletedCount → materi completed
+class _StudentStatsGrid extends StatefulWidget {
+  final String? uid;
+  const _StudentStatsGrid({required this.uid});
+
+  @override
+  State<_StudentStatsGrid> createState() => _StudentStatsGridState();
+}
+
+class _StudentStatsGridState extends State<_StudentStatsGrid> {
+  late Future<int> _materialsCompletedFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _materialsCompletedFuture = widget.uid != null
+        ? UserService.materialsCompletedCount(widget.uid!)
+        : Future.value(0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream:
+          widget.uid != null ? UserService.userStream(widget.uid!) : null,
+      builder: (context, userSnap) {
+        final userData = userSnap.data?.data();
+        final point = (userData?['point'] as num?)?.toInt() ?? 0;
+        final streakDay =
+            ((userData?['streak'] as Map?)?['current'] as num?)?.toInt() ??
+                0;
+
+        return StreamBuilder<List<ClassModel>>(
+          stream: widget.uid != null
+              ? ClassService.studentClassesStream(widget.uid!)
+              : Stream.value(const []),
+          builder: (context, classSnap) {
+            final joinedClassesCount = classSnap.data?.length ?? 0;
+
+            return FutureBuilder<int>(
+              future: _materialsCompletedFuture,
+              builder: (context, matSnap) {
+                final matCount = matSnap.data ?? 0;
+
+                return GridView.count(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  childAspectRatio: 2.3,
+                  children: [
+                    _statCard(
+                      icon: Icons.local_fire_department,
+                      value: streakDay.toString(),
+                      label: 'Day streak',
+                    ),
+                    _statCard(
+                      icon: Icons.star_rounded,
+                      value: point.toString(),
+                      label: 'Total Points',
+                    ),
+                    _statCard(
+                      icon: Icons.people_alt,
+                      value: joinedClassesCount.toString(),
+                      label: 'Class Joined',
+                    ),
+                    _statCard(
+                      icon: Icons.assignment,
+                      value: matCount.toString(),
+                      label: 'Materials completed',
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _statCard({
     required IconData icon,
     required String value,
     required String label,
@@ -262,11 +294,7 @@ class StudentProfilePage extends StatelessWidget {
               color: const Color(0xFF6F5AAA),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: Icon(icon, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -298,6 +326,112 @@ class StudentProfilePage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Render SEMUA badges. Earned di-render normal, locked di-grayscale (handled
+/// di BadgeCard). Secret locked di-mask di backend (name='?????', ? icon).
+/// Default preview 6 badge (2 row). Tombol "More" expand jadi full list.
+/// Sort: non-secret dulu (preserve backend order), secret di paling akhir.
+class _EarnedBadgesGrid extends StatefulWidget {
+  final String? uid;
+  const _EarnedBadgesGrid({required this.uid});
+
+  @override
+  State<_EarnedBadgesGrid> createState() => _EarnedBadgesGridState();
+}
+
+class _EarnedBadgesGridState extends State<_EarnedBadgesGrid> {
+  static const int _previewCount = 6;
+  late Future<List<BadgeItem>> _future;
+  bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.uid != null
+        ? BadgesService.getBadges(widget.uid!)
+        : Future.value(const []);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<BadgeItem>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Color(0xFF6F5AAA),
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          );
+        }
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Gagal load badges: ${snap.error}',
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          );
+        }
+        final all = snap.data ?? const <BadgeItem>[];
+        if (all.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Text(
+                'Belum ada badge tersedia.',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ),
+            ),
+          );
+        }
+        final sorted = <BadgeItem>[
+          ...all.where((b) => !b.isSecret),
+          ...all.where((b) => b.isSecret),
+        ];
+        final visible = _expanded
+            ? sorted
+            : sorted.take(_previewCount).toList();
+        final canShowMore = !_expanded && sorted.length > _previewCount;
+
+        return Column(
+          children: [
+            BadgesGrid(badges: visible, columns: 3, iconSize: 64),
+            if (canShowMore)
+              Center(
+                child: TextButton(
+                  onPressed: () => setState(() => _expanded = true),
+                  style: TextButton.styleFrom(
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                  ),
+                  child: const Text(
+                    'More',
+                    style: TextStyle(
+                      color: Color(0xFF9886C5),
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.underline,
+                      decorationColor: Color(0xFF9886C5),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

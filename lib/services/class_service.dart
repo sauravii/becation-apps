@@ -86,6 +86,23 @@ class ClassService {
             .toList());
   }
 
+  /// Count total materials yang dibuat teacher di semua class-nya.
+  /// Dipakai di teacher profile Statistics. N+1 reads (1 untuk class list,
+  /// N untuk count per class) — acceptable untuk profile page yang one-shot.
+  static Future<int> teacherMaterialsCount(String teacherId) async {
+    final classesSnap = await _classesRef
+        .where('teacherId', isEqualTo: teacherId)
+        .get();
+    final counts = await Future.wait(classesSnap.docs.map((classDoc) async {
+      final agg = await _firestore
+          .collection('classes/${classDoc.id}/materials')
+          .count()
+          .get();
+      return agg.count ?? 0;
+    }));
+    return counts.fold<int>(0, (a, b) => a + b);
+  }
+
   /// Stream semua kelas milik student (realtime, live count).
   static Stream<List<ClassModel>> studentClassesStream(String studentId) {
     return _classesRef

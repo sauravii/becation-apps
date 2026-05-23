@@ -136,78 +136,7 @@ class TeacherProfilePage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                StreamBuilder<List<ClassModel>>(
-                  stream: user != null 
-                      ? ClassService.teacherClassesStream(user.uid)
-                      : Stream.value([]),
-                  builder: (context, snapshot) {
-                    final createdClassesCount = snapshot.data?.length ?? 0;
-                    
-                    return GridView.count(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      childAspectRatio: 2.3,
-                      children: [
-                        _buildStatCard(
-                          icon: Icons.local_fire_department,
-                          value: '0',
-                          label: 'Day streak',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.star_rounded,
-                          value: '6967',
-                          label: 'Total XP',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.people_alt,
-                          value: createdClassesCount.toString(),
-                          label: 'Class Created',
-                        ),
-                        _buildStatCard(
-                          icon: Icons.assignment,
-                          value: '23',
-                          label: 'Materials created',
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 16),
-                
-                // Badges
-                const Text(
-                  'Badges',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: 6,
-                  itemBuilder: (context, index) {
-                    return const CircleAvatar(
-                      backgroundColor: Color(0xFFE9DFF0),
-                      child: Icon(
-                        Icons.add,
-                        color: Color(0xFF6F5AAA),
-                        size: 30,
-                      ),
-                    );
-                  },
-                ),
+                _TeacherStatsGrid(uid: user?.uid),
                 const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 16),
@@ -224,7 +153,7 @@ class TeacherProfilePage extends StatelessWidget {
                       ),
                     ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
+                      backgroundColor: const Color(0xFF8B2C2C),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -242,7 +171,70 @@ class TeacherProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard({
+}
+
+/// Stats grid teacher — gamifikasi (streak/point/badges) tidak dipakai untuk
+/// teacher, jadi cuma 2 cards: classes created + materials created.
+class _TeacherStatsGrid extends StatefulWidget {
+  final String? uid;
+  const _TeacherStatsGrid({required this.uid});
+
+  @override
+  State<_TeacherStatsGrid> createState() => _TeacherStatsGridState();
+}
+
+class _TeacherStatsGridState extends State<_TeacherStatsGrid> {
+  late Future<int> _materialsCountFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _materialsCountFuture = widget.uid != null
+        ? ClassService.teacherMaterialsCount(widget.uid!)
+        : Future.value(0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<ClassModel>>(
+      stream: widget.uid != null
+          ? ClassService.teacherClassesStream(widget.uid!)
+          : Stream.value(const []),
+      builder: (context, classSnap) {
+        final createdClassesCount = classSnap.data?.length ?? 0;
+
+        return FutureBuilder<int>(
+          future: _materialsCountFuture,
+          builder: (context, matSnap) {
+            final matCount = matSnap.data ?? 0;
+
+            return GridView.count(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 2.3,
+              children: [
+                _statCard(
+                  icon: Icons.people_alt,
+                  value: createdClassesCount.toString(),
+                  label: 'Class Created',
+                ),
+                _statCard(
+                  icon: Icons.assignment,
+                  value: matCount.toString(),
+                  label: 'Materials Created',
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _statCard({
     required IconData icon,
     required String value,
     required String label,
@@ -262,11 +254,7 @@ class TeacherProfilePage extends StatelessWidget {
               color: const Color(0xFF6F5AAA),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: Icon(icon, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 8),
           Expanded(

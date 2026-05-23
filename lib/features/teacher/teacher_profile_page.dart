@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -5,7 +6,9 @@ import 'package:intl/intl.dart';
 
 import '../../models/class_model.dart';
 import '../../services/class_service.dart';
+import '../../services/user_service.dart';
 import '../auth/login_page.dart';
+import '../profile/profile_edit_page.dart';
 
 class TeacherProfilePage extends StatelessWidget {
   const TeacherProfilePage({super.key, this.onTabRequested});
@@ -59,60 +62,40 @@ class TeacherProfilePage extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 60, bottom: 40),
                   child: Center(
-                    child: Stack(
-                      children: [
-                        const CircleAvatar(
+                    child: StreamBuilder<
+                        DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: user != null
+                          ? UserService.userStream(user.uid)
+                          : null,
+                      builder: (context, snap) {
+                        final photoUrl =
+                            (snap.data?.data()?['photoUrl'] as String?) ??
+                                '';
+                        final hasPhoto = photoUrl.isNotEmpty;
+                        return CircleAvatar(
                           radius: 50,
-                          backgroundColor: Color(0xFFE9DFF0),
-                          child: Icon(Icons.person, size: 60, color: Color(0xFF6F5AAA)),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.edit,
-                              size: 20,
-                              color: Color(0xFF6F5AAA),
-                            ),
-                          ),
-                        ),
-                      ],
+                          backgroundColor: const Color(0xFFE9DFF0),
+                          backgroundImage:
+                              hasPhoto ? NetworkImage(photoUrl) : null,
+                          child: hasPhoto
+                              ? null
+                              : const Icon(Icons.person,
+                                  size: 60, color: Color(0xFF6F5AAA)),
+                        );
+                      },
                     ),
                   ),
                 ),
                 Positioned(
                   top: 16,
                   right: 16,
-                  child: PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, color: Colors.white),
-                    onSelected: (value) {
-                      if (value == 'logout') {
-                        _logout(context);
-                      }
-                    },
-                    itemBuilder: (BuildContext context) {
-                      return [
-                        PopupMenuItem<String>(
-                          value: 'logout',
-                          child: Row(
-                            children: [
-                              Icon(Icons.logout, color: Theme.of(context).colorScheme.error, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Logout',
-                                style: TextStyle(color: Theme.of(context).colorScheme.error),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ];
-                    },
+                  child: IconButton(
+                    icon: const Icon(Icons.settings, color: Colors.white),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileEditPage(),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -225,7 +208,32 @@ class TeacherProfilePage extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => _logout(context),
+                    icon: const Icon(Icons.logout),
+                    label: const Text(
+                      'Logout',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
               ],
             ),
           ),

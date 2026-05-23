@@ -17,5 +17,15 @@ service firebase.storage {
       allow read: if true;
       allow write: if false;
     }
+
+    // Profile photos di path: users/{uid}/profile.{ext}
+    // Public read — supaya display di profile/leaderboard tanpa auth header.
+    // Write hanya owner sendiri (max 5MB).
+    match /users/{uid}/{file} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 5 * 1024 * 1024;
+    }
   }
 }

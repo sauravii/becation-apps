@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
 import 'api_client.dart';
@@ -32,6 +35,7 @@ class UserService {
       await doc.set({
         'email': user.email,
         'displayName': name,
+        'photoUrl': '',
         'role': 'student',
         'createdAt': FieldValue.serverTimestamp(),
         'lastLogin': FieldValue.serverTimestamp(),
@@ -100,6 +104,57 @@ class UserService {
   }
 
   static const allowedRoles = {'student', 'teacher'};
+
+  // Update displayName di Firestore + Firebase Auth.
+  // Dipanggil dari profile edit page. Trim + non-empty validation di sini.
+  static Future<void> updateDisplayName(String name) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw StateError('Not signed in');
+    }
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Name cannot be empty');
+    }
+    await _usersRef.doc(user.uid).update({'displayName': trimmed});
+    try {
+      await user.updateDisplayName(trimmed);
+    } catch (e, st) {
+      debugPrint(
+        '[UserService] Failed to update FirebaseAuth.displayName: $e\n$st',
+      );
+    }
+  }
+
+  // Upload foto profile ke Storage di path users/{uid}/profile.{ext},
+  // lalu update photoUrl di Firestore + FirebaseAuth. Return download URL.
+  // Max size 5MB di-enforce di storage.rules.
+  static Future<String> uploadProfilePhoto(File file) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw StateError('Not signed in');
+    }
+
+    final ext = file.path.contains('.')
+        ? file.path.split('.').last.toLowerCase()
+        : 'jpg';
+    final storagePath = 'users/${user.uid}/profile.$ext';
+    final ref = FirebaseStorage.instance.ref(storagePath);
+
+    debugPrint('[UserService] Uploading profile photo: $storagePath');
+
+    final task = await ref.putFile(file);
+    final downloadUrl = await task.ref.getDownloadURL();
+
+    await _usersRef.doc(user.uid).update({'photoUrl': downloadUrl});
+    try {
+      await user.updatePhotoURL(downloadUrl);
+    } catch (e, st) {
+      debugPrint('[UserService] Failed to update FirebaseAuth.photoURL: $e\n$st');
+    }
+
+    return downloadUrl;
+  }
 
   // Update role user (misal: student -> teacher).
   static Future<void> updateUserRole(String uid, String role) async {

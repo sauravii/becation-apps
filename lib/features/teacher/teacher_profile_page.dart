@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 
+import '../../components/skeleton_circle_avatar.dart';
 import '../../models/class_model.dart';
 import '../../services/class_service.dart';
 import '../../services/user_service.dart';
@@ -33,15 +34,16 @@ class TeacherProfilePage extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Logout gagal: $e')));
+      ).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final username = user?.displayName ?? user?.email?.split('@').first ?? 'Username';
-    
+    final fallbackName =
+        user?.displayName ?? user?.email?.split('@').first ?? 'Username';
+
     String joinedDate = 'December 2025';
     if (user?.metadata.creationTime != null) {
       joinedDate = DateFormat('MMMM yyyy').format(user!.metadata.creationTime!);
@@ -68,19 +70,43 @@ class TeacherProfilePage extends StatelessWidget {
                           ? UserService.userStream(user.uid)
                           : null,
                       builder: (context, snap) {
+                        final waitingStream =
+                            snap.connectionState == ConnectionState.waiting;
                         final photoUrl =
                             (snap.data?.data()?['photoUrl'] as String?) ??
                                 '';
                         final hasPhoto = photoUrl.isNotEmpty;
-                        return CircleAvatar(
-                          radius: 50,
-                          backgroundColor: const Color(0xFFE9DFF0),
-                          backgroundImage:
-                              hasPhoto ? NetworkImage(photoUrl) : null,
-                          child: hasPhoto
-                              ? null
-                              : const Icon(Icons.person,
-                                  size: 60, color: Color(0xFF6F5AAA)),
+
+                        if (waitingStream) {
+                          return const SkeletonCircleAvatar(radius: 50);
+                        }
+                        if (!hasPhoto) {
+                          return const CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Color(0xFFE9DFF0),
+                            child: Icon(Icons.person,
+                                size: 60, color: Color(0xFF6F5AAA)),
+                          );
+                        }
+                        return ClipOval(
+                          child: SizedBox(
+                            width: 100,
+                            height: 100,
+                            child: Image.network(
+                              photoUrl,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (_, child, progress) {
+                                if (progress == null) return child;
+                                return const SkeletonCircleAvatar(radius: 50);
+                              },
+                              errorBuilder: (_, __, ___) => const CircleAvatar(
+                                radius: 50,
+                                backgroundColor: Color(0xFFE9DFF0),
+                                child: Icon(Icons.person,
+                                    size: 60, color: Color(0xFF6F5AAA)),
+                              ),
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -107,13 +133,26 @@ class TeacherProfilePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Username and Join Date
-                Text(
-                  username,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                // Username (reactive — listen Firestore supaya refresh setelah
+                // edit name tanpa harus pindah tab).
+                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: user != null
+                      ? UserService.userStream(user.uid)
+                      : null,
+                  builder: (context, snap) {
+                    final fsName =
+                        (snap.data?.data()?['displayName'] as String?)?.trim();
+                    final name = (fsName == null || fsName.isEmpty)
+                        ? fallbackName
+                        : fsName;
+                    return Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 4),
                 Text(

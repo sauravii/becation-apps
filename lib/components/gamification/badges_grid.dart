@@ -26,7 +26,7 @@ class BadgesGrid extends StatelessWidget {
         padding: EdgeInsets.all(32),
         child: Center(
           child: Text(
-            'Belum ada badge tersedia.',
+            'No badges available yet.',
             style: TextStyle(color: Colors.grey),
           ),
         ),

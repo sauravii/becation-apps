@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
 
+import '../../components/skeleton_circle_avatar.dart';
 import '../../services/user_service.dart';
 
 const Color _kPurple = Color(0xFF6F5AAA);
@@ -61,14 +63,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       await UserService.updateDisplayName(_nameCtrl.text);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil berhasil diperbarui')),
+        const SnackBar(content: Text('Profile updated successfully')),
       );
       Navigator.of(context).pop(true);
     } catch (err) {
       if (!mounted) return;
       setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal: $err')),
+        SnackBar(content: Text('Failed: $err')),
       );
     }
   }
@@ -86,41 +88,109 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       if (path == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('File path tidak tersedia')),
+          const SnackBar(content: Text('File path not available')),
         );
         return;
       }
 
-      final file = File(path);
+      // Crop ke 1:1 dengan circular mask preview (UI uCrop native di Android).
+      // Hasil tetap PNG/JPEG kotak — circular cuma overlay. CircleAvatar di FE
+      // yang clip jadi bulet.
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: path,
+        compressFormat: ImageCompressFormat.jpg,
+        compressQuality: 90,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Adjust Profile Photo',
+            toolbarColor: const Color(0xFF6F5AAA),
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: const Color(0xFF6F5AAA),
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            hideBottomControls: true,
+            cropStyle: CropStyle.circle,
+            aspectRatioPresets: [CropAspectRatioPreset.square],
+          ),
+          IOSUiSettings(
+            title: 'Adjust Profile Photo',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+            cropStyle: CropStyle.circle,
+            aspectRatioPresets: [CropAspectRatioPreset.square],
+          ),
+        ],
+      );
+      if (cropped == null) return; // user cancel di cropper
+
+      final file = File(cropped.path);
       final size = await file.length();
       const maxBytes = 5 * 1024 * 1024;
       if (size > maxBytes) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto melebihi 5 MB')),
+          const SnackBar(content: Text('Photo exceeds 5 MB')),
         );
         return;
       }
 
       setState(() => _isUploadingPhoto = true);
       await UserService.uploadProfilePhoto(file);
+      // Cleanup temp file cropper supaya gak akumulasi di app cache (bisa
+      // bocor ke gallery / file manager kalau terindeks MediaStore).
+      try {
+        if (await file.exists()) await file.delete();
+      } catch (_) {/* best-effort */}
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Foto profile berhasil diunggah')),
+        const SnackBar(content: Text('Profile photo uploaded successfully')),
       );
     } catch (err) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal upload foto: $err')),
+        SnackBar(content: Text('Failed to upload photo: $err')),
       );
     } finally {
       if (mounted) setState(() => _isUploadingPhoto = false);
     }
   }
 
+  Future<bool> _confirmDiscard() async {
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard changes?'),
+        content: const Text(
+          'You have unsaved changes to your name. Leave without saving?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF8B2C2C)),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return res ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final nav = Navigator.of(context);
+        final discard = await _confirmDiscard();
+        if (discard) nav.pop();
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFFF7F2FA),
       appBar: AppBar(
         title: const Text(
@@ -135,27 +205,55 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
         child: Column(
           children: [
-            // Profile photo — listen ke Firestore supaya auto-refresh setelah upload.
+            // Profile photo — listen ke Firestore supaya auto-refresh setelah
+            // upload. Loading state (Firestore waiting / NetworkImage
+            // downloading) pakai shimmer skeleton, bukan plain grey.
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: UserService.userStream(_uid),
               builder: (context, snap) {
+                final waitingStream =
+                    snap.connectionState == ConnectionState.waiting;
                 final data = snap.data?.data();
                 final photoUrl = (data?['photoUrl'] as String?) ?? '';
                 final hasPhoto = photoUrl.isNotEmpty;
 
+                Widget avatar;
+                if (waitingStream) {
+                  avatar = const SkeletonCircleAvatar(radius: 56);
+                } else if (!hasPhoto) {
+                  avatar = const CircleAvatar(
+                    radius: 56,
+                    backgroundColor: Color(0xFFE9DFF0),
+                    child: Icon(Icons.person,
+                        size: 72, color: _kPurple),
+                  );
+                } else {
+                  avatar = ClipOval(
+                    child: SizedBox(
+                      width: 112,
+                      height: 112,
+                      child: Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (_, child, progress) {
+                          if (progress == null) return child;
+                          return const SkeletonCircleAvatar(radius: 56);
+                        },
+                        errorBuilder: (_, __, ___) => const CircleAvatar(
+                          radius: 56,
+                          backgroundColor: Color(0xFFE9DFF0),
+                          child: Icon(Icons.person,
+                              size: 72, color: _kPurple),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
                 return Stack(
                   alignment: Alignment.center,
                   children: [
-                    CircleAvatar(
-                      radius: 56,
-                      backgroundColor: const Color(0xFFE9DFF0),
-                      backgroundImage:
-                          hasPhoto ? NetworkImage(photoUrl) : null,
-                      child: hasPhoto
-                          ? null
-                          : const Icon(Icons.person,
-                              size: 72, color: _kPurple),
-                    ),
+                    avatar,
                     if (_isUploadingPhoto)
                       const SizedBox(
                         width: 112,
@@ -225,6 +323,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
           ],
         ),
       ),
+    ),
     );
   }
 }

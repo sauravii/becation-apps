@@ -15,6 +15,10 @@ const classesRouter = require("./routes/classes");
 const {joinRouter, memberRouter} = require("./routes/memberships");
 const quizzesRouter = require("./routes/quizzes");
 const quizAiRouter = require("./routes/quiz_ai");
+const pointsRouter = require("./routes/points");
+const badgesRouter = require("./routes/badges");
+const leaderboardRouter = require("./routes/leaderboard");
+const materialProgressRouter = require("./routes/material_progress");
 
 const app = express();
 
@@ -38,8 +42,12 @@ app.use("/classes", attachmentsRouter);
 app.use("/classes", quizzesRouter);
 app.use("/classes", classesRouter);
 app.use("/classes", memberRouter);
+app.use("/classes", leaderboardRouter);
+app.use("/classes", materialProgressRouter);
 app.use("/memberships", joinRouter);
 app.use("/users", usersRouter);
+app.use("/users", pointsRouter);
+app.use("/users", badgesRouter);
 app.use("/quizzes", quizAiRouter);
 
 // Centralized error handler harus terdaftar paling akhir.

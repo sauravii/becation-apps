@@ -59,7 +59,7 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 
 **Kuis & Evaluasi**
 
-- **AI Quiz Generator**: Membuat kuis otomatis dalam hitungan detik menggunakan **Gemini 2.0 Flash**.
+- **AI Quiz Generator**: Membuat kuis otomatis dalam hitungan detik menggunakan **Gemini 3.1 Flash Lite**.
 - Konfigurasi AI: Pilih jumlah soal (5-20), jumlah pilihan jawaban (2-5), **tingkat kesulitan** (Easy / Medium / Hard / Expert), **bahasa output** (English / Bahasa Indonesia), dan masukkan prompt topik kuis.
 - **Tipe Soal True/False**: Mendukung pembuatan soal Benar/Salah baik secara manual maupun otomatis via AI.
 - **Kuis Manual**: Susun soal pilihan ganda sendiri dengan kontrol penuh atas pilihan jawaban.

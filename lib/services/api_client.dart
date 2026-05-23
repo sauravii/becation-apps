@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 /// Setiap request otomatis attach Firebase ID token sebagai Bearer.
 class ApiClient {
   static const String _baseUrl =
-      'https://us-central1-becation-eac04.cloudfunctions.net/api';
+      'https://asia-southeast2-becation-eac04.cloudfunctions.net/api';
 
   static String get baseUrl => _baseUrl;
 

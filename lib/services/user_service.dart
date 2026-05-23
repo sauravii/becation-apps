@@ -138,8 +138,10 @@ class UserService {
     return agg.count ?? 0;
   }
 
-  // Upload foto profile ke Storage di path users/{uid}/profile.{ext},
-  // lalu update photoUrl di Firestore + FirebaseAuth. Return download URL.
+  // Upload foto profile ke Storage di path users/{uid}/profile.jpg (fixed ext
+   // supaya format apapun selalu overwrite ke 1 file — gak akumulasi profile.png
+   // + profile.jpg dst di Storage). Cropper sudah convert ke JPG.
+  // Update photoUrl di Firestore + FirebaseAuth. Return download URL.
   // Max size 5MB di-enforce di storage.rules.
   static Future<String> uploadProfilePhoto(File file) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -147,15 +149,15 @@ class UserService {
       throw StateError('Not signed in');
     }
 
-    final ext = file.path.contains('.')
-        ? file.path.split('.').last.toLowerCase()
-        : 'jpg';
-    final storagePath = 'users/${user.uid}/profile.$ext';
+    final storagePath = 'users/${user.uid}/profile.jpg';
     final ref = FirebaseStorage.instance.ref(storagePath);
 
     debugPrint('[UserService] Uploading profile photo: $storagePath');
 
-    final task = await ref.putFile(file);
+    final task = await ref.putFile(
+      file,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
     final downloadUrl = await task.ref.getDownloadURL();
 
     await _usersRef.doc(user.uid).update({'photoUrl': downloadUrl});

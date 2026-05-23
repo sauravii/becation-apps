@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is on -->
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <!-- Show a splash screen on the activity. Automatically removed when
@@ -14,5 +14,20 @@
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+    <!-- Theme khusus untuk uCrop activity (image_cropper). Force non-translucent
+         status bar + warna gelap supaya toolbar gak bleed ke status bar.
+         Pakai opt-out edge-to-edge (Android 15+) supaya activity gak dipaksa
+         draw di bawah status bar. -->
+    <style name="UCropTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">#FF5A4894</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:fitsSystemWindows">true</item>
+        <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">true</item>
+        <item name="colorPrimary">#FF6F5AAA</item>
+        <item name="colorPrimaryDark">#FF5A4894</item>
+        <item name="colorAccent">#FF6F5AAA</item>
     </style>
 </resources>

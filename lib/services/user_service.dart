@@ -2,7 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'api_client.dart';
+
 // Service untuk CRUD data user di Firestore collection 'users'.
+// CRUD-style read/write sudah punya REST counterpart via Express (suffix `Api`);
+// stream + auth-flow helpers tetap pakai Firestore SDK langsung.
 class UserService {
   static final _firestore = FirebaseFirestore.instance;
   static CollectionReference<Map<String, dynamic>> get _usersRef =>
@@ -127,5 +131,42 @@ class UserService {
       data['uid'] = doc.id;
       return data;
     }).toList();
+  }
+
+  // === REST API counterparts (via Express) ===
+
+  // GET /api/users/me — profile user yang lagi login.
+  static Future<Map<String, dynamic>> getMeApi() async {
+    final data = await ApiClient.get('/users/me') as Map<String, dynamic>;
+    return data;
+  }
+
+  // GET /api/users/:uid — profile user spesifik.
+  static Future<Map<String, dynamic>> getUserApi(String uid) async {
+    final data = await ApiClient.get('/users/$uid') as Map<String, dynamic>;
+    return data;
+  }
+
+  // GET /api/users — list user (optional ?email= exact filter).
+  static Future<List<Map<String, dynamic>>> listUsersApi({String? email}) async {
+    final qs = (email == null || email.isEmpty)
+        ? ''
+        : '?email=${Uri.encodeQueryComponent(email)}';
+    final data = await ApiClient.get('/users$qs') as Map<String, dynamic>;
+    final raw = (data['users'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+  }
+
+  // PATCH /api/users/:uid/role — update role via Express.
+  static Future<Map<String, dynamic>> updateUserRoleApi(
+      String uid, String role) async {
+    final data = await ApiClient.patch(
+      '/users/$uid/role',
+      {'role': role},
+    ) as Map<String, dynamic>;
+    return data;
   }
 }

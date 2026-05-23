@@ -1,8 +1,8 @@
 import "dart:math";
 
 import "package:flutter/material.dart";
-import "package:cloud_functions/cloud_functions.dart";
 
+import "../../services/api_client.dart";
 import "teacher_create_question_screen.dart";
 
 class TeacherAiGenerateScreen extends StatefulWidget {
@@ -123,19 +123,17 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await FirebaseFunctions.instance
-          .httpsCallable("generateQuizAI")
-          .call({
+      final result = await ApiClient.post("/quizzes/generate-ai", {
         "prompt": prompt,
         "count": _questionCount,
         "optionsCount": _optionsCount,
         "difficulty": _difficulty,
         "language": _language,
-      });
+      }) as Map<String, dynamic>;
 
       if (!mounted) return;
 
-      final List<dynamic> rawList = result.data["data"];
+      final List<dynamic> rawList = result["data"] as List<dynamic>;
 
       final List<PendingQuestion> generatedQuestions = rawList.map((item) {
         return PendingQuestion(

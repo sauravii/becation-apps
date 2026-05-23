@@ -43,7 +43,7 @@ class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
   }
 
   Future<void> _loadMaterial() async {
-    final material = await MaterialService.getMaterial(
+    final material = await MaterialService.getMaterialApi(
         widget.classId, widget.materialId);
     if (mounted) {
       setState(() {

@@ -138,7 +138,7 @@ class _StudentClassesPageState extends State<StudentClassesPage> {
                       setDialogState(() => isLoading = true);
 
                       try {
-                        await ClassService.joinClassByCode(classCode: code);
+                        await ClassService.joinClassByCodeApi(classCode: code);
 
                         if (dialogContext.mounted) {
                           Navigator.pop(dialogContext);

@@ -131,7 +131,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                         setDialogState(() => isLeaving = true);
 
                         try {
-                          await ClassService.leaveClass(widget.classId);
+                          await ClassService.leaveClassApi(widget.classId);
 
                           timer?.cancel();
                           if (dialogContext.mounted) {
@@ -533,7 +533,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
     );
 
     try {
-      final attempts = await QuizService.getStudentAttemptsCount(
+      final attempts = await QuizService.getStudentAttemptsCountApi(
         widget.classId,
         q.id,
       );
@@ -590,11 +590,11 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
             builder: (_) => const Center(child: CircularProgressIndicator()),
           );
           try {
-            final questionsSnap = await QuizService.getQuestionsFuture(
+            final questionsSnap = await QuizService.getQuestionsFutureApi(
               widget.classId,
               q.id,
             );
-            final latestAttempt = await QuizService.getLatestStudentAttempt(
+            final latestAttempt = await QuizService.getLatestStudentAttemptApi(
               widget.classId,
               q.id,
             );

@@ -245,7 +245,7 @@ class _TeacherCreateClassScreenState extends State<TeacherCreateClassScreen> {
     setState(() => _isCreating = true);
 
     try {
-      await ClassService.createClass(
+      await ClassService.createClassApi(
         title: title,
         subject: subject,
         description: _descriptionController.text.trim(),

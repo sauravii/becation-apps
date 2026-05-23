@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/topic_model.dart';
+import 'api_client.dart';
 
 class TopicService {
   static final _firestore = FirebaseFirestore.instance;
@@ -126,5 +127,47 @@ class TopicService {
       String classId, String topicId, String newTitle) async {
     await _topicsRef(classId).doc(topicId).update({'title': newTitle});
     debugPrint('[TopicService] Topic title updated: $topicId');
+  }
+
+  // === REST API counterparts (via Express) ===
+
+  /// GET /api/classes/:cid/topics — list topic via REST.
+  static Future<List<Map<String, dynamic>>> listTopicsApi(String classId) async {
+    final data =
+        await ApiClient.get('/classes/$classId/topics') as Map<String, dynamic>;
+    final raw = (data['topics'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+  }
+
+  /// POST /api/classes/:cid/topics — create topic via REST.
+  /// Server hitung `order` otomatis (gak perlu pass dari client).
+  /// Return topic id baru.
+  static Future<String> createTopicApi({
+    required String classId,
+    required String title,
+  }) async {
+    final data = await ApiClient.post(
+      '/classes/$classId/topics',
+      {'title': title},
+    ) as Map<String, dynamic>;
+    return data['id'] as String;
+  }
+
+  /// PATCH /api/classes/:cid/topics/:tid — update judul via REST.
+  static Future<void> updateTopicTitleApi(
+      String classId, String topicId, String newTitle) async {
+    await ApiClient.patch(
+      '/classes/$classId/topics/$topicId',
+      {'title': newTitle},
+    );
+  }
+
+  /// DELETE /api/classes/:cid/topics/:tid — cascade delete via REST.
+  static Future<void> deleteTopicWithContentApi(
+      String classId, String topicId) async {
+    await ApiClient.delete('/classes/$classId/topics/$topicId');
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/question_model.dart';
 import '../models/quiz_model.dart';
+import 'api_client.dart';
 
 class QuizDraftQuestion {
   final String type;
@@ -357,5 +358,151 @@ class QuizService {
       'keys: ${keysSnap.size}, '
       'attempts: ${attemptsSnap.size}',
     );
+  }
+
+  // === REST API counterparts (Quiz CRUD via Express) ===
+
+  static Map<String, dynamic> _draftToJson(QuizDraftQuestion q) => {
+        'type': q.type,
+        'question': q.question,
+        'options': q.options
+            .map((o) => {'text': o.text, 'isCorrect': o.isCorrect})
+            .toList(),
+      };
+
+  /// POST /api/classes/:cid/quizzes — create quiz + questions + answer_keys.
+  /// Return quiz id.
+  static Future<String> createQuizApi({
+    required String classId,
+    required String title,
+    required String topicId,
+    String topicTitle = '',
+    required int timeLimit,
+    required int passingGrade,
+    required int attemptLimit,
+    required bool showAnswer,
+    required List<QuizDraftQuestion> questions,
+  }) async {
+    final data = await ApiClient.post('/classes/$classId/quizzes', {
+      'title': title,
+      'topicId': topicId,
+      'topicTitle': topicTitle,
+      'timeLimit': timeLimit,
+      'passingGrade': passingGrade,
+      'attemptLimit': attemptLimit,
+      'showAnswer': showAnswer,
+      'questions': questions.map(_draftToJson).toList(),
+    }) as Map<String, dynamic>;
+    return data['id'] as String;
+  }
+
+  /// PATCH /api/classes/:cid/quizzes/:qid — atomic full update.
+  static Future<void> updateQuizFullApi({
+    required String classId,
+    required String quizId,
+    required String title,
+    required String topicId,
+    String topicTitle = '',
+    required int timeLimit,
+    required int passingGrade,
+    required int attemptLimit,
+    required bool showAnswer,
+    required List<QuizKeptQuestion> keptOrdered,
+    required List<String> removedQuestionIds,
+    required List<QuizDraftQuestion> newQuestions,
+  }) async {
+    await ApiClient.patch('/classes/$classId/quizzes/$quizId', {
+      'title': title,
+      'topicId': topicId,
+      'topicTitle': topicTitle,
+      'timeLimit': timeLimit,
+      'passingGrade': passingGrade,
+      'attemptLimit': attemptLimit,
+      'showAnswer': showAnswer,
+      'keptOrdered': keptOrdered
+          .map((k) => {
+                'id': k.id,
+                if (k.edited != null) 'edited': _draftToJson(k.edited!),
+              })
+          .toList(),
+      'removedQuestionIds': removedQuestionIds,
+      'newQuestions': newQuestions.map(_draftToJson).toList(),
+    });
+  }
+
+  /// DELETE /api/classes/:cid/quizzes/:qid — cascade.
+  static Future<void> deleteQuizApi(String classId, String quizId) async {
+    await ApiClient.delete('/classes/$classId/quizzes/$quizId');
+  }
+
+  /// GET /api/classes/:cid/quizzes/:qid/answer-keys — teacher-only.
+  static Future<Map<String, List<int>>> fetchAnswerKeysApi(
+    String classId,
+    String quizId,
+  ) async {
+    final data = await ApiClient.get(
+      '/classes/$classId/quizzes/$quizId/answer-keys',
+    ) as Map<String, dynamic>;
+    final raw = (data['answerKeys'] as Map?) ?? const {};
+    return raw.map((k, v) {
+      final list = (v as List?) ?? const [];
+      return MapEntry(
+        k as String,
+        list.whereType<num>().map((n) => n.toInt()).toList(),
+      );
+    });
+  }
+
+  /// GET /api/classes/:cid/quizzes/:qid/questions — one-shot list.
+  static Future<List<QuestionModel>> getQuestionsFutureApi(
+    String classId,
+    String quizId,
+  ) async {
+    final data = await ApiClient.get(
+      '/classes/$classId/quizzes/$quizId/questions',
+    ) as Map<String, dynamic>;
+    final raw = (data['questions'] as List?) ?? const [];
+    return raw.whereType<Map>().map((m) {
+      final data = Map<String, dynamic>.from(m);
+      final rawOptions = (data['options'] as List?) ?? const [];
+      return QuestionModel(
+        id: data['id'] ?? '',
+        type: data['type'] ?? 'multiple_choice',
+        question: data['question'] ?? '',
+        options: rawOptions
+            .whereType<Map>()
+            .map((o) => QuestionOption(
+                  text: o['text']?.toString() ?? '',
+                ))
+            .toList(),
+        order: (data['order'] as num?)?.toInt() ?? 0,
+        createdAt: null,
+      );
+    }).toList();
+  }
+
+  /// GET /api/classes/:cid/quizzes/:qid/my-attempts/count
+  static Future<int> getStudentAttemptsCountApi(
+    String classId,
+    String quizId,
+  ) async {
+    final data = await ApiClient.get(
+      '/classes/$classId/quizzes/$quizId/my-attempts/count',
+    ) as Map<String, dynamic>;
+    return (data['count'] as num?)?.toInt() ?? 0;
+  }
+
+  /// GET /api/classes/:cid/quizzes/:qid/my-attempts/latest
+  /// Return null kalau belum pernah attempt.
+  static Future<Map<String, dynamic>?> getLatestStudentAttemptApi(
+    String classId,
+    String quizId,
+  ) async {
+    final data = await ApiClient.get(
+      '/classes/$classId/quizzes/$quizId/my-attempts/latest',
+    ) as Map<String, dynamic>;
+    final attempt = data['attempt'];
+    if (attempt == null) return null;
+    return Map<String, dynamic>.from(attempt as Map);
   }
 }

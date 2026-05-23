@@ -141,7 +141,7 @@ void showEditTopicDialog(
                     setDialogState(() => isLoading = true);
 
                     try {
-                      await TopicService.updateTopicTitle(
+                      await TopicService.updateTopicTitleApi(
                         classId,
                         topic.id,
                         newTitle,
@@ -273,7 +273,7 @@ void showDeleteTopicDialog(
                       setDialogState(() => isDeleting = true);
 
                       try {
-                        await TopicService.deleteTopicWithContent(
+                        await TopicService.deleteTopicWithContentApi(
                           classId,
                           topic.id,
                         );
@@ -412,7 +412,7 @@ void showDeleteQuizDialog(
                       setDialogState(() => isDeleting = true);
 
                       try {
-                        await QuizService.deleteQuiz(classId, quizId);
+                        await QuizService.deleteQuizApi(classId, quizId);
 
                         timer?.cancel();
                         if (dialogContext.mounted) {
@@ -511,7 +511,7 @@ void showRemoveStudentsDialog(
                       setDialogState(() => isRemoving = true);
 
                       try {
-                        await ClassService.removeStudents(
+                        await ClassService.removeStudentsApi(
                           classId,
                           selectedUids,
                         );

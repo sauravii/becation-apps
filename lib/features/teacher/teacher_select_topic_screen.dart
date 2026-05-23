@@ -273,12 +273,9 @@ class _TeacherSelectTopicScreenState extends State<TeacherSelectTopicScreen> {
                         setDialogState(() => isLoading = true);
 
                         try {
-                          final count =
-                              await TopicService.getTopicCount(widget.classId);
-                          final newId = await TopicService.createTopic(
+                          final newId = await TopicService.createTopicApi(
                             classId: widget.classId,
                             title: value,
-                            order: count,
                           );
 
                           if (dialogContext.mounted) {

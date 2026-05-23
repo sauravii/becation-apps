@@ -1,139 +1,20 @@
-import 'dart:convert';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
+import 'api_client.dart';
 
 /// Client untuk Express API quiz analytics.
-/// Base URL hardcoded ke project `becation-eac04` region `us-central1`.
 class QuizAnalyticsService {
-  static const String _baseUrl =
-      'https://us-central1-becation-eac04.cloudfunctions.net/api';
-
-  static Future<Map<String, dynamic>> _get(String path) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('Not signed in');
-    }
-    final token = await user.getIdToken();
-
-    final res = await http.get(
-      Uri.parse('$_baseUrl$path'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-
-    if (res.statusCode >= 400) {
-      String msg = 'HTTP ${res.statusCode}';
-      try {
-        final body = jsonDecode(res.body);
-        if (body is Map && body['error'] is String) {
-          msg = body['error'] as String;
-        }
-      } catch (_) {}
-      throw Exception(msg);
-    }
-    return jsonDecode(res.body) as Map<String, dynamic>;
-  }
-
   static Future<AnalyticsSummary> fetchSummary(
       String classId, String quizId) async {
-    final db = FirebaseFirestore.instance;
-    
-    // 1. Get total students
-    final membersSnap = await db.collection('classes').doc(classId).collection('members').where('role', isEqualTo: 'student').get();
-    final totalStudents = membersSnap.size;
-
-    // 2. Get quiz details
-    final quizSnap = await db.collection('classes').doc(classId).collection('quizzes').doc(quizId).get();
-    final passingGrade = (quizSnap.data()?['passingGrade'] as num?)?.toInt() ?? 0;
-
-    // 3. Get all attempts
-    final attemptsSnap = await db.collection('classes').doc(classId).collection('quizzes').doc(quizId).collection('attempts').get();
-    final totalAttempts = attemptsSnap.size;
-
-    final emptyBuckets = [
-      ScoreBucket(bucket: '0-20', count: 0),
-      ScoreBucket(bucket: '21-40', count: 0),
-      ScoreBucket(bucket: '41-60', count: 0),
-      ScoreBucket(bucket: '61-80', count: 0),
-      ScoreBucket(bucket: '81-100', count: 0),
-    ];
-
-    if (totalAttempts == 0) {
-      return AnalyticsSummary(
-        totalAttempts: 0,
-        avgScore: 0,
-        minScore: 0,
-        maxScore: 0,
-        passRate: 0,
-        scoreDistribution: emptyBuckets,
-        totalStudents: totalStudents,
-        passingGrade: passingGrade,
-        uniqueParticipants: 0,
-        failedParticipants: 0,
-      );
-    }
-
-    int sum = 0;
-    int minScore = 999999;
-    int maxScore = -999999;
-    int passedCount = 0;
-    List<int> bucketCounts = [0, 0, 0, 0, 0];
-    
-    Map<String, int> bestScores = {};
-
-    for (var doc in attemptsSnap.docs) {
-      final data = doc.data();
-      final score = (data['score'] as num?)?.toInt() ?? 0;
-      final studentId = data['studentId'] as String?;
-      
-      sum += score;
-      if (score < minScore) minScore = score;
-      if (score > maxScore) maxScore = score;
-      if (score >= passingGrade) passedCount++;
-
-      if (score <= 20) bucketCounts[0]++;
-      else if (score <= 40) bucketCounts[1]++;
-      else if (score <= 60) bucketCounts[2]++;
-      else if (score <= 80) bucketCounts[3]++;
-      else bucketCounts[4]++;
-
-      if (studentId != null) {
-        if (!bestScores.containsKey(studentId) || bestScores[studentId]! < score) {
-          bestScores[studentId] = score;
-        }
-      }
-    }
-
-    int failedParticipants = 0;
-    for (var score in bestScores.values) {
-      if (score < passingGrade) failedParticipants++;
-    }
-
-    return AnalyticsSummary(
-      totalAttempts: totalAttempts,
-      avgScore: (sum / totalAttempts).round(),
-      minScore: minScore == 999999 ? 0 : minScore,
-      maxScore: maxScore == -999999 ? 0 : maxScore,
-      passRate: passedCount / totalAttempts,
-      scoreDistribution: [
-        ScoreBucket(bucket: '0-20', count: bucketCounts[0]),
-        ScoreBucket(bucket: '21-40', count: bucketCounts[1]),
-        ScoreBucket(bucket: '41-60', count: bucketCounts[2]),
-        ScoreBucket(bucket: '61-80', count: bucketCounts[3]),
-        ScoreBucket(bucket: '81-100', count: bucketCounts[4]),
-      ],
-      totalStudents: totalStudents,
-      passingGrade: passingGrade,
-      uniqueParticipants: bestScores.length,
-      failedParticipants: failedParticipants,
-    );
+    final data = await ApiClient.get(
+      '/classes/$classId/quizzes/$quizId/analytics',
+    ) as Map<String, dynamic>;
+    return AnalyticsSummary.fromJson(data);
   }
 
   static Future<List<QuestionAnalytics>> fetchPerQuestion(
       String classId, String quizId) async {
-    final data = await _get(
-        '/classes/$classId/quizzes/$quizId/analytics/per-question');
+    final data = await ApiClient.get(
+      '/classes/$classId/quizzes/$quizId/analytics/per-question',
+    ) as Map<String, dynamic>;
     final raw = (data['questions'] as List?) ?? const [];
     return raw
         .whereType<Map>()
@@ -148,42 +29,10 @@ class QuizAnalyticsService {
     int limit = 20,
     String sort = 'submittedAt',
   }) async {
-    final sortField = sort == 'score' ? 'score' : 'completedAt';
-    final query = FirebaseFirestore.instance
-        .collection('classes')
-        .doc(classId)
-        .collection('quizzes')
-        .doc(quizId)
-        .collection('attempts')
-        .orderBy(sortField, descending: true);
-
-    final totalSnap = await query.count().get();
-    final total = totalSnap.count ?? 0;
-
-    final offset = (page - 1) * limit;
-    final snap = await query.limit(offset + limit).get();
-    
-    // Manual offset since Firestore doesn't have native offset efficiently without startAfter
-    final docs = snap.docs.skip(offset).take(limit).toList();
-
-    final items = docs.map((doc) {
-      final d = doc.data();
-      return AttemptItem(
-        attemptId: doc.id,
-        studentId: d['studentId'] ?? '',
-        studentName: d['studentName'] ?? '',
-        score: (d['score'] as num?)?.toInt() ?? 0,
-        submittedAt: (d['completedAt'] as Timestamp?)?.toDate(),
-        passed: d['passed'] == true,
-        attemptNumber: (d['attemptNumber'] as num?)?.toInt() ?? 1,
-      );
-    }).toList();
-
-    return AttemptsPage(
-      items: items,
-      hasMore: offset + items.length < total,
-      total: total,
-    );
+    final data = await ApiClient.get(
+      '/classes/$classId/quizzes/$quizId/attempts?page=$page&limit=$limit&sort=$sort',
+    ) as Map<String, dynamic>;
+    return AttemptsPage.fromJson(data);
   }
 }
 
@@ -194,7 +43,7 @@ class AnalyticsSummary {
   final int maxScore;
   final double passRate;
   final List<ScoreBucket> scoreDistribution;
-  
+
   final int totalStudents;
   final int passingGrade;
   final int uniqueParticipants;
@@ -225,6 +74,12 @@ class AnalyticsSummary {
           .whereType<Map>()
           .map((m) => ScoreBucket.fromJson(Map<String, dynamic>.from(m)))
           .toList(),
+      totalStudents: (json['totalStudents'] as num?)?.toInt() ?? 0,
+      passingGrade: (json['passingGrade'] as num?)?.toInt() ?? 0,
+      uniqueParticipants:
+          (json['uniqueParticipants'] as num?)?.toInt() ?? 0,
+      failedParticipants:
+          (json['failedParticipants'] as num?)?.toInt() ?? 0,
     );
   }
 }

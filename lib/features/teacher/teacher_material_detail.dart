@@ -56,7 +56,7 @@ class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
   }
 
   Future<void> _loadMaterial() async {
-    final material = await MaterialService.getMaterial(
+    final material = await MaterialService.getMaterialApi(
         widget.classId, widget.materialId);
     if (mounted) {
       setState(() {
@@ -136,7 +136,7 @@ class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
                       setDialogState(() => isLoading = true);
 
                       try {
-                        await MaterialService.updateMaterial(
+                        await MaterialService.updateMaterialApi(
                           classId: widget.classId,
                           materialId: widget.materialId,
                           title: title,
@@ -204,7 +204,7 @@ class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
               Navigator.pop(dialogContext);
 
               try {
-                await MaterialService.deleteMaterial(
+                await MaterialService.deleteMaterialApi(
                   widget.classId,
                   widget.materialId,
                 );
@@ -240,7 +240,7 @@ class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
   // Update judul attachment di Firestore.
   Future<void> _editAttachmentTitle(AttachmentModel attachment, String newTitle) async {
     try {
-      await AttachmentService.updateAttachmentTitle(
+      await AttachmentService.updateAttachmentTitleApi(
         widget.classId,
         widget.materialId,
         attachment.id,
@@ -275,7 +275,7 @@ class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
               Navigator.pop(dialogContext);
 
               try {
-                await AttachmentService.deleteAttachment(
+                await AttachmentService.deleteAttachmentApi(
                   widget.classId,
                   widget.materialId,
                   attachment.id,
@@ -728,7 +728,7 @@ class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
 
                       try {
                         if (selectedType == 'link') {
-                          await AttachmentService.addAttachment(
+                          await AttachmentService.addAttachmentApi(
                             classId: widget.classId,
                             materialId: widget.materialId,
                             title: title,
@@ -737,7 +737,7 @@ class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
                             fileSize: 'Web Link',
                           );
                         } else {
-                          await AttachmentService.uploadFileAttachment(
+                          await AttachmentService.uploadFileAttachmentApi(
                             classId: widget.classId,
                             materialId: widget.materialId,
                             title: title,

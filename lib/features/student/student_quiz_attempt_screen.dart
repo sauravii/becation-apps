@@ -117,7 +117,7 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final result = await FirebaseFunctions.instance
+      final result = await FirebaseFunctions.instanceFor(region: 'asia-southeast2')
           .httpsCallable('submitQuizAttempt')
           .call({
             'classId': widget.classId,

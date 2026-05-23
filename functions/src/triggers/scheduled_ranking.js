@@ -22,7 +22,7 @@ const weeklyRankSnapshot = onSchedule(
     {
       schedule: "every monday 02:00",
       timeZone: "Asia/Jakarta",
-      region: "us-central1",
+      region: "asia-southeast2",
     },
     async () => {
       const db = getFirestore();
@@ -56,7 +56,7 @@ const dailySemesterCloseCheck = onSchedule(
     {
       schedule: "every day 03:00",
       timeZone: "Asia/Jakarta",
-      region: "us-central1",
+      region: "asia-southeast2",
     },
     async () => {
       const db = getFirestore();

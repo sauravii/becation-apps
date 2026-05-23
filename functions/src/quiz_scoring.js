@@ -7,7 +7,7 @@ const db = getFirestore();
  * Submit a quiz attempt.
  */
 exports.submitQuizAttempt = onCall(
-    {region: "us-central1"},
+    {region: "asia-southeast2"},
     async (request) => {
       const {auth, data} = request;
 

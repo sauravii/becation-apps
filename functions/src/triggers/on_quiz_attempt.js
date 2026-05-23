@@ -24,7 +24,7 @@ const {recordTopicProgress} = require("../shared/topic_progress");
 exports.onQuizAttemptCreated = onDocumentCreated(
     {
       document: "classes/{cid}/quizzes/{qid}/attempts/{aid}",
-      region: "us-central1",
+      region: "asia-southeast2",
     },
     async (event) => {
       const db = getFirestore();

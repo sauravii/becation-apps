@@ -18,6 +18,7 @@ import '../../components/map/learning_map.dart';
 import 'student_material_detail.dart';
 import 'student_quiz_intro_screen.dart';
 import 'student_quiz_result_page.dart';
+import 'student_leaderboard.dart';
 
 class StudentClassesDetail extends StatefulWidget {
   final String classId;
@@ -50,12 +51,14 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
 
   @override
   Widget build(BuildContext context) {
+    final isLeaderboard = _selectedIndex == 1;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F2FA),
+      backgroundColor: isLeaderboard ? const Color(0xFF6F5AAA) : const Color(0xFFF7F2FA),
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
+            if (!isLeaderboard) _buildHeader(),
             Expanded(child: _buildContent()),
             _buildBottomNav(),
           ],
@@ -228,7 +231,10 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
       case 0:
         return _buildClassTab();
       case 1:
-        return _buildClassworkTab();
+        return StudentLeaderboard(
+          classId: widget.classId,
+          classColor: widget.classColor,
+        );
       case 2:
         return _buildPeopleTab();
       default:
@@ -862,8 +868,8 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           NavItem(
-            icon: Icons.class_rounded,
-            label: 'Class',
+            icon: Icons.map_rounded, // Changed to map icon to perfectly represent Roadmap
+            label: 'Roadmap',
             active: _selectedIndex == 0,
             onTap: () {
               setState(() {

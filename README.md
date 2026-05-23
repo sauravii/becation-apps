@@ -157,21 +157,33 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 
 ## Struktur Project
 
-```
+```text
 lib/
 ├── main.dart              # Entry point
 ├── spashscreen.dart       # Splash & role routing
-├── features/              # Halaman per role
-│   ├── auth/              # Login, register, forgot password
-│   ├── student/           # Dashboard, kuis, materi, settings siswa
-│   └── teacher/           # Dashboard, kuis (AI & Manual), materi, guru
+├── assets/                # Aset statis aplikasi (gambar & ikon)
 ├── components/            # Widget reusable
+│   ├── buttons/           # Tombol kustom
 │   ├── cards/             # Card UI (kelas, materi, kuis, attachment)
-│   ├── forms/             # Input field & button
+│   ├── forms/             # Input field form
+│   ├── map/               # Komponen peta pembelajaran
 │   ├── navigation/        # Bottom nav item
 │   └── viewers/           # Image viewer
+├── features/              # Halaman per role & fitur
+│   ├── auth/              # Login, register, forgot password, verify
+│   ├── home/              # Halaman utama & manajemen role
+│   ├── student/           # Dashboard, kuis, materi, settings siswa
+│   └── teacher/           # Dashboard, kuis (AI & Manual), materi, guru
+├── models/                # Data class
+│   ├── attachment_model.dart
+│   ├── class_model.dart
+│   ├── material_model.dart
+│   ├── member_model.dart
+│   ├── question_model.dart
+│   ├── quiz_model.dart
+│   └── topic_model.dart
 ├── services/              # Business logic & Firebase operations
-│   ├── user_service.dart
+│   ├── attachment_service.dart
 │   ├── class_service.dart
 │   ├── quiz_service.dart           # Logika kuis & integrasi AI
 │   ├── quiz_analytics_service.dart # REST client untuk endpoint Express analytics

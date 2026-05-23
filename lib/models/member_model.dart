@@ -6,6 +6,7 @@ class MemberModel {
   final String email;
   final String role;
   final Timestamp? joinedAt;
+  final int xp;
 
   MemberModel({
     required this.uid,
@@ -13,6 +14,7 @@ class MemberModel {
     required this.email,
     required this.role,
     this.joinedAt,
+    this.xp = 0,
   });
 
   bool get isTeacher => role == 'teacher';
@@ -24,6 +26,7 @@ class MemberModel {
       email: data['email'] ?? '',
       role: data['role'] ?? 'student',
       joinedAt: data['joinedAt'] as Timestamp?,
+      xp: data['xp'] ?? 0,
     );
   }
 }

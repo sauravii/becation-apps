@@ -13,6 +13,7 @@ import '../../services/quiz_service.dart';
 import '../../components/cards/material_card.dart';
 import '../../components/cards/quiz_card.dart';
 import '../../components/cards/topic_section.dart';
+import '../../components/member_avatar.dart';
 import '../../components/navigation/nav_item.dart';
 import '../../components/map/learning_map.dart';
 import 'student_material_detail.dart';
@@ -836,18 +837,13 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
   Widget _buildMemberTile(MemberModel member) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(
-        backgroundColor: member.isTeacher
-            ? const Color(0xFF6F5AAA)
-            : const Color(0xFFE9DFF0),
-        child: Icon(
-          member.isTeacher ? Icons.school : Icons.person,
-          color: member.isTeacher ? Colors.white : const Color(0xFF6F5AAA),
-          size: 20,
-        ),
+      leading: MemberAvatar(
+        uid: member.uid,
+        isTeacher: member.isTeacher,
       ),
-      title: Text(
-        member.displayName.isNotEmpty ? member.displayName : 'No name',
+      title: MemberDisplayName(
+        uid: member.uid,
+        fallback: member.displayName,
         style: const TextStyle(fontWeight: FontWeight.w500),
       ),
       subtitle: Text(

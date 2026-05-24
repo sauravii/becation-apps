@@ -17,6 +17,7 @@ import '../../services/quiz_service.dart';
 import '../../components/cards/topic_section.dart';
 import '../../components/cards/material_card.dart';
 import '../../components/cards/quiz_card.dart';
+import '../../components/member_avatar.dart';
 import '../../components/navigation/nav_item.dart';
 
 class TeacherClassesDetail extends StatefulWidget {
@@ -734,19 +735,13 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
                 size: 20,
               ),
             )
-          : CircleAvatar(
-              backgroundColor: member.isTeacher
-                  ? const Color(0xFF6F5AAA)
-                  : const Color(0xFFE9DFF0),
-              child: Icon(
-                member.isTeacher ? Icons.school : Icons.person,
-                color:
-                    member.isTeacher ? Colors.white : const Color(0xFF6F5AAA),
-                size: 20,
-              ),
+          : MemberAvatar(
+              uid: member.uid,
+              isTeacher: member.isTeacher,
             ),
-      title: Text(
-        member.displayName.isNotEmpty ? member.displayName : 'No name',
+      title: MemberDisplayName(
+        uid: member.uid,
+        fallback: member.displayName,
         style: const TextStyle(fontWeight: FontWeight.w500),
       ),
       subtitle: Text(

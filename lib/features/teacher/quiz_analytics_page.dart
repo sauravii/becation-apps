@@ -225,11 +225,14 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     }
 
     final pendingStudents = s.totalStudents - s.uniqueParticipants;
+    // Antisipasi gesture navbar — extra bottom padding biar konten terakhir
+    // (insight cards) tidak collide dengan system nav.
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return RefreshIndicator(
       onRefresh: _loadSummary,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
         children: [
           _bigStat(
             'Participation Rate',
@@ -476,10 +479,12 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
         message: 'This quiz has no questions yet',
       );
     }
+    // Antisipasi gesture navbar di bawah list scroll.
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return RefreshIndicator(
       onRefresh: _loadPerQuestion,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
         itemCount: qs.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, i) => _questionCard(qs[i], i + 1),
@@ -867,8 +872,11 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
   Widget _paginationBar(AttemptsPage page) {
     final canPrev = _attemptsPage > 1;
     final canNext = page.hasMore;
+    // Extend white bar ke bottom edge layar tapi konten button (Prev/Next +
+    // page label) di-inset sebanyak gesture navbar supaya tetap clickable.
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomInset),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),

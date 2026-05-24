@@ -181,6 +181,8 @@ class AttemptItem {
   final String studentId;
   final String studentName;
   final int score;
+  final int correct;
+  final int total;
   final DateTime? submittedAt;
   final bool passed;
   final int attemptNumber;
@@ -190,6 +192,8 @@ class AttemptItem {
     required this.studentId,
     required this.studentName,
     required this.score,
+    this.correct = 0,
+    this.total = 0,
     required this.submittedAt,
     this.passed = false,
     this.attemptNumber = 1,
@@ -202,6 +206,8 @@ class AttemptItem {
       studentId: json['studentId'] ?? '',
       studentName: json['studentName'] ?? '',
       score: (json['score'] as num?)?.toInt() ?? 0,
+      correct: (json['correct'] as num?)?.toInt() ?? 0,
+      total: (json['total'] as num?)?.toInt() ?? 0,
       submittedAt: ts is String ? DateTime.tryParse(ts) : null,
       passed: json['passed'] == true,
       attemptNumber: (json['attemptNumber'] as num?)?.toInt() ?? 1,

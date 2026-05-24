@@ -963,87 +963,263 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     );
   }
 
+  Future<void> _showAttemptDetails(AttemptItem a) async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.8,
+          maxChildSize: 0.95,
+          minChildSize: 0.5,
+          builder: (_, controller) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Attempt Details - ${a.studentName}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance
+                          .collection('classes')
+                          .doc(widget.classId)
+                          .collection('quizzes')
+                          .doc(widget.quizId)
+                          .collection('attempts')
+                          .doc(a.attemptId)
+                          .get(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                          return const Center(child: Text('Failed to load attempt details'));
+                        }
+                        
+                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                        final questionSnapshot = data['questionSnapshot'] as List<dynamic>? ?? [];
+                        final answers = data['answers'] as Map<String, dynamic>? ?? {};
+                        
+                        if (questionSnapshot.isEmpty) {
+                          return const Center(child: Text('No questions found in this attempt'));
+                        }
+                        
+                        return ListView.separated(
+                          controller: controller,
+                          padding: const EdgeInsets.all(16),
+                          itemCount: questionSnapshot.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 16),
+                          itemBuilder: (context, i) {
+                            final qData = questionSnapshot[i] as Map<String, dynamic>;
+                            final qId = qData['id'] as String;
+                            final questionText = qData['question'] as String? ?? '';
+                            final options = qData['options'] as List<dynamic>? ?? [];
+                            final correctIndices = List<int>.from(qData['correctIndices'] ?? []);
+                            final studentAnswer = answers[qId] as int?;
+                            
+                            final isCorrect = studentAnswer != null && correctIndices.contains(studentAnswer);
+                            
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: isCorrect ? Colors.green.shade50 : Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isCorrect ? Colors.green.shade200 : Colors.red.shade200,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        isCorrect ? Icons.check_circle : Icons.cancel,
+                                        color: isCorrect ? Colors.green.shade600 : Colors.red.shade600,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Q${i+1}. $questionText',
+                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ...options.asMap().entries.map((entry) {
+                                    final idx = entry.key;
+                                    final text = entry.value['text'] as String? ?? '';
+                                    final isStudentChoice = idx == studentAnswer;
+                                    final isRightAnswer = correctIndices.contains(idx);
+                                    
+                                    Color tileColor = Colors.transparent;
+                                    Color borderColor = Colors.grey.shade300;
+                                    if (isRightAnswer) {
+                                      tileColor = Colors.green.shade100;
+                                      borderColor = Colors.green.shade400;
+                                    } else if (isStudentChoice && !isRightAnswer) {
+                                      tileColor = Colors.red.shade100;
+                                      borderColor = Colors.red.shade400;
+                                    }
+                                    
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: tileColor,
+                                        border: Border.all(color: borderColor),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isStudentChoice ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                                            size: 16,
+                                            color: isStudentChoice ? _purple : Colors.grey.shade500,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+                                          if (isRightAnswer)
+                                            Icon(Icons.check, size: 16, color: Colors.green.shade700),
+                                          if (isStudentChoice && !isRightAnswer)
+                                            Icon(Icons.close, size: 16, color: Colors.red.shade700),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _attemptTile(AttemptItem a) {
     final isPassed = a.passed || a.score >= widget.passingGrade;
     final dateStr = a.submittedAt == null
         ? '-'
         : DateFormat('d MMM yyyy · HH:mm').format(a.submittedAt!.toLocal());
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: _purple.withValues(alpha: 0.15),
-            child: Text(
-              a.studentName.isNotEmpty ? a.studentName[0].toUpperCase() : '?',
-              style: const TextStyle(
-                color: _purple,
-                fontWeight: FontWeight.w600,
+    final correctInfo = a.total > 0 ? '${a.correct}/${a.total} correct' : '';
+    final attemptLabel = a.attemptNumber > 1 ? 'Re-attempt #${a.attemptNumber}' : 'Attempt #1';
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _showAttemptDetails(a),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: _purple.withValues(alpha: 0.15),
+                child: Text(
+                  a.studentName.isNotEmpty ? a.studentName[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: _purple,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Text(
+                          a.studentName.isNotEmpty ? a.studentName : '(no name)',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isPassed
+                                ? Colors.green.shade50
+                                : Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: isPassed
+                                  ? Colors.green.shade200
+                                  : Colors.red.shade200,
+                            ),
+                          ),
+                          child: Text(
+                            isPassed ? 'PASS' : 'FAIL',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isPassed
+                                  ? Colors.green.shade700
+                                  : Colors.red.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Text(
-                      a.studentName.isNotEmpty ? a.studentName : '(no name)',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      '$attemptLabel • $dateStr',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isPassed
-                            ? Colors.green.shade50
-                            : Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: isPassed
-                              ? Colors.green.shade200
-                              : Colors.red.shade200,
-                        ),
-                      ),
-                      child: Text(
-                        isPassed ? 'PASS' : 'FAIL',
+                    if (correctInfo.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        correctInfo,
                         style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: isPassed
-                              ? Colors.green.shade700
-                              : Colors.red.shade700,
+                          fontSize: 11,
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Attempt #${a.attemptNumber} • $dateStr',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
+              ),
+              Text(
+                '${a.score}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
-          Text(
-            '${a.score}',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ],
+        ),
       ),
     );
   }

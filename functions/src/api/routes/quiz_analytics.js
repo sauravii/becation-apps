@@ -191,6 +191,8 @@ router.get("/:classId/quizzes/:quizId/attempts", async (req, res, next) => {
         studentId: d.studentId ?? "",
         studentName: d.studentName ?? "",
         score: d.score ?? 0,
+        correct: d.correct ?? 0,
+        total: d.total ?? 0,
         passed: d.passed ?? false,
         attemptNumber: d.attemptNumber ?? 1,
         submittedAt: d.completedAt?.toDate?.().toISOString?.() ?? null,

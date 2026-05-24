@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:becation_apps/features/auth/login_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:becation_apps/features/teacher/teacher_root_page.dart';
+import 'package:becation_apps/services/points_service.dart';
 import 'package:becation_apps/services/user_service.dart';
 import 'package:becation_apps/features/student/student_root_page.dart';
 
@@ -49,6 +50,20 @@ class _SplashScreenState extends State<SplashScreen>
         // Pastikan FirebaseAuth.displayName sudah sinkron dengan Firestore
         // supaya dashboard langsung pakai nama, bukan fallback 'Student'.
         await UserService.syncAuthDisplayNameFromFirestore(user);
+
+        // Fire-and-forget daily streak ping. Backend idempotent untuk hari yang
+        // sama jadi aman dipanggil tiap cold-start. Gak block navigation.
+        PointsService.ping().catchError((e) {
+          debugPrint('[splash] streak ping failed: $e');
+          return PingResult(
+            streakDay: 0,
+            longestStreak: 0,
+            isNewDay: false,
+            pointAwarded: 0,
+            milestoneReached: null,
+            overachieverEarned: false,
+          );
+        });
 
         final role = await UserService.getUserRole(user.uid);
 

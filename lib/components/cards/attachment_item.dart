@@ -17,6 +17,9 @@ class AttachmentItem extends StatelessWidget {
   final ValueChanged<String>? onEditTitle;
   // Callback saat user pilih "Delete" dari menu.
   final VoidCallback? onDelete;
+  // Callback fire-and-forget pas attachment di-akses (sebelum URL terbuka).
+  // Dipakai student view untuk track progress completion ke backend.
+  final VoidCallback? onAccessed;
 
   const AttachmentItem({
     super.key,
@@ -30,6 +33,7 @@ class AttachmentItem extends StatelessWidget {
     this.onTap,
     this.onEditTitle,
     this.onDelete,
+    this.onAccessed,
   });
 
   bool get _isEditing => onDelete != null || onEditTitle != null;
@@ -39,6 +43,9 @@ class AttachmentItem extends StatelessWidget {
   // - file / link → buka di browser (browser handle download + buka file)
   void _openAttachment(BuildContext context) {
     if (url == null || url!.isEmpty) return;
+
+    // Fire-and-forget track sebelum buka — backend handle idempotency.
+    onAccessed?.call();
 
     if (type == 'image') {
       Navigator.of(context).push(

@@ -12,6 +12,41 @@ class SkeletonCircleAvatar extends StatefulWidget {
   State<SkeletonCircleAvatar> createState() => _SkeletonCircleAvatarState();
 }
 
+/// Helper untuk circular network image dengan built-in skeleton loading +
+/// error/empty fallback. Dipakai di leaderboard, profile badges, people tab —
+/// dimanapun kita load foto profil bulat dari URL.
+class NetworkCircleAvatar extends StatelessWidget {
+  final String? url;
+  final double radius;
+  // Widget yang ditampilkan kalau url empty/null atau kalau image error.
+  final Widget fallback;
+
+  const NetworkCircleAvatar({
+    super.key,
+    required this.url,
+    required this.radius,
+    required this.fallback,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null || url!.isEmpty) return fallback;
+    return ClipOval(
+      child: SizedBox(
+        width: radius * 2,
+        height: radius * 2,
+        child: Image.network(
+          url!,
+          fit: BoxFit.cover,
+          loadingBuilder: (_, child, progress) =>
+              progress == null ? child : SkeletonCircleAvatar(radius: radius),
+          errorBuilder: (_, __, ___) => fallback,
+        ),
+      ),
+    );
+  }
+}
+
 class _SkeletonCircleAvatarState extends State<SkeletonCircleAvatar>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;

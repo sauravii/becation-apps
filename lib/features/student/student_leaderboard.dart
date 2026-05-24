@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../components/skeleton_circle_avatar.dart';
 import '../../services/api_client.dart';
 import '../../services/leaderboard_service.dart';
 
@@ -546,24 +547,28 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
                     color: Color(0xFFFBBEC4),
                     shape: BoxShape.circle,
                   ),
-                  child: CircleAvatar(
+                  child: NetworkCircleAvatar(
+                    url: item.photoUrl,
                     radius: avatarSize / 2,
-                    backgroundColor: Colors.white,
-                    backgroundImage: item.photoUrl.isNotEmpty
-                        ? NetworkImage(item.photoUrl)
-                        : null,
-                    child: item.photoUrl.isEmpty
-                        ? Text(
-                            item.displayName.isNotEmpty
-                                ? item.displayName[0].toUpperCase()
-                                : 'S',
-                            style: TextStyle(
-                              color: const Color(0xFF6F5AAA),
-                              fontWeight: FontWeight.bold,
-                              fontSize: avatarSize * 0.45,
-                            ),
-                          )
-                        : null,
+                    fallback: Container(
+                      width: avatarSize,
+                      height: avatarSize,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        item.displayName.isNotEmpty
+                            ? item.displayName[0].toUpperCase()
+                            : 'S',
+                        style: TextStyle(
+                          color: const Color(0xFF6F5AAA),
+                          fontWeight: FontWeight.bold,
+                          fontSize: avatarSize * 0.45,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -689,24 +694,28 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
           ),
           const SizedBox(width: 12), // Premium, consistent spacing before the avatar
           // Avatar
-          CircleAvatar(
+          NetworkCircleAvatar(
+            url: item.photoUrl,
             radius: 20,
-            backgroundColor: const Color(0xFFE9DFF0),
-            backgroundImage: item.photoUrl.isNotEmpty
-                ? NetworkImage(item.photoUrl)
-                : null,
-            child: item.photoUrl.isEmpty
-                ? Text(
-                    item.displayName.isNotEmpty
-                        ? item.displayName[0].toUpperCase()
-                        : 'S',
-                    style: const TextStyle(
-                      color: Color(0xFF6F5AAA),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  )
-                : null,
+            fallback: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE9DFF0),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                item.displayName.isNotEmpty
+                    ? item.displayName[0].toUpperCase()
+                    : 'S',
+                style: const TextStyle(
+                  color: Color(0xFF6F5AAA),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 16),
           // Display Name

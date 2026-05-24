@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'skeleton_circle_avatar.dart';
+
 /// Module-level cache user doc — dipakai bareng MemberAvatar + MemberDisplayName.
 /// Cache hit → return SynchronousFuture supaya FutureBuilder skip waiting state
 /// (no flicker pas re-render / repeat visit).
@@ -61,28 +63,40 @@ class _MemberAvatarState extends State<MemberAvatar> {
     }
   }
 
+  Widget _fallbackPlaceholder() {
+    return Container(
+      width: widget.radius * 2,
+      height: widget.radius * 2,
+      decoration: BoxDecoration(
+        color: widget.isTeacher
+            ? const Color(0xFF6F5AAA)
+            : const Color(0xFFE9DFF0),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        widget.isTeacher ? Icons.school : Icons.person,
+        color:
+            widget.isTeacher ? Colors.white : const Color(0xFF6F5AAA),
+        size: widget.radius,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>?>(
       future: _userFuture,
       builder: (context, snap) {
+        // Pas fetch user doc masih jalan, kasih skeleton biar gak blank.
+        if (snap.connectionState != ConnectionState.done) {
+          return SkeletonCircleAvatar(radius: widget.radius);
+        }
         final url = (snap.data?['photoUrl'] as String?) ?? '';
-        final hasPhoto = url.isNotEmpty;
-        return CircleAvatar(
+        return NetworkCircleAvatar(
+          url: url,
           radius: widget.radius,
-          backgroundColor: widget.isTeacher
-              ? const Color(0xFF6F5AAA)
-              : const Color(0xFFE9DFF0),
-          backgroundImage: hasPhoto ? NetworkImage(url) : null,
-          child: hasPhoto
-              ? null
-              : Icon(
-                  widget.isTeacher ? Icons.school : Icons.person,
-                  color: widget.isTeacher
-                      ? Colors.white
-                      : const Color(0xFF6F5AAA),
-                  size: widget.radius,
-                ),
+          fallback: _fallbackPlaceholder(),
         );
       },
     );

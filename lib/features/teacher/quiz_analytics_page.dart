@@ -781,6 +781,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
   }
 
   Widget _attemptTile(AttemptItem a) {
+    final isPassed = a.passed || (_summary != null && a.score >= _summary!.passingGrade);
     final dateStr = a.submittedAt == null
         ? '-'
         : DateFormat('d MMM yyyy · HH:mm').format(a.submittedAt!.toLocal());
@@ -824,22 +825,22 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: a.passed
+                        color: isPassed
                             ? Colors.green.shade50
                             : Colors.red.shade50,
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                          color: a.passed
+                          color: isPassed
                               ? Colors.green.shade200
                               : Colors.red.shade200,
                         ),
                       ),
                       child: Text(
-                        a.passed ? 'PASS' : 'FAIL',
+                        isPassed ? 'PASS' : 'FAIL',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: a.passed
+                          color: isPassed
                               ? Colors.green.shade700
                               : Colors.red.shade700,
                         ),

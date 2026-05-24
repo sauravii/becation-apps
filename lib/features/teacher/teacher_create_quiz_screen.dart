@@ -537,7 +537,7 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
             _buildClickableValueRow(
               value: _passingGrade,
               placeholder: 70,
-              suffix: '%',
+              suffix: '/100',
             ),
           ],
         ),

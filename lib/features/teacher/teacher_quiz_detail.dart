@@ -361,7 +361,7 @@ class _TeacherQuizDetailState extends State<TeacherQuizDetail> {
           child: _buildStatCard(
             label: 'PASSING GRADE',
             value: '${quiz.passingGrade}',
-            suffix: '%',
+            suffix: '/100',
           ),
         ),
         const SizedBox(width: 12),

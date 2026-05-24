@@ -612,7 +612,7 @@ class _TeacherEditQuizScreenState extends State<TeacherEditQuizScreen> {
             _buildClickableValueRow(
               value: _passingGrade,
               placeholder: 70,
-              suffix: '%',
+              suffix: '/100',
             ),
           ],
         ),

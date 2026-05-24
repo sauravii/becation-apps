@@ -241,7 +241,23 @@ class _StudentStatsGrid extends StatefulWidget {
 }
 
 class _StudentStatsGridState extends State<_StudentStatsGrid> {
+  // Static cache per uid — skip flicker pas widget re-mount (tab switch dll).
+  // Invalidate kalau uid berubah (logout-login akun lain).
+  static String? _cacheUid;
+  static Map<String, dynamic>? _cachedUserDoc;
+  static List<ClassModel>? _cachedClasses;
+  static int? _cachedMaterialsCount;
+
   late Future<int> _materialsCompletedFuture;
+
+  void _resetCacheIfDifferentUid(String? uid) {
+    if (_cacheUid != uid) {
+      _cacheUid = uid;
+      _cachedUserDoc = null;
+      _cachedClasses = null;
+      _cachedMaterialsCount = null;
+    }
+  }
 
   @override
   void initState() {
@@ -253,11 +269,14 @@ class _StudentStatsGridState extends State<_StudentStatsGrid> {
 
   @override
   Widget build(BuildContext context) {
+    _resetCacheIfDifferentUid(widget.uid);
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream:
           widget.uid != null ? UserService.userStream(widget.uid!) : null,
       builder: (context, userSnap) {
-        final userData = userSnap.data?.data();
+        final fetched = userSnap.data?.data();
+        if (fetched != null) _cachedUserDoc = fetched;
+        final userData = fetched ?? _cachedUserDoc;
         final point = (userData?['point'] as num?)?.toInt() ?? 0;
         final streakDay =
             ((userData?['streak'] as Map?)?['current'] as num?)?.toInt() ??
@@ -267,13 +286,21 @@ class _StudentStatsGridState extends State<_StudentStatsGrid> {
           stream: widget.uid != null
               ? ClassService.studentClassesStream(widget.uid!)
               : Stream.value(const []),
+          initialData: _cachedClasses,
           builder: (context, classSnap) {
-            final joinedClassesCount = classSnap.data?.length ?? 0;
+            final fetchedClasses = classSnap.data;
+            if (fetchedClasses != null) _cachedClasses = fetchedClasses;
+            final joinedClassesCount =
+                (fetchedClasses ?? _cachedClasses ?? const []).length;
 
             return FutureBuilder<int>(
               future: _materialsCompletedFuture,
+              initialData: _cachedMaterialsCount,
               builder: (context, matSnap) {
-                final matCount = matSnap.data ?? 0;
+                final fetchedMat = matSnap.data;
+                if (fetchedMat != null) _cachedMaterialsCount = fetchedMat;
+                final matCount =
+                    fetchedMat ?? _cachedMaterialsCount ?? 0;
 
                 return GridView.count(
                   crossAxisCount: 2,

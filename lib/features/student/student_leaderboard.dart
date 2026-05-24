@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../components/skeleton_circle_avatar.dart';
 import '../../services/api_client.dart';
 import '../../services/leaderboard_service.dart';
 
@@ -29,10 +30,16 @@ class _StudentLeaderboardState extends State<StudentLeaderboard> {
     _future = LeaderboardService.getLeaderboard(widget.classId);
   }
 
-  void _refresh() {
+  Future<void> _refresh() async {
+    final newFuture = LeaderboardService.getLeaderboard(widget.classId);
     setState(() {
-      _future = LeaderboardService.getLeaderboard(widget.classId);
+      _future = newFuture;
     });
+    // Tunggu future selesai supaya RefreshIndicator spinner tetap visible
+    // sampai data baru datang. Swallow error — sudah dihandle FutureBuilder.
+    try {
+      await newFuture;
+    } catch (_) {}
   }
 
   @override
@@ -85,6 +92,7 @@ class _StudentLeaderboardState extends State<StudentLeaderboard> {
             .map((e) => LeaderboardItem(
                   uid: e.uid,
                   displayName: e.displayName,
+                  photoUrl: e.photoUrl,
                   xp: e.point,
                   rank: e.rank,
                   isCurrentUser: e.uid == _currentUid,
@@ -97,6 +105,7 @@ class _StudentLeaderboardState extends State<StudentLeaderboard> {
         return LeaderboardContent(
           leaderboardList: leaderboardList,
           top3: top3,
+          onRefresh: _refresh,
         );
       },
     );
@@ -161,11 +170,13 @@ class _StudentLeaderboardState extends State<StudentLeaderboard> {
 class LeaderboardContent extends StatefulWidget {
   final List<LeaderboardItem> leaderboardList;
   final List<LeaderboardItem> top3;
+  final Future<void> Function() onRefresh;
 
   const LeaderboardContent({
     super.key,
     required this.leaderboardList,
     required this.top3,
+    required this.onRefresh,
   });
 
   @override
@@ -300,12 +311,29 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
             // Deep Purple Background
             Container(color: const Color(0xFF6F5AAA)),
 
-            // Podium (Placed behind the bottom sheet, below the app bar)
+            // Podium dibungkus RefreshIndicator + scrollable agar pull-down
+            // di area ungu (atas) trigger refresh data leaderboard.
+            // top: 56 = di bawah app bar, padding 19 supaya podium tetap
+            // start di y=75 seperti layout lama.
             Positioned(
-              top: 75,
+              top: 56,
               left: 0,
               right: 0,
-              child: widget.top3.isNotEmpty ? _buildPodium(widget.top3) : const SizedBox(),
+              bottom: sheetHeight,
+              child: RefreshIndicator(
+                color: const Color(0xFF6F5AAA),
+                backgroundColor: Colors.white,
+                onRefresh: widget.onRefresh,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(top: 19),
+                  children: [
+                    widget.top3.isNotEmpty
+                        ? _buildPodium(widget.top3)
+                        : const SizedBox.shrink(),
+                  ],
+                ),
+              ),
             ),
 
             // Bottom Sheet containing the leaderboard list (max 7 items) - Custom Drag height
@@ -519,17 +547,26 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
                     color: Color(0xFFFBBEC4),
                     shape: BoxShape.circle,
                   ),
-                  child: CircleAvatar(
+                  child: NetworkCircleAvatar(
+                    url: item.photoUrl,
                     radius: avatarSize / 2,
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      item.displayName.isNotEmpty
-                          ? item.displayName[0].toUpperCase()
-                          : 'S',
-                      style: TextStyle(
-                        color: const Color(0xFF6F5AAA),
-                        fontWeight: FontWeight.bold,
-                        fontSize: avatarSize * 0.45,
+                    fallback: Container(
+                      width: avatarSize,
+                      height: avatarSize,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        item.displayName.isNotEmpty
+                            ? item.displayName[0].toUpperCase()
+                            : 'S',
+                        style: TextStyle(
+                          color: const Color(0xFF6F5AAA),
+                          fontWeight: FontWeight.bold,
+                          fontSize: avatarSize * 0.45,
+                        ),
                       ),
                     ),
                   ),
@@ -657,17 +694,26 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
           ),
           const SizedBox(width: 12), // Premium, consistent spacing before the avatar
           // Avatar
-          CircleAvatar(
+          NetworkCircleAvatar(
+            url: item.photoUrl,
             radius: 20,
-            backgroundColor: const Color(0xFFE9DFF0),
-            child: Text(
-              item.displayName.isNotEmpty
-                  ? item.displayName[0].toUpperCase()
-                  : 'S',
-              style: const TextStyle(
-                color: Color(0xFF6F5AAA),
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+            fallback: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE9DFF0),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                item.displayName.isNotEmpty
+                    ? item.displayName[0].toUpperCase()
+                    : 'S',
+                style: const TextStyle(
+                  color: Color(0xFF6F5AAA),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
           ),
@@ -706,6 +752,7 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
 class LeaderboardItem {
   final String uid;
   final String displayName;
+  final String photoUrl;
   final int xp;
   final int rank;
   final bool isCurrentUser;
@@ -716,11 +763,13 @@ class LeaderboardItem {
     required this.xp,
     required this.rank,
     required this.isCurrentUser,
+    this.photoUrl = '',
   });
 
   LeaderboardItem copyWith({
     String? uid,
     String? displayName,
+    String? photoUrl,
     int? xp,
     int? rank,
     bool? isCurrentUser,
@@ -728,6 +777,7 @@ class LeaderboardItem {
     return LeaderboardItem(
       uid: uid ?? this.uid,
       displayName: displayName ?? this.displayName,
+      photoUrl: photoUrl ?? this.photoUrl,
       xp: xp ?? this.xp,
       rank: rank ?? this.rank,
       isCurrentUser: isCurrentUser ?? this.isCurrentUser,

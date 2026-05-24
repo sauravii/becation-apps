@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/badges_service.dart';
+import '../skeleton_circle_avatar.dart';
 
 /// Card untuk satu badge. Greyed kalau belum earned. Untuk repeatable badge
 /// dengan count > 1, tampilkan multiplier "xN" di pojok kanan bawah.
@@ -52,24 +53,36 @@ class BadgeCard extends StatelessWidget {
                   height: iconSize,
                   child: url != null
                       ? ClipOval(
-                          child: ColorFiltered(
-                            colorFilter: earned
-                                ? const ColorFilter.mode(
-                                    Colors.transparent, BlendMode.multiply)
-                                : const ColorFilter.matrix([
-                                    0.2126, 0.7152, 0.0722, 0, 0,
-                                    0.2126, 0.7152, 0.0722, 0, 0,
-                                    0.2126, 0.7152, 0.0722, 0, 0,
-                                    0, 0, 0, 1, 0,
-                                  ]),
-                            child: Image.network(
-                              url,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.emoji_events,
-                                size: iconSize * 0.5,
-                                color: Colors.grey,
-                              ),
+                          child: Image.network(
+                            url,
+                            fit: BoxFit.cover,
+                            // frameBuilder dipakai supaya skeleton tampil
+                            // tanpa kena ColorFilter (matrix grayscale /
+                            // multiply transparent yang bikin pixel jadi
+                            // hilang). Filter cuma di-apply ke gambar yang
+                            // udah ke-decode.
+                            frameBuilder:
+                                (_, child, frame, wasSyncLoaded) {
+                              if (frame == null) {
+                                return SkeletonCircleAvatar(
+                                  radius: iconSize / 2,
+                                );
+                              }
+                              if (earned) return child;
+                              return ColorFiltered(
+                                colorFilter: const ColorFilter.matrix([
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0, 0, 0, 1, 0,
+                                ]),
+                                child: child,
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.emoji_events,
+                              size: iconSize * 0.5,
+                              color: Colors.grey,
                             ),
                           ),
                         )

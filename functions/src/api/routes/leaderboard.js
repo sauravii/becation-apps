@@ -28,6 +28,8 @@ router.get("/:cid/leaderboard", async (req, res, next) => {
       return next({status: 404, message: "Class not found"});
     }
 
+    const teacherId = classSnap.data().teacherId;
+
     let memberIds = classSnap.data().memberIds;
     if (!Array.isArray(memberIds) || memberIds.length === 0) {
       // Fallback ke sub-collection kalau memberIds cache belum populated.
@@ -35,6 +37,8 @@ router.get("/:cid/leaderboard", async (req, res, next) => {
           await db.collection(`classes/${cid}/members`).get();
       memberIds = subSnap.docs.map((d) => d.id);
     }
+    // Exclude teacher — leaderboard hanya untuk student.
+    memberIds = memberIds.filter((uid) => uid !== teacherId);
     if (memberIds.length === 0) {
       return res.json({ranking: [], total: 0});
     }
@@ -46,6 +50,7 @@ router.get("/:cid/leaderboard", async (req, res, next) => {
         .map((s) => ({
           uid: s.id,
           displayName: s.data().displayName || "",
+          photoUrl: s.data().photoUrl || "",
           point: s.data().point || 0,
         }));
     list.sort((a, b) => b.point - a.point);

@@ -1,6 +1,6 @@
+import 'package:becation_apps/services/points_service.dart';
 import 'package:becation_apps/services/user_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:becation_apps/features/auth/register_page.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -92,6 +92,19 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _navigateByRole(User user) async {
     final role = await UserService.getUserRole(user.uid);
+
+    // Fire-and-forget daily streak ping pas login. Backend idempotent.
+    PointsService.ping().catchError((e) {
+      debugPrint('[login] streak ping failed: $e');
+      return PingResult(
+        streakDay: 0,
+        longestStreak: 0,
+        isNewDay: false,
+        pointAwarded: 0,
+        milestoneReached: null,
+        overachieverEarned: false,
+      );
+    });
 
     if (!mounted) return;
 

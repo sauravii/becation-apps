@@ -18,6 +18,10 @@ class StudentDashboard extends StatefulWidget {
   State<StudentDashboard> createState() => _StudentDashboardState();
 }
 
+/// Module-level cache untuk skip flicker pas widget re-mount (tab switch /
+/// pop back). Hidup selama app session — di-bersih kan otomatis pas hot restart.
+List<ClassModel>? _studentClassesCache;
+
 class _StudentDashboardState extends State<StudentDashboard> {
   String? _displayName;
   late final Stream<List<ClassModel>> _classesStream;
@@ -43,7 +47,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
     final today = DateTime.now();
     final user = FirebaseAuth.instance.currentUser;
 
-    Widget buildBody(String displayName, List<ClassModel> classes) {
+    Widget buildBody(
+      String displayName,
+      List<ClassModel> classes, {
+      bool loading = false,
+    }) {
       return SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -53,7 +61,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
             const SizedBox(height: 24),
             _buildGreeting(displayName, classes.length),
             const SizedBox(height: 20),
-            _buildStatsSection(classes),
+            _buildStatsSection(classes, loading: loading),
             const SizedBox(height: 24),
             _buildCalendar(today),
             const SizedBox(height: 24),
@@ -83,9 +91,23 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
         return StreamBuilder<List<ClassModel>>(
           stream: _classesStream,
+          // Pakai cache sebagai initial data → no flicker pas re-mount.
+          initialData: _studentClassesCache,
           builder: (context, classesSnapshot) {
             final classes = classesSnapshot.data ?? [];
-            return buildBody(_displayName ?? 'Student', classes);
+            if (classesSnapshot.hasData) {
+              _studentClassesCache = classes;
+            }
+            // Loading hanya kalau benar-benar gak ada data sama sekali
+            // (first session ever, cache masih kosong).
+            final loading =
+                classesSnapshot.connectionState == ConnectionState.waiting &&
+                    !classesSnapshot.hasData;
+            return buildBody(
+              _displayName ?? 'Student',
+              classes,
+              loading: loading,
+            );
           },
         );
       },
@@ -141,11 +163,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
     );
   }
 
-  Widget _buildStatsSection(List<ClassModel> classes) {
+  Widget _buildStatsSection(List<ClassModel> classes, {bool loading = false}) {
     return Row(
       children: [
         StatCard(
-          title: classes.length.toString(),
+          title: loading ? '-' : classes.length.toString(),
           subtitle: 'Total Classes',
           icon: Icons.menu_book_rounded,
           filled: true,

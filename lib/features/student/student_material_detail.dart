@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/material_model.dart';
 import '../../models/attachment_model.dart';
+import '../../services/material_progress_service.dart';
 import '../../services/material_service.dart';
 import '../../services/attachment_service.dart';
 import '../../components/cards/material_info_card.dart';
@@ -51,6 +52,34 @@ class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
         _isLoading = false;
       });
     }
+  }
+
+  // Fire-and-forget track attachment access ke backend. Backend bakal:
+  //  - arrayUnion(attachmentId) ke material_completion
+  //  - kalau semua attachment udah di-click → mark complete + award point
+  // Show snackbar pas justCompleted supaya user dapat feedback.
+  void _trackAccess(String attachmentId) {
+    MaterialProgressService.trackAttachmentAccess(
+      classId: widget.classId,
+      materialId: widget.materialId,
+      attachmentId: attachmentId,
+    ).then((result) {
+      if (!mounted || !result.justCompleted) return;
+      final pts = result.pointAwarded;
+      final badgeNames = result.badgesEarned.map((b) => b.badgeId).join(', ');
+      final msg = badgeNames.isNotEmpty
+          ? 'Material completed! +$pts points · Badge: $badgeNames'
+          : 'Material completed! +$pts points';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: const Color(0xFF6F5AAA),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }).catchError((e) {
+      debugPrint('[material_progress] track failed: $e');
+    });
   }
 
   IconData _getIconForType(String type) {
@@ -151,6 +180,7 @@ class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
                           url: a.url,
                           type: a.type,
                           fileExtension: a.fileExtension,
+                          onAccessed: () => _trackAccess(a.id),
                         ))
                     .toList(),
                 topicColor: widget.topicColor,

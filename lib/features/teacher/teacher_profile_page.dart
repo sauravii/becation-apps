@@ -223,7 +223,20 @@ class _TeacherStatsGrid extends StatefulWidget {
 }
 
 class _TeacherStatsGridState extends State<_TeacherStatsGrid> {
+  // Static cache per uid — skip flicker pas widget re-mount.
+  static String? _cacheUid;
+  static List<ClassModel>? _cachedClasses;
+  static int? _cachedMaterialsCount;
+
   late Future<int> _materialsCountFuture;
+
+  void _resetCacheIfDifferentUid(String? uid) {
+    if (_cacheUid != uid) {
+      _cacheUid = uid;
+      _cachedClasses = null;
+      _cachedMaterialsCount = null;
+    }
+  }
 
   @override
   void initState() {
@@ -235,17 +248,25 @@ class _TeacherStatsGridState extends State<_TeacherStatsGrid> {
 
   @override
   Widget build(BuildContext context) {
+    _resetCacheIfDifferentUid(widget.uid);
     return StreamBuilder<List<ClassModel>>(
       stream: widget.uid != null
           ? ClassService.teacherClassesStream(widget.uid!)
           : Stream.value(const []),
+      initialData: _cachedClasses,
       builder: (context, classSnap) {
-        final createdClassesCount = classSnap.data?.length ?? 0;
+        final fetchedClasses = classSnap.data;
+        if (fetchedClasses != null) _cachedClasses = fetchedClasses;
+        final createdClassesCount =
+            (fetchedClasses ?? _cachedClasses ?? const []).length;
 
         return FutureBuilder<int>(
           future: _materialsCountFuture,
+          initialData: _cachedMaterialsCount,
           builder: (context, matSnap) {
-            final matCount = matSnap.data ?? 0;
+            final fetchedMat = matSnap.data;
+            if (fetchedMat != null) _cachedMaterialsCount = fetchedMat;
+            final matCount = fetchedMat ?? _cachedMaterialsCount ?? 0;
 
             return GridView.count(
               crossAxisCount: 2,

@@ -240,7 +240,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     return RefreshIndicator(
       onRefresh: _loadSummary,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           _bigStat(
             'Participation Rate',
@@ -1227,8 +1227,11 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
   Widget _paginationBar(AttemptsPage page) {
     final canPrev = _attemptsPage > 1;
     final canNext = page.hasMore;
+    // Extend white bar ke bottom edge layar tapi konten button (Prev/Next +
+    // page label) di-inset sebanyak gesture navbar supaya tetap clickable.
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomInset),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),

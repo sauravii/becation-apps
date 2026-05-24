@@ -19,14 +19,21 @@ router.get("/:classId/quizzes/:quizId/analytics", async (req, res, next) => {
     await assertTeacherOfClass(req.user.uid, classId);
 
     const db = getFirestore();
-    const quizRef = db.doc(`classes/${classId}/quizzes/${quizId}`);
-    const quizSnap = await quizRef.get();
+    const classRef = db.doc(`classes/${classId}`);
+    const quizRef = classRef.collection("quizzes").doc(quizId);
+
+    // Parallel: quiz doc + attempts + count students (role=student) di class.
+    const [quizSnap, attemptsSnap, studentsCountSnap] = await Promise.all([
+      quizRef.get(),
+      quizRef.collection("attempts").get(),
+      classRef.collection("members").where("role", "==", "student").count().get(),
+    ]);
+
     if (!quizSnap.exists) {
       return next({status: 404, message: "Quiz not found"});
     }
     const passingGrade = quizSnap.data().passingGrade ?? 0;
-
-    const attemptsSnap = await quizRef.collection("attempts").get();
+    const totalStudents = studentsCountSnap.data().count;
     const total = attemptsSnap.size;
 
     const emptyBuckets = [
@@ -45,21 +52,35 @@ router.get("/:classId/quizzes/:quizId/analytics", async (req, res, next) => {
         maxScore: 0,
         passRate: 0,
         scoreDistribution: emptyBuckets,
+        totalStudents,
+        passingGrade,
+        uniqueParticipants: 0,
+        failedParticipants: 0,
       });
     }
 
     let sum = 0;
     let min = Infinity;
     let max = -Infinity;
-    let passed = 0;
     const buckets = [0, 0, 0, 0, 0];
+    // Best score per student — sumber utama untuk pass/fail per-student basis.
+    const studentBestScore = new Map();
 
     attemptsSnap.docs.forEach((doc) => {
-      const score = doc.data().score ?? 0;
+      const d = doc.data();
+      const score = d.score ?? 0;
+      const studentId = d.studentId;
+
       sum += score;
       if (score < min) min = score;
       if (score > max) max = score;
-      if (score >= passingGrade) passed++;
+
+      if (studentId) {
+        const prev = studentBestScore.get(studentId);
+        if (prev === undefined || score > prev) {
+          studentBestScore.set(studentId, score);
+        }
+      }
 
       if (score <= 20) buckets[0]++;
       else if (score <= 40) buckets[1]++;
@@ -68,16 +89,29 @@ router.get("/:classId/quizzes/:quizId/analytics", async (req, res, next) => {
       else buckets[4]++;
     });
 
+    const uniqueParticipants = studentBestScore.size;
+    let studentsPassed = 0;
+    studentBestScore.forEach((bestScore) => {
+      if (bestScore >= passingGrade) studentsPassed++;
+    });
+    const failedParticipants = uniqueParticipants - studentsPassed;
+    const passRate = uniqueParticipants > 0 ?
+      studentsPassed / uniqueParticipants : 0;
+
     res.json({
       totalAttempts: total,
       avgScore: Math.round(sum / total),
       minScore: min,
       maxScore: max,
-      passRate: passed / total,
+      passRate,
       scoreDistribution: emptyBuckets.map((b, i) => ({
         bucket: b.bucket,
         count: buckets[i],
       })),
+      totalStudents,
+      passingGrade,
+      uniqueParticipants,
+      failedParticipants,
     });
   } catch (err) {
     next(err);
@@ -196,6 +230,8 @@ router.get("/:classId/quizzes/:quizId/attempts", async (req, res, next) => {
         passed: d.passed ?? false,
         attemptNumber: d.attemptNumber ?? 1,
         submittedAt: d.completedAt?.toDate?.().toISOString?.() ?? null,
+        passed: d.passed === true,
+        attemptNumber: d.attemptNumber ?? 1,
       };
     });
 

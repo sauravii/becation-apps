@@ -51,6 +51,7 @@ class LeaderboardData {
 class LeaderboardEntry {
   final String uid;
   final String displayName;
+  final String photoUrl;
   final int point;
   final int rank;
 
@@ -59,12 +60,14 @@ class LeaderboardEntry {
     required this.displayName,
     required this.point,
     required this.rank,
+    this.photoUrl = '',
   });
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) =>
       LeaderboardEntry(
         uid: json['uid'] ?? '',
         displayName: json['displayName'] ?? '',
+        photoUrl: json['photoUrl'] ?? '',
         point: (json['point'] as num?)?.toInt() ?? 0,
         rank: (json['rank'] as num?)?.toInt() ?? 0,
       );

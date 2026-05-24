@@ -518,7 +518,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
           classId: widget.classId,
           materialId: m.id,
           materialTitle: m.title,
-          materialTimestamp: m.formattedTime,
+          materialTimestamp: m.formattedDate,
           topicTitle: m.topicTitle,
           topicColor: widget.classColor,
         ),
@@ -731,7 +731,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                           (m) => MaterialItem(
                             id: m.id,
                             title: m.title,
-                            timestamp: m.formattedTime,
+                            timestamp: m.formattedDate,
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -739,7 +739,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                                     classId: widget.classId,
                                     materialId: m.id,
                                     materialTitle: m.title,
-                                    materialTimestamp: m.formattedTime,
+                                    materialTimestamp: m.formattedDate,
                                     topicTitle: topic.title,
                                     topicColor: widget.classColor,
                                   ),

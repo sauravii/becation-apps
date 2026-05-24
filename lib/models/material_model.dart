@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class MaterialModel {
   final String id;
@@ -26,6 +27,13 @@ class MaterialModel {
     final period = dt.hour >= 12 ? 'PM' : 'AM';
     final minute = dt.minute.toString().padLeft(2, '0');
     return '$hour:$minute $period';
+  }
+
+  // Format tanggal upload — dipakai di classwork list supaya material lama
+  // tetap kontekstual (sebelumnya cuma jam, gak ada info hari).
+  String get formattedDate {
+    if (createdAt == null) return '';
+    return DateFormat('d MMM yyyy').format(createdAt!.toDate());
   }
 
   factory MaterialModel.fromFirestore(

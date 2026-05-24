@@ -1,20 +1,25 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../models/question_model.dart';
 import '../../services/quiz_analytics_service.dart';
 import '../../services/quiz_service.dart';
+import 'teacher_create_question_screen.dart';
 
 class QuizAnalyticsPage extends StatefulWidget {
   final String classId;
   final String quizId;
   final String quizTitle;
+  final int passingGrade;
 
   const QuizAnalyticsPage({
     super.key,
     required this.classId,
     required this.quizId,
     required this.quizTitle,
+    required this.passingGrade,
   });
 
   @override
@@ -42,6 +47,8 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
   int _attemptsPage = 1;
   static const int _attemptsLimit = 20;
   String _attemptsSort = 'submittedAt';
+
+  String _perQuestionFilter = 'All';
 
   @override
   void initState() {
@@ -186,13 +193,15 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
           ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildSummaryTab(),
-          _buildPerQuestionTab(),
-          _buildAttemptsTab(),
-        ],
+      body: SafeArea(
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildSummaryTab(),
+            _buildPerQuestionTab(),
+            _buildAttemptsTab(),
+          ],
+        ),
       ),
     );
   }
@@ -225,6 +234,8 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     }
 
     final pendingStudents = s.totalStudents - s.uniqueParticipants;
+    final passedAttempts = (s.totalAttempts * s.passRate).round();
+    final failedAttempts = s.totalAttempts - passedAttempts;
 
     return RefreshIndicator(
       onRefresh: _loadSummary,
@@ -256,10 +267,10 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _statCard('Passing Grade', '${s.passingGrade}')),
+              Expanded(child: _statCard('Passing Grade', '${widget.passingGrade}')),
               const SizedBox(width: 12),
               Expanded(
-                child: _statCard('Failed Students', '${s.failedParticipants}'),
+                child: _statCard('Failed Attempts', '$failedAttempts'),
               ),
             ],
           ),
@@ -298,7 +309,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
             _sectionTitle('Question Insights'),
             const SizedBox(height: 12),
             _insightCard(
-              title: 'Hardest Question',
+              title: 'Most Missed Question',
               question: hardestQuestion.question,
               correctRate: hardestQuestion.correctRate,
               color: Colors.red.shade50,
@@ -307,7 +318,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
             ),
             const SizedBox(height: 12),
             _insightCard(
-              title: 'Easiest Question',
+              title: 'Most Correctly Answered',
               question: easiestQuestion.question,
               correctRate: easiestQuestion.correctRate,
               color: Colors.green.shade50,
@@ -476,19 +487,178 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
         message: 'This quiz has no questions yet',
       );
     }
-    return RefreshIndicator(
-      onRefresh: _loadPerQuestion,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: qs.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => _questionCard(qs[i], i + 1),
+
+    final sortedQs = List<QuestionAnalytics>.from(qs);
+    sortedQs.sort((a, b) => a.correctRate.compareTo(b.correctRate));
+
+    final filteredQs = sortedQs.where((q) {
+      final correctPercent = (q.correctRate * 100).round();
+      if (_perQuestionFilter == 'Needs Review (< 50%)') {
+        return correctPercent < 50;
+      } else if (_perQuestionFilter == '100% Correct') {
+        return correctPercent == 100;
+      }
+      return true;
+    }).toList();
+
+    return Column(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            children: [
+              _filterChip('All'),
+              const SizedBox(width: 8),
+              _filterChip('Needs Review (< 50%)'),
+              const SizedBox(width: 8),
+              _filterChip('100% Correct'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: filteredQs.isEmpty
+              ? const _EmptyView(
+                  icon: Icons.filter_alt_off,
+                  message: 'No questions match the selected filter',
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadPerQuestion,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    itemCount: filteredQs.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) {
+                      final originalIndex = qs.indexOf(filteredQs[i]) + 1;
+                      return _questionCard(filteredQs[i], originalIndex);
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _filterChip(String label) {
+    final isSelected = _perQuestionFilter == label;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _perQuestionFilter = label;
+          });
+        }
+      },
+      selectedColor: _purple.withValues(alpha: 0.2),
+      labelStyle: TextStyle(
+        color: isSelected ? _purple : Colors.grey.shade700,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 13,
+      ),
+      side: BorderSide(
+        color: isSelected ? _purple : Colors.grey.shade300,
       ),
     );
   }
 
+  Future<void> _onEditQuestion(QuestionAnalytics q) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('classes')
+          .doc(widget.classId)
+          .collection('quizzes')
+          .doc(widget.quizId)
+          .collection('questions')
+          .doc(q.questionId)
+          .get();
+
+      if (!doc.exists) throw Exception('Question not found');
+      
+      final qModel = QuestionModel.fromFirestore(doc);
+      final keys = await QuizService.fetchAnswerKeys(widget.classId, widget.quizId);
+      final correctIndices = keys[q.questionId] ?? [];
+      
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading
+
+      final pending = PendingQuestion(
+        type: 'Multiple Choice', 
+        question: qModel.question,
+        options: qModel.options.map((o) => o.text).toList(),
+        correctIndex: correctIndices.isNotEmpty ? correctIndices.first : 0,
+      );
+
+      final result = await Navigator.of(context).push<PendingQuestion>(
+        MaterialPageRoute(
+          builder: (_) => TeacherCreateQuestionScreen(
+            initial: pending,
+            lockType: true,
+          ),
+        ),
+      );
+
+      if (result != null && mounted) {
+        setState(() {
+          _loadingPerQuestion = true;
+        });
+        
+        await QuizService.updateSingleQuestion(
+          classId: widget.classId,
+          quizId: widget.quizId,
+          questionId: q.questionId,
+          edited: QuizDraftQuestion(
+            type: 'multiple_choice',
+            question: result.question,
+            options: result.options.asMap().entries.map((e) => QuestionOption(
+              text: e.value,
+              isCorrect: e.key == result.correctIndex,
+            )).toList(),
+          ),
+        );
+        
+        _loadPerQuestion();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Question updated successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load question: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _questionCard(QuestionAnalytics q, int number) {
     final correctPercent = (q.correctRate * 100).round();
+
+    Color progressColor;
+    if (correctPercent < 50) {
+      progressColor = Colors.red.shade400;
+    } else if (correctPercent < 80) {
+      progressColor = Colors.amber.shade400;
+    } else {
+      progressColor = Colors.green.shade400;
+    }
 
     OptionDistribution? mostChosenWrong;
     if (q.correctOptionIndex != null) {
@@ -503,20 +673,31 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
       }
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Q$number. ${q.question}',
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-          const SizedBox(height: 12),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _onEditQuestion(q),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Q$number. ${q.question}',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.edit_outlined, size: 18, color: Colors.grey.shade500),
+                ],
+              ),
+              const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -565,7 +746,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
               value: q.correctRate.clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: Colors.grey.shade200,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade400),
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
             ),
           ),
           if (mostChosenWrong != null) ...[
@@ -603,6 +784,8 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
           const SizedBox(height: 16),
           _optionDistributionDonut(q.optionDistribution, q.correctOptionIndex),
         ],
+      ),
+        ),
       ),
     );
   }
@@ -781,7 +964,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
   }
 
   Widget _attemptTile(AttemptItem a) {
-    final isPassed = a.passed || (_summary != null && a.score >= _summary!.passingGrade);
+    final isPassed = a.passed || a.score >= widget.passingGrade;
     final dateStr = a.submittedAt == null
         ? '-'
         : DateFormat('d MMM yyyy · HH:mm').format(a.submittedAt!.toLocal());

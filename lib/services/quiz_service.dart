@@ -266,6 +266,35 @@ class QuizService {
     );
   }
 
+  /// Update a single question directly in Firestore (for quick edit from analytics)
+  static Future<void> updateSingleQuestion({
+    required String classId,
+    required String quizId,
+    required String questionId,
+    required QuizDraftQuestion edited,
+  }) async {
+    final quizRef = _quizzesRef(classId).doc(quizId);
+    final qRef = quizRef.collection('questions').doc(questionId);
+
+    final batch = _firestore.batch();
+
+    batch.update(qRef, {
+      'type': edited.type,
+      'question': edited.question,
+      'options': edited.options.map((o) => {'text': o.text}).toList(),
+    });
+
+    final correctIndices = [
+      for (var j = 0; j < edited.options.length; j++)
+        if (edited.options[j].isCorrect) j,
+    ];
+    batch.set(quizRef.collection('answer_keys').doc(questionId), {
+      'correctIndices': correctIndices,
+    });
+
+    await batch.commit();
+  }
+
   static Future<int> getStudentAttemptsCount(
     String classId,
     String quizId,

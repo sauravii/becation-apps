@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
+import '../../services/gamification_feedback.dart';
 import '../../services/quiz_service.dart';
 
 class StudentQuizAttemptScreen extends StatefulWidget {
@@ -116,6 +118,13 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
 
     setState(() => _isSubmitting = true);
 
+    // Capture badge state sebelum submit — buat diff nanti supaya bisa
+    // tampilkan popup untuk badge baru yang di-award oleh trigger async.
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final preBadges = uid.isEmpty
+        ? const <String>{}
+        : await GamificationFeedback.captureBefore(uid);
+
     try {
       final result = await FirebaseFunctions.instanceFor(region: 'asia-southeast2')
           .httpsCallable('submitQuizAttempt')
@@ -134,6 +143,21 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
       final correct = (data['correct'] as num?)?.toInt() ?? 0;
       final total = (data['total'] as num?)?.toInt() ?? 0;
       final passed = data['passed'] as bool? ?? false;
+
+      // Fire-and-forget gamification feedback — snackbar untuk point earned
+      // + popup untuk badge baru. Jalan paralel dgn navigation di bawah.
+      if (uid.isNotEmpty) {
+        unawaited(
+          GamificationFeedback.showDiffAfter(
+            context: context,
+            uid: uid,
+            previousBadgeIds: preBadges,
+            customSnackbarMessage: passed
+                ? 'Quiz completed! Score: $score'
+                : 'Quiz submitted. Score: $score',
+          ),
+        );
+      }
 
       // Parse correctAnswers if function returned them (showAnswer == true)
       final Map<String, List<int>> correctAnswers = {};

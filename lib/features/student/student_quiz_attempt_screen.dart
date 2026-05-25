@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
+import '../../services/gamification_feedback.dart';
 import '../../services/quiz_service.dart';
 
 class StudentQuizAttemptScreen extends StatefulWidget {
@@ -116,6 +118,13 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
 
     setState(() => _isSubmitting = true);
 
+    // Capture badge state sebelum submit — buat diff nanti supaya bisa
+    // tampilkan popup untuk badge baru / repeat earn yang di-award trigger.
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final preBadges = uid.isEmpty
+        ? const <String, int>{}
+        : await GamificationFeedback.captureBefore(uid);
+
     try {
       final result = await FirebaseFunctions.instanceFor(region: 'asia-southeast2')
           .httpsCallable('submitQuizAttempt')
@@ -134,6 +143,14 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
       final correct = (data['correct'] as num?)?.toInt() ?? 0;
       final total = (data['total'] as num?)?.toInt() ?? 0;
       final passed = data['passed'] as bool? ?? false;
+
+      // Snackbar — fire-and-forget, tampil instan setelah submit success.
+      GamificationFeedback.showSnackbar(
+        context,
+        passed
+            ? 'Quiz completed! Score: $score'
+            : 'Quiz submitted. Score: $score',
+      );
 
       // Parse correctAnswers if function returned them (showAnswer == true)
       final Map<String, List<int>> correctAnswers = {};
@@ -155,7 +172,8 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
       }
 
       if (widget.quiz.showAnswer && correctAnswers.isNotEmpty) {
-        // Switch screen to review mode
+        // Switch screen to review mode — screen tetap alive, popup bisa fire
+        // di background tanpa risiko context invalid.
         setState(() {
           _isSubmitting = false;
           _isReviewing = true;
@@ -165,9 +183,26 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
           _total = total;
           _passed = passed;
         });
+        if (uid.isNotEmpty) {
+          unawaited(GamificationFeedback.showBadgePopups(
+            context: context,
+            uid: uid,
+            previousBadgeCounts: preBadges,
+          ));
+        }
       } else {
-        // No review — just show summary dialog and pop
+        // No review — show summary dialog, lalu badge popups (sambil screen
+        // masih alive), baru pop. Awaited supaya popup tidak ke-skip karena
+        // context invalid setelah Navigator.pop.
         await _showResultDialog(score, correct, total, passed);
+        if (!mounted) return;
+        if (uid.isNotEmpty) {
+          await GamificationFeedback.showBadgePopups(
+            context: context,
+            uid: uid,
+            previousBadgeCounts: preBadges,
+          );
+        }
         if (mounted) Navigator.of(context).pop();
       }
     } catch (e) {

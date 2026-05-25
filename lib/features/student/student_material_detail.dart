@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../models/material_model.dart';
 import '../../models/attachment_model.dart';
+import '../../services/gamification_feedback.dart';
 import '../../services/material_progress_service.dart';
 import '../../services/material_service.dart';
 import '../../services/attachment_service.dart';
@@ -57,29 +59,39 @@ class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
   // Fire-and-forget track attachment access ke backend. Backend bakal:
   //  - arrayUnion(attachmentId) ke material_completion
   //  - kalau semua attachment udah di-click → mark complete + award point
-  // Show snackbar pas justCompleted supaya user dapat feedback.
-  void _trackAccess(String attachmentId) {
-    MaterialProgressService.trackAttachmentAccess(
-      classId: widget.classId,
-      materialId: widget.materialId,
-      attachmentId: attachmentId,
-    ).then((result) {
-      if (!mounted || !result.justCompleted) return;
-      final pts = result.pointAwarded;
-      final badgeNames = result.badgesEarned.map((b) => b.badgeId).join(', ');
-      final msg = badgeNames.isNotEmpty
-          ? 'Material completed! +$pts points · Badge: $badgeNames'
-          : 'Material completed! +$pts points';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: const Color(0xFF6F5AAA),
-          duration: const Duration(seconds: 3),
-        ),
+  // Show snackbar pas justCompleted + popup untuk setiap badge baru.
+  void _trackAccess(String attachmentId) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    // Capture badge state SEBELUM API call (untuk diff popup).
+    final preBadges = uid.isEmpty
+        ? const <String, int>{}
+        : await GamificationFeedback.captureBefore(uid);
+
+    try {
+      final result = await MaterialProgressService.trackAttachmentAccess(
+        classId: widget.classId,
+        materialId: widget.materialId,
+        attachmentId: attachmentId,
       );
-    }).catchError((e) {
+      if (!mounted || !result.justCompleted) return;
+
+      // Snackbar instant + popup. Screen tetap alive setelah ini, jadi
+      // delay popup pendek aja (Sync API udah return pointAwarded).
+      GamificationFeedback.showSnackbar(
+        context,
+        'Material completed! +${result.pointAwarded} points',
+      );
+      if (uid.isNotEmpty) {
+        await GamificationFeedback.showBadgePopups(
+          context: context,
+          uid: uid,
+          previousBadgeCounts: preBadges,
+          waitFor: const Duration(milliseconds: 500),
+        );
+      }
+    } catch (e) {
       debugPrint('[material_progress] track failed: $e');
-    });
+    }
   }
 
   IconData _getIconForType(String type) {

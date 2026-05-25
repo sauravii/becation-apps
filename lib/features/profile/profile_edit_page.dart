@@ -28,6 +28,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   bool _isSaving = false;
   bool _isUploadingPhoto = false;
   final String _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  // Cache stream — tanpa ini setiap keystroke (setState) bikin
+  // UserService.userStream() di-call ulang, StreamBuilder re-subscribe,
+  // waiting state muncul sebentar → skeleton flicker di photo.
+  late final Stream<DocumentSnapshot<Map<String, dynamic>>> _userStream;
 
   @override
   void initState() {
@@ -36,6 +40,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _originalName =
         user?.displayName ?? user?.email?.split('@').first ?? '';
     _nameCtrl = TextEditingController(text: _originalName);
+    _userStream = UserService.userStream(_uid);
   }
 
   @override
@@ -209,7 +214,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             // upload. Loading state (Firestore waiting / NetworkImage
             // downloading) pakai shimmer skeleton, bukan plain grey.
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: UserService.userStream(_uid),
+              stream: _userStream,
               builder: (context, snap) {
                 final waitingStream =
                     snap.connectionState == ConnectionState.waiting;

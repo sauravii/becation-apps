@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/badges_service.dart';
+import '../skeleton_circle_avatar.dart';
 
 /// Popup announcement waktu user dapat badge baru. Dipakai setelah quiz
 /// completion / material completion / streak milestone.
@@ -12,14 +13,16 @@ class BadgeAwardPopup extends StatelessWidget {
 
   const BadgeAwardPopup({super.key, required this.badge});
 
-  /// Static helper — show popup sebagai dialog. Awaitable, resolve setelah
-  /// user dismiss. Pakai ini supaya bisa show beberapa badge berurutan via
-  /// `await ... ; await ...`.
+  /// Static helper — show popup sebagai modal dialog. Barrier dismiss
+  /// disabled supaya gak ke-tutup gak sengaja saat user tap luar; user harus
+  /// klik tombol "Awesome!" untuk close. useRootNavigator supaya tetap
+  /// muncul kalau parent screen kebetulan pop.
   static Future<void> show(BuildContext context, BadgeItem badge) {
     return showDialog<void>(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       barrierColor: Colors.black54,
+      useRootNavigator: true,
       builder: (_) => BadgeAwardPopup(badge: badge),
     );
   }
@@ -73,6 +76,9 @@ class BadgeAwardPopup extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             // Badge image — large di tengah supaya jadi focus.
+            // frameBuilder kasih shimmer skeleton saat image belum decode
+            // (precache di GamificationFeedback biasanya udah warm cache,
+            // jadi skeleton cuma muncul kalau precache miss/network slow).
             SizedBox(
               width: 120,
               height: 120,
@@ -81,6 +87,13 @@ class BadgeAwardPopup extends StatelessWidget {
                       child: Image.network(
                         url,
                         fit: BoxFit.cover,
+                        frameBuilder:
+                            (_, child, frame, wasSyncLoaded) {
+                          if (frame == null) {
+                            return const SkeletonCircleAvatar(radius: 60);
+                          }
+                          return child;
+                        },
                         errorBuilder: (_, __, ___) => const Icon(
                           Icons.emoji_events,
                           size: 80,

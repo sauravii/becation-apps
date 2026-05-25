@@ -64,7 +64,7 @@ class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     // Capture badge state SEBELUM API call (untuk diff popup).
     final preBadges = uid.isEmpty
-        ? const <String>{}
+        ? const <String, int>{}
         : await GamificationFeedback.captureBefore(uid);
 
     try {
@@ -75,17 +75,20 @@ class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
       );
       if (!mounted || !result.justCompleted) return;
 
-      // Trigger gamification feedback — snackbar point + popup badge baru.
-      // Sync API ini langsung return pointAwarded, jadi gak perlu polling
-      // delay panjang — singkat aja.
-      await GamificationFeedback.showDiffAfter(
-        context: context,
-        uid: uid,
-        previousBadgeIds: preBadges,
-        customSnackbarMessage:
-            'Material completed! +${result.pointAwarded} points',
-        waitFor: const Duration(milliseconds: 500),
+      // Snackbar instant + popup. Screen tetap alive setelah ini, jadi
+      // delay popup pendek aja (Sync API udah return pointAwarded).
+      GamificationFeedback.showSnackbar(
+        context,
+        'Material completed! +${result.pointAwarded} points',
       );
+      if (uid.isNotEmpty) {
+        await GamificationFeedback.showBadgePopups(
+          context: context,
+          uid: uid,
+          previousBadgeCounts: preBadges,
+          waitFor: const Duration(milliseconds: 500),
+        );
+      }
     } catch (e) {
       debugPrint('[material_progress] track failed: $e');
     }

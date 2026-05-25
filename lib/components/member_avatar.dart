@@ -1,35 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'skeleton_circle_avatar.dart';
 
 /// Module-level cache user doc — dipakai bareng MemberAvatar + MemberDisplayName.
-/// Cache hit → return SynchronousFuture supaya FutureBuilder skip waiting state
-/// (no flicker pas re-render / repeat visit).
+/// Pattern: cache jadi initial value (no skeleton flicker pas re-mount), TAPI
+/// background fetch tetap jalan supaya update terbaru tetap masuk (kalau user
+/// lain update photo/nama, gak perlu cold restart).
 final Map<String, Map<String, dynamic>?> _userDocCache = {};
 
-Future<Map<String, dynamic>?> _fetchUserDoc(String uid) {
-  if (_userDocCache.containsKey(uid)) {
-    return SynchronousFuture(_userDocCache[uid]);
-  }
-  return _fetchUserDocAsync(uid);
-}
-
-Future<Map<String, dynamic>?> _fetchUserDocAsync(String uid) async {
+Future<Map<String, dynamic>?> _fetchUserDocFresh(String uid) async {
   try {
     final snap = await FirebaseFirestore.instance.doc('users/$uid').get();
     _userDocCache[uid] = snap.data();
-    return _userDocCache[uid];
+    return snap.data();
   } catch (_) {
-    return null;
+    // Network error → fallback ke cache supaya UI tetap punya value.
+    return _userDocCache[uid];
   }
 }
 
-/// Avatar reusable untuk class member tile. Fetch photoUrl dari `users/{uid}`
-/// sekali per instance (memoized via initState). Kalau ada photo → render
-/// NetworkImage; kalau gak ada → fallback ke placeholder Icon (school untuk
-/// teacher, person untuk student).
+/// Avatar reusable untuk class member tile. Fetch photoUrl dari `users/{uid}`.
+/// Pakai cache sbg initial value (skip skeleton kalau pernah load), dan selalu
+/// fetch fresh di background supaya update photo dari user lain auto-masuk.
 class MemberAvatar extends StatefulWidget {
   final String uid;
   final bool isTeacher;
@@ -52,14 +45,14 @@ class _MemberAvatarState extends State<MemberAvatar> {
   @override
   void initState() {
     super.initState();
-    _userFuture = _fetchUserDoc(widget.uid);
+    _userFuture = _fetchUserDocFresh(widget.uid);
   }
 
   @override
   void didUpdateWidget(covariant MemberAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.uid != widget.uid) {
-      _userFuture = _fetchUserDoc(widget.uid);
+      _userFuture = _fetchUserDocFresh(widget.uid);
     }
   }
 
@@ -87,9 +80,13 @@ class _MemberAvatarState extends State<MemberAvatar> {
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>?>(
       future: _userFuture,
+      // initialData = cache. Kalau cache hit, snap.hasData = true dari frame
+      // pertama → skeleton di-skip. Begitu future done, snap rebuild dgn
+      // fresh data — kalau sama, no visible change; kalau beda (user update),
+      // UI auto-update tanpa cold restart.
+      initialData: _userDocCache[widget.uid],
       builder: (context, snap) {
-        // Pas fetch user doc masih jalan, kasih skeleton biar gak blank.
-        if (snap.connectionState != ConnectionState.done) {
+        if (snap.connectionState != ConnectionState.done && !snap.hasData) {
           return SkeletonCircleAvatar(radius: widget.radius);
         }
         final url = (snap.data?['photoUrl'] as String?) ?? '';
@@ -128,14 +125,14 @@ class _MemberDisplayNameState extends State<MemberDisplayName> {
   @override
   void initState() {
     super.initState();
-    _userFuture = _fetchUserDoc(widget.uid);
+    _userFuture = _fetchUserDocFresh(widget.uid);
   }
 
   @override
   void didUpdateWidget(covariant MemberDisplayName oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.uid != widget.uid) {
-      _userFuture = _fetchUserDoc(widget.uid);
+      _userFuture = _fetchUserDocFresh(widget.uid);
     }
   }
 
@@ -143,11 +140,11 @@ class _MemberDisplayNameState extends State<MemberDisplayName> {
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>?>(
       future: _userFuture,
+      initialData: _userDocCache[widget.uid],
       builder: (context, snap) {
-        // Jangan tampilkan fallback (member doc stale) selama loading —
-        // bikin flicker dari nama lama → nama baru. Reserve baseline pakai
-        // Text kosong supaya tinggi ListTile gak shift.
-        if (snap.connectionState != ConnectionState.done) {
+        // Kalau cache miss DAN future belum selesai → empty Text (preserve
+        // height, no stale fallback).
+        if (snap.connectionState != ConnectionState.done && !snap.hasData) {
           return Text('', style: widget.style);
         }
         final fresh = (snap.data?['displayName'] as String?)?.trim() ?? '';

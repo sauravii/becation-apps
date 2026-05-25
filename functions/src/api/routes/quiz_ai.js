@@ -10,7 +10,9 @@ const router = Router();
 // Genkit untuk cold-start lebih ringan. API key tetap via defineSecret di
 // `functions/index.js` (Cloud Functions runtime feature, bukan Genkit-specific).
 
-const MODEL = "gemini-3.1-flash-lite-preview";
+// Stable channel — preview identifier sudah di-retire Google.
+// Display name di docs/UI tetap "Gemini 3.1 Flash Lite".
+const MODEL = "gemini-3.1-flash-lite";
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 

@@ -31,6 +31,56 @@ class PointsService {
         as Map<String, dynamic>;
     return PointsLogPage.fromJson(data);
   }
+
+  /// GET /api/users/:uid/points/by-class
+  /// Per-class breakdown untuk profile detail page. Sorted by point desc.
+  static Future<PointsByClass> getPointsByClass(String uid) async {
+    final data = await ApiClient.get('/users/$uid/points/by-class')
+        as Map<String, dynamic>;
+    return PointsByClass.fromJson(data);
+  }
+}
+
+class PointsByClass {
+  final List<ClassPointEntry> classes;
+  final int totalClassPoints;
+
+  PointsByClass({required this.classes, required this.totalClassPoints});
+
+  factory PointsByClass.fromJson(Map<String, dynamic> json) {
+    final raw = (json['classes'] as List?) ?? const [];
+    return PointsByClass(
+      classes: raw
+          .whereType<Map>()
+          .map((m) => ClassPointEntry.fromJson(Map<String, dynamic>.from(m)))
+          .toList(),
+      totalClassPoints: (json['totalClassPoints'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class ClassPointEntry {
+  final String classId;
+  final String title;
+  final String subject;
+  final int colorValue;
+  final int point;
+
+  ClassPointEntry({
+    required this.classId,
+    required this.title,
+    required this.subject,
+    required this.colorValue,
+    required this.point,
+  });
+
+  factory ClassPointEntry.fromJson(Map<String, dynamic> json) => ClassPointEntry(
+        classId: json['classId'] ?? '',
+        title: json['title'] ?? '',
+        subject: json['subject'] ?? '',
+        colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xFF6F5AAA,
+        point: (json['point'] as num?)?.toInt() ?? 0,
+      );
 }
 
 class PingResult {

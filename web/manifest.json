@@ -1,6 +1,6 @@
 {
-    "name": "becation_apps",
-    "short_name": "becation_apps",
+    "name": "Becation",
+    "short_name": "Becation",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

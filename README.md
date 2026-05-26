@@ -150,11 +150,11 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - **AI-Powered** — Integrasi model bahasa besar (LLM) Gemini untuk asisten pembuatan konten kuis.
 - **Real-time sync** — perubahan dari guru langsung muncul di perangkat siswa tanpa refresh
 - **Offline-aware** — Firestore cache otomatis menyimpan data terakhir
-- **Secure Backend** — Logika krusial (seperti penilaian kuis) dijalankan di Node.js via Firebase Functions.
-- **REST API selektif** — Express dipakai khusus untuk fitur yang butuh agregasi server-side (Quiz Analytics). Fitur lain tetap pakai Direct Firestore Stream (realtime) atau HTTPS Callable (action-based) sesuai fit-nya.
+- **Backend Hybrid (~75% Express, ~25% Firebase native)** — Express dominan handle semua CRUD (14 entitas), gamifikasi, quiz analytics, AI generation, dan badge/leaderboard system (~50 endpoint REST). Firebase native dipertahankan untuk hal yang memang Firebase paling cocok: Authentication flow, Storage bytes upload (file & foto profile), realtime Firestore stream untuk UI live (members, materials, dll), serta 1 Callable `submitQuizAttempt` (anti-cheat scoring server-side). Tiap path native punya alasan teknis defensible (auth token plumbing, body limit 32MB Functions, no realtime di Express, anti-cheat scoring).
+- **Cloud Functions Architecture** — 5 functions di-deploy di `asia-southeast2` (Jakarta): 1 HTTPS Express (`api`) + 1 Callable (`submitQuizAttempt`) + 1 Firestore trigger (`onQuizAttemptCreated`) + 2 scheduled cron (`weeklyRankSnapshot`, `dailySemesterCloseCheck`).
 - **Responsive design** — menyesuaikan berbagai ukuran layar (flutter_screenutil)
 - **Role-based access** — siswa tidak bisa modifikasi materi, hanya guru pemilik kelas
-- **Atomic operations** — pembuatan kelas, join, dan leave dijalankan sebagai batch transaction
+- **Atomic operations** — pembuatan kelas, join, leave, dan award point/badge dijalankan sebagai batch transaction
 - **Tap to dismiss keyboard** — tap di area kosong mana pun untuk menutup keyboard
 - **Countdown confirmation** — aksi destructive (hapus kelas, topik, leave) dilindungi countdown timer
 

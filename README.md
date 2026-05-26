@@ -72,10 +72,11 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
   - **Attempts**: list paginated semua attempt siswa (sort by submitted date atau score).
   - Dibangun di atas Express REST API yang melakukan agregasi server-side (lebih hemat bandwidth dibanding query mentah dari client).
 
-**Settings**
+**Profile (Teacher)**
 
-- Lihat & edit profil (nama, email)
-- Manajemen role user
+- Lihat profil (foto, nama, email, role badge)
+- Edit nama + upload foto profil (dengan circular crop preview)
+- Stat ringkas: classes created, materials uploaded
 - Sign out
 
 ### Untuk Siswa
@@ -119,6 +120,31 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - Leave class dari menu di dalam halaman kelas (dengan countdown konfirmasi 3 detik)
 - Sign out
 
+**Profile (Student)**
+
+- Lihat profil (foto, nama, email)
+- Edit nama + upload foto profil (image_cropper circular preview, validate ≤5 MB)
+- 4 stat card: **Day Streak**, **Total Points**, **Class Joined**, **Materials Completed**
+- **Total Points** tappable → **Points Breakdown Page**: list per-class point earned (scrollable, sorted desc, tampil class color + title + subject), plus total card hero
+- Badges grid: 6 preview (2 row), tombol "More" untuk show all. Locked = grayscale, secret unearned = masked ('?????'). Modal detail per badge dengan difficulty + status pill + description
+- Sign out
+
+### Gamification
+
+- **Point system**:
+  - Quiz: `quizScoreReward(score, isFirstSubmitter)` (bonus first submitter + perfect score)
+  - Material complete: +5 point (semua attachment di-click)
+  - Daily streak: bonus harian via `POST /api/users/me/ping` (called on splash + login)
+  - Badge earned: bonus per badge tier
+- **Per-class tracking** (v1.5.0): point disimpan di **dua tempat**:
+  - `users/{uid}.point` (global total → ditampilkan di profile stat card)
+  - `classes/{cid}/members/{uid}.point` (per-class → digunakan untuk leaderboard tiap kelas)
+- **Local leaderboard**: tiap kelas punya leaderboard independent (1 kelas = 1 ranking). Sort by per-class point desc, teacher di-exclude
+- **Streak**: daily login bonus, milestone Overachiever badge tiap 28 hari
+- **Badge system**: ~8 badges dengan tier (Easy/Medium/Hard/Reward + Secret). Auto-award via Firestore trigger `onQuizAttemptCreated` + endpoint `material_progress` + `awardBadge` shared helper
+- **Badge announcement popup**: muncul setelah submit quiz / complete material kalau ada badge baru di-earn (modal dialog dengan icon + name + "+X points" chip, tombol "Awesome!" untuk close)
+- **Snackbar feedback**: quiz/material completion langsung tampil snackbar score/point earned (instant feedback sambil tunggu trigger async)
+
 ### Fitur Sistem
 
 - **AI-Powered** — Integrasi model bahasa besar (LLM) Gemini untuk asisten pembuatan konten kuis.
@@ -136,22 +162,24 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 
 ## Tech Stack
 
-| Layer        | Teknologi                                                     |
-| ------------ | ------------------------------------------------------------- |
-| Framework    | Flutter 3.x                                                   |
-| Language     | Dart, Node.js (Backend)                                       |
-| AI Model     | Gemini 3.1 Flash-Lite Preview (AI Studio)                     |
-| AI Framework | Genkit + Firebase Genkit Monitoring                           |
-| Backend      | Node.js on Firebase Cloud Functions (Gen 2)                   |
-| REST API     | Express + cors (mounted as HTTPS function `api`)              |
-| Auth         | Firebase Authentication                                       |
-| Database     | Cloud Firestore                                               |
-| Storage      | Firebase Storage (file upload)                                |
-| State        | StreamBuilder + Firestore Streams                             |
-| Charts       | fl_chart (bar chart, donut chart untuk Quiz Analytics)        |
-| HTTP Client  | http (REST calls ke Express API dengan Bearer ID token)       |
-| UI Helper    | flutter_screenutil, flutter_svg, intl                         |
-| Utility      | url_launcher, google_sign_in, file_picker, permission_handler |
+| Layer        | Teknologi                                                                     |
+| ------------ | ----------------------------------------------------------------------------- |
+| Framework    | Flutter 3.x                                                                   |
+| Language     | Dart, Node.js (Backend)                                                       |
+| AI Model     | Gemini 3.1 Flash Lite (Google AI Studio)                                      |
+| AI Wiring    | Direct REST call ke `generativelanguage.googleapis.com` via `fetch()` + `responseSchema` (structured output) — migrasi dari Genkit untuk kurangi cold-start |
+| Backend      | Node.js on Firebase Cloud Functions Gen 2 (region asia-southeast2 / Jakarta)  |
+| REST API     | Express + cors, mounted as single HTTPS function `api` (~50 endpoint, 14 entitas) |
+| Auth         | Firebase Authentication (email/password + Google Sign-In)                     |
+| Database     | Cloud Firestore                                                               |
+| Storage      | Firebase Storage (attachment file + profile photo)                            |
+| State        | StreamBuilder + Firestore Streams (realtime UI)                               |
+| Charts       | fl_chart (bar + donut chart Quiz Analytics)                                   |
+| HTTP Client  | http (REST calls ke Express API dengan Bearer Firebase ID token)              |
+| Photo        | image_cropper (1:1 circular crop) + file_picker untuk profile photo upload    |
+| UI Helper    | flutter_screenutil, flutter_svg, intl                                         |
+| Utility      | url_launcher, google_sign_in, permission_handler                              |
+| Build Tools  | flutter_launcher_icons (generate Android + iOS launcher icon dari `lib/assets/icons/logo.png`) |
 
 ---
 
@@ -159,55 +187,64 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 
 ```text
 lib/
-├── main.dart              # Entry point
-├── spashscreen.dart       # Splash & role routing
-├── assets/                # Aset statis aplikasi (gambar & ikon)
-├── components/            # Widget reusable
-│   ├── buttons/           # Tombol kustom
-│   ├── cards/             # Card UI (kelas, materi, kuis, attachment)
-│   ├── forms/             # Input field form
-│   ├── map/               # Komponen peta pembelajaran
-│   ├── navigation/        # Bottom nav item
-│   └── viewers/           # Image viewer
-├── features/              # Halaman per role & fitur
-│   ├── auth/              # Login, register, forgot password, verify
-│   ├── home/              # Halaman utama & manajemen role
-│   ├── student/           # Dashboard, kuis, materi, settings siswa
-│   └── teacher/           # Dashboard, kuis (AI & Manual), materi, guru
-├── models/                # Data class
+├── main.dart                       # Entry point (MaterialApp + ScreenUtil)
+├── spashscreen.dart                # Splash, role routing, streak ping
+├── assets/icons/                   # Logo aplikasi (source untuk launcher icon)
+├── components/                     # Widget reusable
+│   ├── buttons/                    # Tombol kustom (auth, dll)
+│   ├── cards/                      # Card UI (kelas, materi, kuis, attachment)
+│   ├── forms/                      # Input field form
+│   ├── gamification/               # Badge card, badge_award_popup (modal congrats!), points_chip, streak_indicator
+│   ├── map/                        # Komponen peta pembelajaran
+│   ├── member_avatar.dart          # CircleAvatar + skeleton + auto-refresh fresh photo/name
+│   ├── navigation/                 # Bottom nav item
+│   ├── skeleton_circle_avatar.dart # Shimmer loading skeleton + NetworkCircleAvatar helper
+│   └── viewers/                    # Image viewer (full screen pinch zoom)
+├── features/
+│   ├── auth/                       # Login, register, forgot password, verify
+│   ├── home/                       # Halaman utama & role routing
+│   ├── profile/                    # ProfileEditPage (nama + photo upload), PointsBreakdownPage
+│   ├── student/                    # Dashboard, kuis attempt, materi detail, profile, leaderboard, class detail
+│   └── teacher/                    # Dashboard, kuis create/edit (AI & Manual), analytics, materi detail, profile, class detail
+├── models/
 │   ├── attachment_model.dart
 │   ├── class_model.dart
-│   ├── material_model.dart
+│   ├── material_model.dart         # formattedTime + formattedDate
 │   ├── member_model.dart
 │   ├── question_model.dart
 │   ├── quiz_model.dart
 │   └── topic_model.dart
-├── services/              # Business logic & Firebase operations
-│   ├── attachment_service.dart
-│   ├── class_service.dart
-│   ├── quiz_service.dart           # Logika kuis & integrasi AI
-│   ├── quiz_analytics_service.dart # REST client untuk endpoint Express analytics
-│   ├── topic_service.dart
-│   ├── material_service.dart
-│   └── attachment_service.dart
-├── models/                # Data class
-│   ├── class_model.dart
-│   ├── quiz_model.dart
-│   ├── topic_model.dart
-│   ├── material_model.dart
-│   ├── attachment_model.dart
-│   └── member_model.dart
-functions/                 # Backend (Node.js + Genkit on Firebase Functions Gen 2)
-├── src/
-│   ├── quiz_ai.js                  # Genkit flow: AI Studio Gemini integration
-│   ├── quiz_scoring.js             # Penilaian kuis aman (callable)
-│   └── api/                        # Express REST API skeleton
-│       ├── index.js                # Express app factory (cors, json, auth, error)
-│       ├── middleware/             # auth (Firebase ID token), logger, error
-│       ├── helpers/                # authorize (teacher-of-class check)
-│       └── routes/                 # health, quiz_analytics (3 GET endpoints)
-├── index.js                        # Entry point Cloud Functions
+└── services/                       # Business logic & API/Firebase operations
+    ├── api_client.dart             # HTTP client dengan auto-attach Firebase ID token
+    ├── attachment_service.dart
+    ├── badges_service.dart         # /users/:uid/badges
+    ├── class_service.dart
+    ├── gamification_feedback.dart  # captureBefore + showSnackbar + showBadgePopups (diff & sequential modal)
+    ├── leaderboard_service.dart    # /classes/:cid/leaderboard + close-semester
+    ├── material_progress_service.dart  # POST attachment access tracking
+    ├── material_service.dart
+    ├── points_service.dart         # /points, /points/log, /points/by-class, /me/ping
+    ├── quiz_analytics_service.dart
+    ├── quiz_service.dart
+    ├── topic_service.dart
+    └── user_service.dart           # User CRUD + photo upload + role + displayName sync
+
+functions/                          # Backend (Node.js on Firebase Functions Gen 2, asia-southeast2)
+├── index.js                        # Exports: submitQuizAttempt (Callable), api (Express HTTPS), onQuizAttemptCreated (trigger), weeklyRankSnapshot + dailySemesterCloseCheck (cron)
+└── src/
+    ├── quiz_scoring.js             # Callable submitQuizAttempt (anti-cheat server-side scoring)
+    ├── api/
+    │   ├── index.js                # Express app factory (cors, json, auth, error handler)
+    │   ├── middleware/             # auth (Firebase ID token verify), request_logger, error_handler
+    │   ├── helpers/                # authorize (admin / teacher-of-class / member-of-class / self-or-admin), pagination
+    │   └── routes/                 # 14 entitas: health, users, classes, memberships, topics, materials, attachments, quizzes, quiz_analytics, quiz_ai (Gemini direct), points (incl by-class v1.5.0), badges, leaderboard, material_progress
+    ├── shared/                     # point_rules, badge_definitions, badge_award (member.point increment kalau context.classId), topic_progress
+    └── triggers/
+        ├── on_quiz_attempt.js      # onCreate attempts → award point (users + members), straight_a / comeback_kid / flash checks
+        └── scheduled_ranking.js    # weeklyRankSnapshot + dailySemesterCloseCheck + closeSemester helper
+
 docs/
-├── FIREBASE_RULES_GUIDE.md  # Dokumentasi Firestore & Storage rules
-└── CHANGELOG.md             # Catatan perubahan versi aplikasi
+├── endpoints.md            # Dokumentasi semua endpoint Express + Callable + background functions
+├── FIREBASE_RULES_GUIDE.md # Firestore & Storage rules guide (commit-able doc satu-satunya)
+└── (lokal-only)            # CurrentTestCaseReport.md, test_scenarios.md, pkm_kc_corrections.md — gak commit per policy
 ```

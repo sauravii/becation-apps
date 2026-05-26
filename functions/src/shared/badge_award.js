@@ -94,6 +94,18 @@ async function awardBadge(uid, badgeId, opts = {}) {
           {point: FieldValue.increment(def.pointReward)},
           {merge: true},
       );
+      // Class-context badge (e.g. Flash dari topic completion) → juga
+      // increment per-class point untuk local leaderboard. Badge tanpa
+      // classId (mis. streak/overachiever) → cuma global users.point.
+      if (context.classId) {
+        const memberRef =
+            db.doc(`classes/${context.classId}/members/${uid}`);
+        tx.set(
+            memberRef,
+            {point: FieldValue.increment(def.pointReward)},
+            {merge: true},
+        );
+      }
       tx.set(logRef, {
         delta: def.pointReward,
         reason: "badge_earned",

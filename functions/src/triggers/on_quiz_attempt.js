@@ -86,9 +86,12 @@ exports.onQuizAttemptCreated = onDocumentCreated(
       }
       if (!quizData) return;
 
-      // (2) Award point.
+      // (2) Award point. Tulis ke users.point (global total) DAN
+      // classes/{cid}/members/{studentId}.point (per-class, untuk local
+      // leaderboard ranking). Atomic via batch.
       const delta = quizScoreReward(score, isFirstSubmitter);
       const userRef = db.doc(`users/${studentId}`);
+      const memberRef = db.doc(`classes/${cid}/members/${studentId}`);
 
       const batch = db.batch();
       batch.set(logRef, {
@@ -102,6 +105,11 @@ exports.onQuizAttemptCreated = onDocumentCreated(
       if (delta > 0) {
         batch.set(
             userRef,
+            {point: FieldValue.increment(delta)},
+            {merge: true},
+        );
+        batch.set(
+            memberRef,
             {point: FieldValue.increment(delta)},
             {merge: true},
         );

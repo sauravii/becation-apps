@@ -11,6 +11,7 @@ import '../../services/badges_service.dart';
 import '../../services/class_service.dart';
 import '../../services/user_service.dart';
 import '../auth/login_page.dart';
+import '../profile/points_breakdown_page.dart';
 import '../profile/profile_edit_page.dart';
 
 class StudentProfilePage extends StatelessWidget {
@@ -319,6 +320,11 @@ class _StudentStatsGridState extends State<_StudentStatsGrid> {
                       icon: Icons.star_rounded,
                       value: point.toString(),
                       label: 'Total Points',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PointsBreakdownPage(),
+                        ),
+                      ),
                     ),
                     _statCard(
                       icon: Icons.people_alt,
@@ -344,8 +350,9 @@ class _StudentStatsGridState extends State<_StudentStatsGrid> {
     required IconData icon,
     required String value,
     required String label,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final card = Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -368,13 +375,25 @@ class _StudentStatsGridState extends State<_StudentStatsGrid> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    height: 1.1,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        value,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                    if (onTap != null)
+                      const Icon(
+                        Icons.chevron_right,
+                        size: 16,
+                        color: Color(0xFF6F5AAA),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -391,6 +410,15 @@ class _StudentStatsGridState extends State<_StudentStatsGrid> {
             ),
           ),
         ],
+      ),
+    );
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: card,
       ),
     );
   }

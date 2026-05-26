@@ -96,13 +96,15 @@ router.post(
             completedAt: FieldValue.serverTimestamp(),
           });
 
-          // (5a) Award point (idempotent via points_log id).
+          // (5a) Award point (idempotent via points_log id). Tulis ke
+          // users.point (global) + members/{uid}.point (per-class).
           const logRef = db.doc(
               `users/${uid}/points_log/material:${cid}:${mid}`,
           );
           const logSnap = await logRef.get();
           if (!logSnap.exists) {
             const userRef = db.doc(`users/${uid}`);
+            const memberRef = db.doc(`classes/${cid}/members/${uid}`);
             const batch = db.batch();
             batch.set(logRef, {
               delta: POINT_MATERIAL_COMPLETE,
@@ -114,6 +116,11 @@ router.post(
             });
             batch.set(
                 userRef,
+                {point: FieldValue.increment(POINT_MATERIAL_COMPLETE)},
+                {merge: true},
+            );
+            batch.set(
+                memberRef,
                 {point: FieldValue.increment(POINT_MATERIAL_COMPLETE)},
                 {merge: true},
             );

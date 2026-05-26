@@ -43,15 +43,31 @@ router.get("/:cid/leaderboard", async (req, res, next) => {
       return res.json({ranking: [], total: 0});
     }
 
-    const refs = memberIds.map((u) => db.doc(`users/${u}`));
-    const snaps = await db.getAll(...refs);
-    const list = snaps
+    // Ambil 2 sumber paralel:
+    //  - users/{uid} → displayName + photoUrl (single source of truth)
+    //  - classes/{cid}/members/{uid} → point per-class (LOCAL leaderboard,
+    //    bukan global users.point)
+    const userRefs = memberIds.map((u) => db.doc(`users/${u}`));
+    const memberRefs = memberIds.map(
+        (u) => db.doc(`classes/${cid}/members/${u}`),
+    );
+    const [userSnaps, memberSnaps] = await Promise.all([
+      db.getAll(...userRefs),
+      db.getAll(...memberRefs),
+    ]);
+
+    const memberPointsByUid = new Map();
+    for (const ms of memberSnaps) {
+      if (ms.exists) memberPointsByUid.set(ms.id, ms.data().point || 0);
+    }
+
+    const list = userSnaps
         .filter((s) => s.exists)
         .map((s) => ({
           uid: s.id,
           displayName: s.data().displayName || "",
           photoUrl: s.data().photoUrl || "",
-          point: s.data().point || 0,
+          point: memberPointsByUid.get(s.id) || 0,
         }));
     list.sort((a, b) => b.point - a.point);
 

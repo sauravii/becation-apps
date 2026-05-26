@@ -151,6 +151,56 @@ router.get("/:uid/points", async (req, res, next) => {
   }
 });
 
+/**
+ * GET /users/:uid/points/by-class
+ *
+ * Return list per-class points untuk user. Sumber:
+ *   classes (where memberIds contains uid) → join dgn members/{uid}.point.
+ *
+ * Response sorted by point desc supaya breakdown page langsung urut tertinggi.
+ * Total (sum) di-include juga supaya client gak perlu reduce sendiri.
+ */
+router.get("/:uid/points/by-class", async (req, res, next) => {
+  try {
+    const targetUid = resolveUid(req);
+    await assertSelfOrAdmin(req.user.uid, targetUid);
+
+    const db = getFirestore();
+    const classSnaps = await db.collection("classes")
+        .where("memberIds", "array-contains", targetUid)
+        .get();
+
+    if (classSnaps.empty) {
+      return res.json({classes: [], totalClassPoints: 0});
+    }
+
+    // Parallel fetch member docs per-class.
+    const memberRefs = classSnaps.docs.map(
+        (c) => db.doc(`classes/${c.id}/members/${targetUid}`),
+    );
+    const memberSnaps = await db.getAll(...memberRefs);
+
+    const items = classSnaps.docs.map((c, i) => {
+      const cd = c.data();
+      const md = memberSnaps[i].exists ? memberSnaps[i].data() : {};
+      return {
+        classId: c.id,
+        title: cd.title || "",
+        subject: cd.subject || "",
+        colorValue: cd.colorValue || 0xFF6F5AAA,
+        point: md.point || 0,
+      };
+    });
+    items.sort((a, b) => b.point - a.point);
+
+    const totalClassPoints =
+        items.reduce((sum, x) => sum + x.point, 0);
+    res.json({classes: items, totalClassPoints});
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get("/:uid/points/log", async (req, res, next) => {
   try {
     const targetUid = resolveUid(req);

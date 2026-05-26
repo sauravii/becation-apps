@@ -33,11 +33,12 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - Hapus kelas beserta seluruh isinya (dengan countdown konfirmasi 5 detik)
 - Lihat jumlah siswa di tiap kelas secara real-time
 
-**Detail Kelas (3 tab)**
+**Detail Kelas (4 tab)**
 
 - **Class**: banner info kelas (subject, judul, deskripsi) & toggle Quiz/Material untuk lihat list materi
-- **Classwork**: kelola topik & materi pembelajaran
-- **People**: kode kelas di atas, daftar anggota kelas, select mode untuk remove student (centang & hapus sekaligus)
+- **Classwork**: kelola topik & materi pembelajaran (tampil tanggal upload di setiap item)
+- **People**: kode kelas di atas, daftar anggota kelas dengan foto profil + nama (fresh-fetch dari user doc, auto-update kalau user edit profil), select mode untuk remove student (centang & hapus sekaligus)
+- **Leaderboard**: ranking student per-class (1 kelas = 1 leaderboard independent). Sort by per-class point, podium top 3 + list, pull-to-refresh di area ungu
 
 **Topik & Materi**
 
@@ -66,11 +67,10 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - Pengaturan Kuis: Judul kuis, batas waktu (1-1440 menit / 24 jam), nilai kelulusan (passing grade 0-100%), dan batas percobaan (1-10 attempts).
 - **Preview & Edit**: Guru bisa meninjau, mengubah urutan (reorder, hanya saat create), dan mengedit soal hasil AI sebelum dipublikasikan.
 - **Soft-delete dengan undo**: Tap delete pada soal akan menandai (grey-out + strike-through) bukan menghapus langsung. Tap restore untuk batalkan. Save/Publish menampilkan ringkasan perubahan sebelum commit.
-- **Quiz Analytics** (teacher-only): dashboard per-quiz dengan 3 tab:
-  - **Summary**: total attempts, average / min / max score, pass rate, distribusi skor (bar chart).
-  - **Per-Question**: correct rate per soal, distribusi pemilihan jawaban (donut chart).
-  - **Attempts**: list paginated semua attempt siswa (sort by submitted date atau score).
-  - Dibangun di atas Express REST API yang melakukan agregasi server-side (lebih hemat bandwidth dibanding query mentah dari client).
+- **Quiz Analytics** (teacher-only): dashboard per-quiz dengan 3 tab — agregasi server-side via Express:
+  - **Summary**: total attempts, average / min / max score, **pass rate per-student** (best score basis), **failed participants**, **participation rate** (X/Y students), **passing grade**, distribusi skor (bar chart), insight hardest/easiest question.
+  - **Per-Question**: correct rate per soal + color threshold, distribusi pemilihan jawaban (donut chart), tap question → jump ke edit page, filter chips untuk drill-down.
+  - **Attempts**: list paginated dengan PASS/FAIL pill, attempt number, correct count, sort by submitted date atau score.
 
 **Profile (Teacher)**
 
@@ -94,18 +94,21 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - Validasi otomatis: kode salah, kelas tidak ditemukan, atau sudah jadi member
 - Kelas langsung muncul di dashboard setelah join
 
-**Detail Kelas (3 tab)**
+**Detail Kelas (4 tab)**
 
-- **Class**: detail kelas (nama guru, subject, jumlah siswa, deskripsi)
-- **Classwork**: semua topik, materi, dan kuis yang bisa diakses
-- **People**: lihat guru pengampu & teman sekelas
+- **Class**: detail kelas (nama guru, subject, jumlah siswa, deskripsi) + learning map visualisasi progress
+- **Classwork**: semua topik, materi, dan kuis yang bisa diakses (tampil tanggal upload)
+- **People**: lihat guru pengampu (school icon) & teman sekelas dengan foto + nama fresh
+- **Leaderboard**: ranking kelas — student bisa lihat posisinya vs teman se-class. Pull-to-refresh di area ungu untuk update manual
 
 **Pengerjaan Kuis**
 
 - Kerjakan kuis dengan antarmuka yang bersih dan fokus.
-- Indikator waktu sisa (countdown timer).
-- **Server-side Scoring**: Penilaian otomatis yang aman dijalankan melalui **Firebase Functions** (mencegah kecurangan).
-- Hasil Kuis: Skor langsung muncul, status lulus/gagal, dan melihat kunci jawaban (jika diaktifkan guru).
+- Indikator waktu sisa (countdown timer) dengan auto-submit ketika habis.
+- **Server-side Scoring**: Penilaian otomatis via Cloud Callable `submitQuizAttempt` (region `asia-southeast2`). Jawaban dikirim ke server, dicocokkan dengan answer keys (tidak pernah expose ke client kecuali `showAnswer === true`), score dihitung server-side — anti-cheat.
+- Hasil Kuis: Skor langsung muncul, status lulus/gagal, dan review mode (lihat kunci jawaban) kalau guru aktifkan `showAnswer`.
+- **Snackbar feedback**: muncul "Quiz completed! Score: X" segera setelah submit.
+- **Badge popup**: kalau quiz attempt trigger badge baru (Flash kalau first to complete topic, Straight-A Crusader untuk 3 quiz ≥90 berturut, Comeback Kid untuk recovery dari fail ke pass), modal dialog "Congrats! 🎉 You earned a new badge" muncul setelah result dialog — image badge, name, +X points chip, tombol "Awesome!" untuk close (barrier-dismiss disabled supaya gak ke-tutup gak sengaja).
 
 **Akses Materi**
 
@@ -113,6 +116,7 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - **Gambar** dibuka di full screen viewer dalam app (pinch-to-zoom)
 - **File** (PDF, PPTX, dll) dibuka di browser untuk download
 - **Link** dibuka di browser atau app yang sesuai
+- **Auto-track completion**: setiap attachment yang di-click direkam server-side. Saat SEMUA attachment di material sudah di-akses → material "complete", award +5 point + cek Flash badge (kalau topic complete) + cek Studyaholic badge (kalau akses jam 22+). Snackbar + popup feedback muncul saat just-completed.
 - Tampilan read-only (tidak bisa edit)
 
 **Kelola Keanggotaan**
@@ -128,6 +132,13 @@ Becation memungkinkan guru membuat kelas digital, mengorganisir materi per topik
 - **Total Points** tappable → **Points Breakdown Page**: list per-class point earned (scrollable, sorted desc, tampil class color + title + subject), plus total card hero
 - Badges grid: 6 preview (2 row), tombol "More" untuk show all. Locked = grayscale, secret unearned = masked ('?????'). Modal detail per badge dengan difficulty + status pill + description
 - Sign out
+
+### Untuk Admin
+
+- Role `admin` di-seed manual di Firestore (`users/{uid}.role = "admin"`) — belum ada self-serve endpoint
+- **Manage Roles Page**: promote/demote user antara `student ↔ teacher` via PATCH `/users/:uid/role` (TODO: assertAdmin enforcement)
+- Manual grant/revoke badge ke user via API (POST/DELETE `/users/:uid/badges`)
+- ⚠️ Belum ada UI admin dashboard yang dedicated — semua via API direct call
 
 ### Gamification
 

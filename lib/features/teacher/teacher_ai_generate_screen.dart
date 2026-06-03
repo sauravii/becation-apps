@@ -430,7 +430,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
           hintStyle: const TextStyle(color: _hint),
           contentPadding: const EdgeInsets.all(16),
           border: InputBorder.none,
-          counterStyle: TextStyle(color: _hint.withOpacity(0.7)),
+          counterStyle: TextStyle(color: _hint.withValues(alpha: 0.7)),
         ),
       ),
     );
@@ -447,7 +447,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFE7DFF8).withOpacity(0.5),
+              color: const Color(0xFFE7DFF8).withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: const Color(0xFFE7DFF8)),
             ),
@@ -463,7 +463,7 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
 
   Widget _buildLoadingOverlay() {
     return Container(
-      color: Colors.black.withOpacity(0.3),
+      color: Colors.black.withValues(alpha: 0.3),
       child: Center(
         child: Container(
           padding: const EdgeInsets.all(32),

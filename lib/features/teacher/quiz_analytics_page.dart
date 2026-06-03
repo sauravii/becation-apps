@@ -1095,7 +1095,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
                                         ],
                                       ),
                                     );
-                                  }).toList(),
+                                  }),
                                 ],
                               ),
                             );

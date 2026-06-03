@@ -166,13 +166,13 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
                             margin: EdgeInsets.only(bottom: 16.h),
                             decoration: BoxDecoration(
                               color: isSuccess
-                                  ? Colors.green.withOpacity(0.1)
-                                  : Colors.red.withOpacity(0.1),
+                                  ? Colors.green.withValues(alpha: 0.1)
+                                  : Colors.red.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8.r),
                               border: Border.all(
                                 color: isSuccess
-                                    ? Colors.green.withOpacity(0.3)
-                                    : Colors.red.withOpacity(0.3),
+                                    ? Colors.green.withValues(alpha: 0.3)
+                                    : Colors.red.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Text(

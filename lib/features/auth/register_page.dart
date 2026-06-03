@@ -245,10 +245,10 @@ class _RegisterPageState extends State<RegisterPage> {
                             padding: EdgeInsets.all(12.w),
                             margin: EdgeInsets.only(bottom: 20.h),
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
+                              color: Colors.red.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8.r),
                               border: Border.all(
-                                color: Colors.red.withOpacity(0.3),
+                                color: Colors.red.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Text(

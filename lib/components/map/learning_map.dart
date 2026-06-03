@@ -109,7 +109,7 @@ class _LearningMapState extends State<LearningMap> {
 
           // Background Overlay for better readability
           Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.05)),
+            child: Container(color: Colors.black.withValues(alpha: 0.05)),
           ),
 
           // BEAUTIFUL 3D ROAD PATH
@@ -302,9 +302,9 @@ class _LearningMapState extends State<LearningMap> {
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    Colors.white.withOpacity(0.0),
-                    Colors.white.withOpacity(0.50),
-                    Colors.white.withOpacity(0.0),
+                    Colors.white.withValues(alpha: 0.0),
+                    Colors.white.withValues(alpha: 0.50),
+                    Colors.white.withValues(alpha: 0.0),
                   ],
                   stops: const [0.0, 0.5, 1.0],
                 ),

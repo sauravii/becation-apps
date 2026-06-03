@@ -21,7 +21,7 @@ class AuthIcon extends StatelessWidget {
         width: 42.w,
         height: 42.w,
         decoration: BoxDecoration(
-          color: (backgroundColor ?? const Color(0xFF875DFC)).withOpacity(0.15),
+          color: (backgroundColor ?? const Color(0xFF875DFC)).withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
         child: Icon(

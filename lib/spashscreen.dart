@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:becation_apps/features/auth/login_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:becation_apps/features/teacher/teacher_root_page.dart';
+import 'package:becation_apps/services/auth_service.dart';
 import 'package:becation_apps/services/points_service.dart';
 import 'package:becation_apps/services/user_service.dart';
 import 'package:becation_apps/features/student/student_root_page.dart';
@@ -35,7 +35,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    final User? user = FirebaseAuth.instance.currentUser;
+    final user = AuthService.currentUser;
 
     Widget targetPage;
 
@@ -44,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen>
     } else {
       final isRegistered = await UserService.isUserRegistered(user.uid);
       if (!isRegistered) {
-        await FirebaseAuth.instance.signOut();
+        await AuthService.signOut();
         targetPage = const LoginPage();
       } else {
         // Pastikan FirebaseAuth.displayName sudah sinkron dengan Firestore

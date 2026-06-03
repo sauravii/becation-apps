@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:becation_apps/services/auth_service.dart';
 import 'package:becation_apps/features/auth/login_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -11,11 +11,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final User? user = FirebaseAuth.instance.currentUser;
+  final user = AuthService.currentUser;
 
   Future<void> _signOut() async {
     try {
-      await FirebaseAuth.instance.signOut();
+      await AuthService.signOut();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginPage()),

@@ -5,9 +5,9 @@
 // lihat verify_page.dart yang sudah disiapkan UI-nya (butuh backend:
 // Cloud Functions + email service seperti SendGrid/Mailgun).
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:becation_apps/services/auth_service.dart';
 import '../../components/forms/auth_text_field.dart';
 import '../../components/buttons/auth_button.dart';
 
@@ -53,7 +53,7 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
     setState(() => isLoading = true);
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await AuthService.sendPasswordReset(email);
       if (mounted) {
         setState(() {
           isSuccess = true;
@@ -61,7 +61,7 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
               'Password reset link has been sent to your email. Please check your inbox or spam folder.';
         });
       }
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       if (mounted) {
         setState(() {
           isSuccess = false;

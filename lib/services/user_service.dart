@@ -112,6 +112,27 @@ class UserService {
     return (name != null && name.isNotEmpty) ? name : null;
   }
 
+  // Cache module-level user doc buat avatar/name reusable widget (MemberAvatar,
+  // MemberDisplayName). Cache dipakai sbg initialData → skip skeleton pas
+  // re-mount; fetch fresh tetap jalan di background supaya update auto-masuk.
+  static final Map<String, Map<String, dynamic>?> _userDocCache = {};
+
+  // User doc dari cache (sync) buat initialData FutureBuilder. Null kalau belum
+  // pernah di-fetch.
+  static Map<String, dynamic>? cachedUserDoc(String uid) => _userDocCache[uid];
+
+  // Fetch fresh users/{uid} + update cache. Fallback ke cache kalau network
+  // error, supaya UI tetap punya value.
+  static Future<Map<String, dynamic>?> getUserDocFresh(String uid) async {
+    try {
+      final snap = await _usersRef.doc(uid).get();
+      _userDocCache[uid] = snap.data();
+      return snap.data();
+    } catch (_) {
+      return _userDocCache[uid];
+    }
+  }
+
   static const allowedRoles = {'student', 'teacher'};
 
   // Update displayName di Firestore + Firebase Auth.

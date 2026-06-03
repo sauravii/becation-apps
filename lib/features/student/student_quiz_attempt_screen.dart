@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
 import '../../services/auth_service.dart';
-import '../../services/gamification_feedback.dart';
+import '../../components/gamification/gamification_feedback.dart';
 import '../../services/quiz_service.dart';
 
 class StudentQuizAttemptScreen extends StatefulWidget {

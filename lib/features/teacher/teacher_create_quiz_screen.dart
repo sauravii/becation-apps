@@ -1159,6 +1159,8 @@ class _TeacherCreateQuizScreenState extends State<TeacherCreateQuizScreen> {
       ),
     );
 
+    if (!mounted) return;
+
     if (result != null && result.isNotEmpty) {
       setState(() {
         _questions.addAll(result.map(_DraftQuestion.fromPending));

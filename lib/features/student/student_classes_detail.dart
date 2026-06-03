@@ -519,7 +519,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
         widget.classId,
         q.id,
       );
-      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pop(context); // close loading modal
 
       if (attempts > 0) {
@@ -564,6 +564,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
         );
 
         if (proceed == null || proceed == 'cancel') return;
+        if (!mounted) return;
 
         if (proceed == 'check') {
           showDialog(
@@ -581,7 +582,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
               q.id,
             );
 
-            if (!context.mounted) return;
+            if (!mounted) return;
             Navigator.pop(context); // close loading
 
             if (latestAttempt == null) {
@@ -609,7 +610,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
               ),
             );
           } catch (e) {
-            if (context.mounted) {
+            if (mounted) {
               Navigator.pop(context);
               ScaffoldMessenger.of(
                 context,
@@ -631,7 +632,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
         ),
       );
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(
         context,

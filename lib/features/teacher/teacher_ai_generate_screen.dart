@@ -2,7 +2,7 @@ import "dart:math";
 
 import "package:flutter/material.dart";
 
-import "../../services/api_client.dart";
+import "../../services/quiz_service.dart";
 import "teacher_create_question_screen.dart";
 
 class TeacherAiGenerateScreen extends StatefulWidget {
@@ -123,26 +123,24 @@ class _TeacherAiGenerateScreenState extends State<TeacherAiGenerateScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await ApiClient.post("/quizzes/generate-ai", {
-        "prompt": prompt,
-        "count": _questionCount,
-        "optionsCount": _optionsCount,
-        "difficulty": _difficulty,
-        "language": _language,
-      }) as Map<String, dynamic>;
+      final generated = await QuizService.generateAiQuestions(
+        prompt: prompt,
+        count: _questionCount,
+        optionsCount: _optionsCount,
+        difficulty: _difficulty,
+        language: _language,
+      );
 
       if (!mounted) return;
 
-      final List<dynamic> rawList = result["data"] as List<dynamic>;
-
-      final List<PendingQuestion> generatedQuestions = rawList.map((item) {
-        return PendingQuestion(
-          type: "Multiple Choice",
-          question: item["question"],
-          options: List<String>.from(item["options"]),
-          correctIndex: item["correctIndex"],
-        );
-      }).toList();
+      final List<PendingQuestion> generatedQuestions = generated
+          .map((q) => PendingQuestion(
+                type: "Multiple Choice",
+                question: q.question,
+                options: q.options,
+                correctIndex: q.correctIndex,
+              ))
+          .toList();
 
       Navigator.of(context).pop(generatedQuestions);
 

@@ -123,6 +123,29 @@ class StudentAttemptReview {
   }
 }
 
+/// Soal hasil generate AI dari `/quizzes/generate-ai`. Neutral data model —
+/// UI map ke PendingQuestion sendiri.
+class AiGeneratedQuestion {
+  final String question;
+  final List<String> options;
+  final int correctIndex;
+
+  AiGeneratedQuestion({
+    required this.question,
+    required this.options,
+    required this.correctIndex,
+  });
+
+  factory AiGeneratedQuestion.fromJson(Map<String, dynamic> json) =>
+      AiGeneratedQuestion(
+        question: json['question']?.toString() ?? '',
+        options: ((json['options'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+        correctIndex: (json['correctIndex'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class QuizService {
   static final _firestore = FirebaseFirestore.instance;
 
@@ -435,6 +458,34 @@ class QuizService {
     return snap.docs.map((doc) => QuestionModel.fromFirestore(doc)).toList();
   }
 
+  /// Get satu question doc (buat quick-edit dari analytics). Return null kalau
+  /// gak ada.
+  static Future<QuestionModel?> getQuestion(
+    String classId,
+    String quizId,
+    String questionId,
+  ) async {
+    final doc = await _questionsRef(classId, quizId).doc(questionId).get();
+    if (!doc.exists) return null;
+    return QuestionModel.fromFirestore(doc);
+  }
+
+  /// Get satu attempt doc lengkap (questionSnapshot + answers) buat dialog
+  /// detail attempt di analytics. Return null kalau gak ada.
+  static Future<Map<String, dynamic>?> getAttempt(
+    String classId,
+    String quizId,
+    String attemptId,
+  ) async {
+    final doc = await _quizzesRef(classId)
+        .doc(quizId)
+        .collection('attempts')
+        .doc(attemptId)
+        .get();
+    if (!doc.exists) return null;
+    return doc.data();
+  }
+
   static Future<Map<String, dynamic>?> getLatestStudentAttempt(
     String classId,
     String quizId,
@@ -577,6 +628,29 @@ class QuizService {
   /// DELETE /api/classes/:cid/quizzes/:qid — cascade.
   static Future<void> deleteQuizApi(String classId, String quizId) async {
     await ApiClient.delete('/classes/$classId/quizzes/$quizId');
+  }
+
+  /// POST /api/quizzes/generate-ai — generate soal pilihan ganda via AI
+  /// (teacher-only, server-side Gemini). Return list soal ter-parse.
+  static Future<List<AiGeneratedQuestion>> generateAiQuestions({
+    required String prompt,
+    required int count,
+    required int optionsCount,
+    required String difficulty,
+    required String language,
+  }) async {
+    final data = await ApiClient.post('/quizzes/generate-ai', {
+      'prompt': prompt,
+      'count': count,
+      'optionsCount': optionsCount,
+      'difficulty': difficulty,
+      'language': language,
+    }) as Map<String, dynamic>;
+    final raw = (data['data'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => AiGeneratedQuestion.fromJson(Map<String, dynamic>.from(m)))
+        .toList();
   }
 
   /// GET /api/classes/:cid/quizzes/:qid/answer-keys — teacher-only.

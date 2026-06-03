@@ -103,6 +103,15 @@ class UserService {
     return _usersRef.doc(uid).snapshots();
   }
 
+  // Ekstrak displayName ter-trim dari snapshot users/{uid}. Return null kalau
+  // kosong — biar parsing field Firestore gak bocor ke UI (dashboard greeting).
+  static String? displayNameFromDoc(
+    DocumentSnapshot<Map<String, dynamic>>? doc,
+  ) {
+    final name = (doc?.data()?['displayName'] as String?)?.trim();
+    return (name != null && name.isNotEmpty) ? name : null;
+  }
+
   static const allowedRoles = {'student', 'teacher'};
 
   // Update displayName di Firestore + Firebase Auth.

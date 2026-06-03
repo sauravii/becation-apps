@@ -16,6 +16,14 @@ class AuthService {
   // UID user yang lagi login (null kalau belum auth).
   static String? get currentUid => FirebaseAuth.instance.currentUser?.uid;
 
+  // displayName dari FirebaseAuth user yang lagi login, ter-trim. Null kalau
+  // kosong/belum login. Dipakai dashboard sebagai fallback nama instan sebelum
+  // Firestore stream resolve.
+  static String? get currentDisplayName {
+    final name = FirebaseAuth.instance.currentUser?.displayName?.trim();
+    return (name != null && name.isNotEmpty) ? name : null;
+  }
+
   // Sign in pakai email/password. Return User (atau null kalau Firebase gak
   // ngasih user). Throws [AuthException] kalau gagal.
   static Future<User?> signInWithEmail({

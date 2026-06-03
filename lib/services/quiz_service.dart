@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -26,6 +27,100 @@ class QuizKeptQuestion {
   final QuizDraftQuestion? edited;
 
   const QuizKeptQuestion({required this.id, this.edited});
+}
+
+/// Hasil submit quiz dari Callable `submitQuizAttempt` — sudah ter-parse dari
+/// payload raw. [correctAnswers] (questionId → list index benar) hanya terisi
+/// kalau quiz.showAnswer == true; selain itu kosong.
+class QuizSubmitResult {
+  final int score;
+  final int correct;
+  final int total;
+  final bool passed;
+  final Map<String, List<int>> correctAnswers;
+
+  QuizSubmitResult({
+    required this.score,
+    required this.correct,
+    required this.total,
+    required this.passed,
+    required this.correctAnswers,
+  });
+
+  factory QuizSubmitResult.fromCallable(dynamic raw) {
+    final data = Map<String, dynamic>.from(raw as Map);
+    return QuizSubmitResult(
+      score: (data['score'] as num?)?.toInt() ?? 0,
+      correct: (data['correct'] as num?)?.toInt() ?? 0,
+      total: (data['total'] as num?)?.toInt() ?? 0,
+      passed: data['passed'] as bool? ?? false,
+      correctAnswers: parseCorrectAnswers(data['correctAnswers']),
+    );
+  }
+
+  /// Normalisasi map mentah `{questionId: [idx,...]}` ke
+  /// `Map<String, List<int>>`. Dipakai juga saat parsing latest attempt.
+  static Map<String, List<int>> parseCorrectAnswers(dynamic raw) {
+    final Map<String, List<int>> out = {};
+    if (raw is Map) {
+      raw.forEach((k, v) {
+        if (v is List) {
+          out[k.toString()] =
+              v.whereType<num>().map((n) => n.toInt()).toList();
+        }
+      });
+    }
+    return out;
+  }
+}
+
+/// Latest attempt yang sudah ter-parse buat halaman review (Check Answer).
+/// [correctAnswers] direkonstruksi dari `questionSnapshot` attempt — list
+/// `{id, correctIndices}` yang disimpan saat submit.
+class StudentAttemptReview {
+  final Map<String, int> answers;
+  final Map<String, List<int>> correctAnswers;
+  final int score;
+  final int correct;
+  final int total;
+  final bool passed;
+
+  StudentAttemptReview({
+    required this.answers,
+    required this.correctAnswers,
+    required this.score,
+    required this.correct,
+    required this.total,
+    required this.passed,
+  });
+
+  factory StudentAttemptReview.fromAttempt(Map<String, dynamic> attempt) {
+    final answers = (attempt['answers'] as Map?)?.cast<String, int>() ?? {};
+
+    final correctAnswers = <String, List<int>>{};
+    final questionSnap = attempt['questionSnapshot'] as List?;
+    if (questionSnap != null) {
+      for (final qData in questionSnap) {
+        if (qData is Map) {
+          final id = qData['id']?.toString();
+          final indices = qData['correctIndices'];
+          if (id != null && indices is List) {
+            correctAnswers[id] =
+                indices.whereType<num>().map((n) => n.toInt()).toList();
+          }
+        }
+      }
+    }
+
+    return StudentAttemptReview(
+      answers: answers,
+      correctAnswers: correctAnswers,
+      score: (attempt['score'] as num?)?.toInt() ?? 0,
+      correct: (attempt['correct'] as num?)?.toInt() ?? 0,
+      total: (attempt['total'] as num?)?.toInt() ?? 0,
+      passed: attempt['passed'] == true,
+    );
+  }
 }
 
 class QuizService {
@@ -293,6 +388,26 @@ class QuizService {
     });
 
     await batch.commit();
+  }
+
+  /// Submit quiz attempt via Callable `submitQuizAttempt` (region
+  /// asia-southeast2). Scoring + point award dikerjakan server-side; client
+  /// gak pernah lihat answer key sebelum submit. Return [QuizSubmitResult]
+  /// dengan field sudah ter-parse.
+  static Future<QuizSubmitResult> submitQuizAttempt({
+    required String classId,
+    required String quizId,
+    required Map<String, int> answers,
+  }) async {
+    final result =
+        await FirebaseFunctions.instanceFor(region: 'asia-southeast2')
+            .httpsCallable('submitQuizAttempt')
+            .call({
+      'classId': classId,
+      'quizId': quizId,
+      'answers': answers,
+    });
+    return QuizSubmitResult.fromCallable(result.data);
   }
 
   static Future<int> getStudentAttemptsCount(

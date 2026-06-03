@@ -610,36 +610,19 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
               return;
             }
 
-            final answersMap =
-                (latestAttempt['answers'] as Map?)?.cast<String, int>() ?? {};
-            final correctAnswersMap = <String, List<int>>{};
-            final questionSnap = latestAttempt['questionSnapshot'] as List?;
-            if (questionSnap != null) {
-              for (final qData in questionSnap) {
-                if (qData is Map) {
-                  final id = qData['id']?.toString();
-                  final indices = qData['correctIndices'];
-                  if (id != null && indices is List) {
-                    correctAnswersMap[id] = indices
-                        .whereType<num>()
-                        .map((n) => n.toInt())
-                        .toList();
-                  }
-                }
-              }
-            }
+            final review = StudentAttemptReview.fromAttempt(latestAttempt);
 
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => StudentQuizResultPage(
                   quiz: q,
                   questions: questionsSnap,
-                  answers: answersMap,
-                  correctAnswers: correctAnswersMap,
-                  score: (latestAttempt['score'] as num?)?.toInt() ?? 0,
-                  correct: (latestAttempt['correct'] as num?)?.toInt() ?? 0,
-                  total: (latestAttempt['total'] as num?)?.toInt() ?? 0,
-                  passed: latestAttempt['passed'] == true,
+                  answers: review.answers,
+                  correctAnswers: review.correctAnswers,
+                  score: review.score,
+                  correct: review.correct,
+                  total: review.total,
+                  passed: review.passed,
                   isFinalAttempt: reachedLimit,
                 ),
               ),

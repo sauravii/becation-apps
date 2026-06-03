@@ -1,11 +1,10 @@
 import 'dart:async';
 
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/question_model.dart';
 import '../../models/quiz_model.dart';
+import '../../services/auth_service.dart';
 import '../../services/gamification_feedback.dart';
 import '../../services/quiz_service.dart';
 
@@ -120,29 +119,26 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
 
     // Capture badge state sebelum submit — buat diff nanti supaya bisa
     // tampilkan popup untuk badge baru / repeat earn yang di-award trigger.
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final uid = AuthService.currentUid ?? '';
     final preBadges = uid.isEmpty
         ? const <String, int>{}
         : await GamificationFeedback.captureBefore(uid);
 
     try {
-      final result = await FirebaseFunctions.instanceFor(region: 'asia-southeast2')
-          .httpsCallable('submitQuizAttempt')
-          .call({
-            'classId': widget.classId,
-            'quizId': widget.quiz.id,
-            'answers': _answers,
-          });
+      final result = await QuizService.submitQuizAttempt(
+        classId: widget.classId,
+        quizId: widget.quiz.id,
+        answers: _answers,
+      );
 
       if (!mounted) return;
 
       _timer?.cancel();
-      final rawData = result.data as Map;
-      final data = Map<String, dynamic>.from(rawData);
-      final score = (data['score'] as num?)?.toInt() ?? 0;
-      final correct = (data['correct'] as num?)?.toInt() ?? 0;
-      final total = (data['total'] as num?)?.toInt() ?? 0;
-      final passed = data['passed'] as bool? ?? false;
+      final score = result.score;
+      final correct = result.correct;
+      final total = result.total;
+      final passed = result.passed;
+      final correctAnswers = result.correctAnswers;
 
       // Snackbar — fire-and-forget, tampil instan setelah submit success.
       GamificationFeedback.showSnackbar(
@@ -151,20 +147,6 @@ class _StudentQuizAttemptScreenState extends State<StudentQuizAttemptScreen> {
             ? 'Quiz completed! Score: $score'
             : 'Quiz submitted. Score: $score',
       );
-
-      // Parse correctAnswers if function returned them (showAnswer == true)
-      final Map<String, List<int>> correctAnswers = {};
-      final rawCorrect = data['correctAnswers'];
-      if (rawCorrect is Map) {
-        rawCorrect.forEach((k, v) {
-          if (v is List) {
-            correctAnswers[k.toString()] = v
-                .whereType<num>()
-                .map((n) => n.toInt())
-                .toList();
-          }
-        });
-      }
 
       if (_autoSubmitted) {
         await _showAutoSubmitNotice();

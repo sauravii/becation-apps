@@ -30,8 +30,6 @@ class StudentQuizResultPage extends StatelessWidget {
   static const _primary = Color(0xFF5E4B8B);
   static const _bg = Color(0xFFF7F2FA);
 
-  bool get _hasReview => correctAnswers.isNotEmpty && quiz.showAnswer;
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -121,54 +119,6 @@ class StudentQuizResultPage extends StatelessWidget {
           ),
           child: const Text('Done', style: TextStyle(fontSize: 16)),
         ),
-      ),
-    );
-  }
-
-  Widget _buildAnswersHiddenNotice() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.visibility_off_outlined,
-            color: Color(0xFF6F5AAA),
-            size: 22,
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Answers hidden',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1C1B20),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Your teacher has hidden the correct answers for this quiz, so the per-question review is not shown.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF49454E),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

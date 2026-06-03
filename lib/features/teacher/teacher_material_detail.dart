@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../models/material_model.dart';
 import '../../models/attachment_model.dart';
 import '../../services/material_service.dart';
 import '../../services/attachment_service.dart';
@@ -34,7 +33,6 @@ class TeacherMaterialDetail extends StatefulWidget {
 }
 
 class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
-  MaterialModel? _material;
   bool _isLoading = true;
   // Flag edit mode — saat aktif, munculkan icon edit di MaterialInfoCard
   // dan tombol hapus (X) di setiap attachment.
@@ -60,7 +58,6 @@ class _TeacherMaterialDetailState extends State<TeacherMaterialDetail> {
         widget.classId, widget.materialId);
     if (mounted) {
       setState(() {
-        _material = material;
         _currentDescription = material?.description ?? '';
         _isLoading = false;
       });

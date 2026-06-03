@@ -1,12 +1,9 @@
-import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:image_cropper/image_cropper.dart';
 
 import '../../components/skeleton_circle_avatar.dart';
+import '../../services/auth_service.dart';
+import '../../services/media_service.dart';
 import '../../services/user_service.dart';
 
 const Color _kPurple = Color(0xFF6F5AAA);
@@ -27,7 +24,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   String _originalName = '';
   bool _isSaving = false;
   bool _isUploadingPhoto = false;
-  final String _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final String _uid = AuthService.currentUid ?? '';
   // Cache stream — tanpa ini setiap keystroke (setState) bikin
   // UserService.userStream() di-call ulang, StreamBuilder re-subscribe,
   // waiting state muncul sebentar → skeleton flicker di photo.
@@ -36,7 +33,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
+    final user = AuthService.currentUser;
     _originalName =
         user?.displayName ?? user?.email?.split('@').first ?? '';
     _nameCtrl = TextEditingController(text: _originalName);
@@ -83,72 +80,22 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   Future<void> _pickAndUploadPhoto() async {
     if (_isUploadingPhoto) return;
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        withData: false,
-      );
-      if (result == null || result.files.isEmpty) return;
-
-      final path = result.files.single.path;
-      if (path == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('File path not available')),
-        );
-        return;
-      }
-
-      // Crop ke 1:1 dengan circular mask preview (UI uCrop native di Android).
-      // Hasil tetap PNG/JPEG kotak — circular cuma overlay. CircleAvatar di FE
-      // yang clip jadi bulet.
-      final cropped = await ImageCropper().cropImage(
-        sourcePath: path,
-        compressFormat: ImageCompressFormat.jpg,
-        compressQuality: 90,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Adjust Profile Photo',
-            toolbarColor: const Color(0xFF6F5AAA),
-            toolbarWidgetColor: Colors.white,
-            activeControlsWidgetColor: const Color(0xFF6F5AAA),
-            initAspectRatio: CropAspectRatioPreset.square,
-            lockAspectRatio: true,
-            hideBottomControls: true,
-            cropStyle: CropStyle.circle,
-            aspectRatioPresets: [CropAspectRatioPreset.square],
-          ),
-          IOSUiSettings(
-            title: 'Adjust Profile Photo',
-            aspectRatioLockEnabled: true,
-            resetAspectRatioEnabled: false,
-            cropStyle: CropStyle.circle,
-            aspectRatioPresets: [CropAspectRatioPreset.square],
-          ),
-        ],
-      );
-      if (cropped == null) return; // user cancel di cropper
-
-      final file = File(cropped.path);
-      final size = await file.length();
-      const maxBytes = 5 * 1024 * 1024;
-      if (size > maxBytes) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo exceeds 5 MB')),
-        );
-        return;
-      }
+      // Pick + crop 1:1 di-handle MediaService (FilePicker + ImageCropper).
+      // Return null kalau user batal; throw MediaException kalau > 5 MB.
+      final file = await MediaService.pickProfilePhoto();
+      if (file == null) return;
 
       setState(() => _isUploadingPhoto = true);
       await UserService.uploadProfilePhoto(file);
-      // Cleanup temp file cropper supaya gak akumulasi di app cache (bisa
-      // bocor ke gallery / file manager kalau terindeks MediaStore).
-      try {
-        if (await file.exists()) await file.delete();
-      } catch (_) {/* best-effort */}
+      await MediaService.deleteTemp(file);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile photo uploaded successfully')),
+      );
+    } on MediaException catch (err) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err.message)),
       );
     } catch (err) {
       if (!mounted) return;

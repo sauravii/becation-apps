@@ -55,21 +55,32 @@ class _LearningMapState extends State<LearningMap> {
 
   Future<void> _loadBackground() async {
     try {
-      final data = await rootBundle.load('assets/icons/map_grass.png');
+      final data = await rootBundle.load("assets/icons/map_grass.png");
       final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
       final frame = await codec.getNextFrame();
-      if (mounted) {
-        setState(() {
-          _backgroundImage = frame.image;
-          _isLoading = false;
-        });
+      final image = frame.image;
+      
+      if (!mounted) {
+        image.dispose(); // Cegah memory leak jika widget sudah tidak ada
+        return;
       }
+
+      setState(() {
+        _backgroundImage = image;
+        _isLoading = false;
+      });
     } catch (e) {
-      debugPrint('Error loading background: $e');
+      debugPrint("Error loading background: $e");
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _backgroundImage?.dispose(); // Bersihkan resource image
+    super.dispose();
   }
 
   @override
@@ -195,43 +206,38 @@ class _LearningMapState extends State<LearningMap> {
                         .toList(),
                   ),
 
-                  // Topic Header (Clean Glassmorphism)
+                  // Topic Header (Pastel Orchid Cloud Banner)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 60),
                     child: Center(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24, // Enough padding to look balanced
-                              vertical: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white, // Pure white base
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFFD1C4E9), // Light Lavender
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6F5AAA).withValues(alpha: 0.15),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: Text(
-                              topic.title.toUpperCase(),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                letterSpacing: 1.2,
-                                shadows: [
-                                  Shadow(
-                                    blurRadius: 4,
-                                    color: Colors.black26,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          ],
+                        ),
+                        child: Text(
+                          topic.title.toUpperCase(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF512DA8), // Royal Purple
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            letterSpacing: 1.2,
                           ),
                         ),
                       ),
@@ -290,37 +296,39 @@ class _LearningMapState extends State<LearningMap> {
               ],
             ),
           ),
-          // Clean Translucent Pill Container positioned exactly below the icon
+          // Pill Container bergaya "Pastel Orchid Cloud" (Solid Soft)
           Positioned(
-            top: 68, // 60px icon + 8px spacing
+            top: 68,
             left: 0,
             right: 0,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.0),
-                    Colors.white.withValues(alpha: 0.50),
-                    Colors.white.withValues(alpha: 0.0),
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
+                color: const Color(0xFFF3E5F5), // Ultra Soft Lilac (Solid)
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color(0xFFE1BEE7), // Soft Orchid border
+                  width: 1.5,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6F5AAA).withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Text(
                 node.title,
                 textAlign: TextAlign.center,
-                maxLines: 2, // Allow up to 2 lines of text
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF1E1A27), // Deep premium obsidian black
-                  fontSize: 11, // Slightly smaller to look beautiful on 2 lines
-                  fontWeight: FontWeight.w800, // S-Tier gamified extra-bold weight
-                  letterSpacing: 0.4,
-                  height: 1.1, // Tighter line height
+                  color: Color(0xFF6A1B9A), // Deep Orchid for readability
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.2,
+                  height: 1.1,
                 ),
               ),
             ),
@@ -385,11 +393,19 @@ class PathPainter extends CustomPainter {
 
     // Single glowing magical path
     final pathPaint = Paint()
-      ..color = const Color(0xFFFFF0DF) // Beautiful glowing color
+      ..color = const Color(0xFFFFF0DF).withValues(alpha: 0.8) // Glowing beam
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 30
+      ..strokeWidth = 32
       ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+
+    // Border path untuk mempertegas "Jalan"
+    final borderPaint = Paint()
+      ..color = const Color(0xFF8D6E63).withValues(alpha: 0.4) // Deep brown edge
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 38
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
 
     final List<Offset> points = [];
     int globalIndex = 0;
@@ -448,11 +464,15 @@ class PathPainter extends CustomPainter {
       );
     }
 
+    canvas.drawPath(path, borderPaint); // Draw border/edge first
     canvas.drawPath(path, pathPaint); // Glowing beam
   }
 
   @override
-  bool shouldRepaint(covariant PathPainter oldDelegate) => true;
+  bool shouldRepaint(covariant PathPainter oldDelegate) {
+    // Hanya repaint jika jumlah topik atau struktur node berubah
+    return oldDelegate.topics.length != topics.length;
+  }
 }
 
 

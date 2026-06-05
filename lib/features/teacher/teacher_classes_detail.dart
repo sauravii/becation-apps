@@ -677,7 +677,7 @@ class _TeacherClassesDetailState extends State<TeacherClassesDetail> {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF6F5AAA).withOpacity(0.15),
+                          color: const Color(0xFF6F5AAA).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Icon(

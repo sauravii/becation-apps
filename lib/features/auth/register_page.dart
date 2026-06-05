@@ -1,7 +1,7 @@
 import 'package:becation_apps/features/auth/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:becation_apps/services/auth_service.dart';
 import 'package:becation_apps/services/user_service.dart';
 import '../../components/forms/auth_text_field.dart';
 import '../../components/buttons/auth_button.dart';
@@ -69,19 +69,18 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => isEmailLoading = true);
 
     try {
-      final credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: emailController.text.trim(),
-            password: passwordController.text,
-          );
+      final user = await AuthService.createAccount(
+        email: emailController.text.trim(),
+        password: passwordController.text,
+      );
 
-      if (credential.user != null) {
+      if (user != null) {
         await UserService.ensureUserDocument(
-          credential.user!,
+          user,
           displayName: fullNameController.text.trim(),
         );
 
-        await FirebaseAuth.instance.signOut();
+        await AuthService.signOut();
 
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
@@ -95,7 +94,7 @@ class _RegisterPageState extends State<RegisterPage> {
           );
         }
       }
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       setState(() {
         switch (e.code) {
           case 'weak-password':
@@ -246,10 +245,10 @@ class _RegisterPageState extends State<RegisterPage> {
                             padding: EdgeInsets.all(12.w),
                             margin: EdgeInsets.only(bottom: 20.h),
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
+                              color: Colors.red.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8.r),
                               border: Border.all(
-                                color: Colors.red.withOpacity(0.3),
+                                color: Colors.red.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Text(

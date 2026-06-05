@@ -1,11 +1,10 @@
+import 'package:becation_apps/services/auth_service.dart';
 import 'package:becation_apps/services/points_service.dart';
 import 'package:becation_apps/services/user_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:becation_apps/features/auth/register_page.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'forgot_page.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:becation_apps/features/teacher/teacher_root_page.dart';
 import 'package:becation_apps/features/student/student_root_page.dart';
 import '../../components/forms/auth_text_field.dart';
@@ -30,8 +29,6 @@ class _LoginPageState extends State<LoginPage> {
   String? emailError;
   String? passwordError;
   String? generalError;
-
-  static final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   @override
   void initState() {
@@ -90,8 +87,8 @@ class _LoginPageState extends State<LoginPage> {
     return emailRegex.hasMatch(email);
   }
 
-  Future<void> _navigateByRole(User user) async {
-    final role = await UserService.getUserRole(user.uid);
+  Future<void> _navigateByRole(String uid) async {
+    final role = await UserService.getUserRole(uid);
 
     // Fire-and-forget daily streak ping pas login. Backend idempotent.
     PointsService.ping().catchError((e) {
@@ -130,17 +127,16 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => isEmailLoading = true);
 
     try {
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final user = await AuthService.signInWithEmail(
         email: emailController.text.trim(),
         password: passwordController.text,
       );
 
-      final user = credential.user;
       if (user == null) return;
 
       final isRegistered = await UserService.isUserRegistered(user.uid);
       if (!isRegistered) {
-        await FirebaseAuth.instance.signOut();
+        await AuthService.signOut();
         if (mounted) {
           setState(() {
             generalError = "Account not registered. Please sign up first.";
@@ -150,8 +146,8 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       await UserService.ensureUserDocument(user);
-      await _navigateByRole(user);
-    } on FirebaseAuthException catch (e) {
+      await _navigateByRole(user.uid);
+    } on AuthException catch (e) {
       setState(() {
         switch (e.code) {
           case 'invalid-credential':
@@ -194,46 +190,24 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      await _googleSignIn.signOut();
-
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
+      final result = await AuthService.signInWithGoogle();
+      if (result.cancelled) {
         if (mounted) {
           setState(() => isGoogleLoading = false);
         }
         return;
       }
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(
-        credential,
-      );
-
-      final user = userCredential.user;
+      final user = result.user;
       if (user == null) return;
 
-      final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
       final isRegistered = await UserService.isUserRegistered(user.uid);
 
       if (!isRegistered) {
-        if (isNewUser) {
-          try {
-            await user.delete();
-          } catch (e, st) {
-            debugPrint(
-              '[GoogleSignIn] Failed to delete new auth user: $e\n$st',
-            );
-          }
+        if (result.isNewUser) {
+          await AuthService.deleteCurrentUser();
         }
-        await _googleSignIn.signOut();
-        await FirebaseAuth.instance.signOut();
+        await AuthService.signOut();
         if (mounted) {
           setState(() {
             generalError = "Account not registered. Please sign up first.";
@@ -243,10 +217,10 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       await UserService.ensureUserDocument(user);
-      await _navigateByRole(user);
-    } on FirebaseAuthException catch (e, st) {
+      await _navigateByRole(user.uid);
+    } on AuthException catch (e, st) {
       debugPrint(
-        '[GoogleSignIn] FirebaseAuthException code=${e.code} msg=${e.message}',
+        '[GoogleSignIn] AuthException code=${e.code} msg=${e.message}',
       );
       debugPrint('$st');
       setState(() {
@@ -358,10 +332,10 @@ class _LoginPageState extends State<LoginPage> {
                             padding: EdgeInsets.all(12.w),
                             margin: EdgeInsets.only(bottom: 20.h),
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
+                              color: Colors.red.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8.r),
                               border: Border.all(
-                                color: Colors.red.withOpacity(0.3),
+                                color: Colors.red.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Text(
@@ -404,7 +378,7 @@ class _LoginPageState extends State<LoginPage> {
                               decoration: BoxDecoration(
                                 color: const Color(
                                   0xFF875DFC,
-                                ).withOpacity(0.15),
+                                ).withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
                               child: isGoogleLoading

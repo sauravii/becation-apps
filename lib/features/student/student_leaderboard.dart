@@ -406,7 +406,7 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
                   item: second,
                   height: 230, // Lowered for a more balanced and compact layout
                   avatarSize: 72, // Mathematically flush (68 + 5 pink + 7 purple = 80 width)
-                  columnColor: const Color(0xFFD6C7FF).withOpacity(0.85),
+                  columnColor: const Color(0xFFD6C7FF).withValues(alpha: 0.85),
                 ),
               ),
             )
@@ -440,7 +440,7 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
                   item: third,
                   height: 210, // Lowered for a more balanced and compact layout
                   avatarSize: 72, // Mathematically flush (68 + 5 pink + 7 purple = 80 width)
-                  columnColor: const Color(0xFFD6C7FF).withOpacity(0.65),
+                  columnColor: const Color(0xFFD6C7FF).withValues(alpha: 0.65),
                 ),
               ),
             )
@@ -491,7 +491,7 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -623,7 +623,7 @@ class _LeaderboardContentState extends State<LeaderboardContent> with TickerProv
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 16,
               offset: const Offset(0, -4), // Elegant upward shadow separating from purple background
             ),

@@ -1,10 +1,3 @@
-// ==========================================================================
-// FILE INI BELUM DIPAKAI — OTP verification untuk forgot password.
-// Saat ini forgot password menggunakan link-based reset bawaan Firebase Auth.
-// File ini disiapkan untuk sprint berikutnya jika ingin migrasi ke OTP-based
-// reset password (butuh backend: Cloud Functions + email service).
-// ==========================================================================
-
 import 'dart:async';
 
 import 'package:becation_apps/features/auth/login_page.dart';

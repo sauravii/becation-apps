@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../components/gamification/badge_award_popup.dart';
-import 'badges_service.dart';
+import '../../services/badges_service.dart';
+import 'badge_award_popup.dart';
 
 // Sama dengan logic resolve URL di BadgeAwardPopup — duplicate kecil OK
 // dibanding expose helper public yang gak dipakai dimana-mana.

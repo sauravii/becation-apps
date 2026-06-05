@@ -37,14 +37,13 @@ class MyApp extends StatelessWidget {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),
                 ],
               ),
               child: MediaQuery(
-                // PAKSA MediaQuery agar selalu berukuran 402x874 apapun ukuran browsernya.
                 data: MediaQuery.of(context).copyWith(
                   size: const Size(402, 874),
                 ),

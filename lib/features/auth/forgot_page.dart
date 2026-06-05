@@ -1,13 +1,6 @@
-// Halaman forgot password menggunakan link-based reset bawaan Firebase Auth.
-// Kirim link reset ke email user, lalu tampilkan pesan sukses.
-//
-// NOTE: Jika ingin migrasi ke OTP-based reset password di sprint berikutnya,
-// lihat verify_page.dart yang sudah disiapkan UI-nya (butuh backend:
-// Cloud Functions + email service seperti SendGrid/Mailgun).
-
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:becation_apps/services/auth_service.dart';
 import '../../components/forms/auth_text_field.dart';
 import '../../components/buttons/auth_button.dart';
 
@@ -53,7 +46,7 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
     setState(() => isLoading = true);
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await AuthService.sendPasswordReset(email);
       if (mounted) {
         setState(() {
           isSuccess = true;
@@ -61,7 +54,7 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
               'Password reset link has been sent to your email. Please check your inbox or spam folder.';
         });
       }
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       if (mounted) {
         setState(() {
           isSuccess = false;
@@ -166,13 +159,13 @@ class _ForgotpassPageState extends State<ForgotpassPage> {
                             margin: EdgeInsets.only(bottom: 16.h),
                             decoration: BoxDecoration(
                               color: isSuccess
-                                  ? Colors.green.withOpacity(0.1)
-                                  : Colors.red.withOpacity(0.1),
+                                  ? Colors.green.withValues(alpha: 0.1)
+                                  : Colors.red.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8.r),
                               border: Border.all(
                                 color: isSuccess
-                                    ? Colors.green.withOpacity(0.3)
-                                    : Colors.red.withOpacity(0.3),
+                                    ? Colors.green.withValues(alpha: 0.3)
+                                    : Colors.red.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Text(

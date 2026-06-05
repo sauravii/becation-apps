@@ -1,24 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../services/user_service.dart';
 import 'skeleton_circle_avatar.dart';
-
-/// Module-level cache user doc — dipakai bareng MemberAvatar + MemberDisplayName.
-/// Pattern: cache jadi initial value (no skeleton flicker pas re-mount), TAPI
-/// background fetch tetap jalan supaya update terbaru tetap masuk (kalau user
-/// lain update photo/nama, gak perlu cold restart).
-final Map<String, Map<String, dynamic>?> _userDocCache = {};
-
-Future<Map<String, dynamic>?> _fetchUserDocFresh(String uid) async {
-  try {
-    final snap = await FirebaseFirestore.instance.doc('users/$uid').get();
-    _userDocCache[uid] = snap.data();
-    return snap.data();
-  } catch (_) {
-    // Network error → fallback ke cache supaya UI tetap punya value.
-    return _userDocCache[uid];
-  }
-}
 
 /// Avatar reusable untuk class member tile. Fetch photoUrl dari `users/{uid}`.
 /// Pakai cache sbg initial value (skip skeleton kalau pernah load), dan selalu
@@ -45,14 +28,14 @@ class _MemberAvatarState extends State<MemberAvatar> {
   @override
   void initState() {
     super.initState();
-    _userFuture = _fetchUserDocFresh(widget.uid);
+    _userFuture = UserService.getUserDocFresh(widget.uid);
   }
 
   @override
   void didUpdateWidget(covariant MemberAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.uid != widget.uid) {
-      _userFuture = _fetchUserDocFresh(widget.uid);
+      _userFuture = UserService.getUserDocFresh(widget.uid);
     }
   }
 
@@ -84,7 +67,7 @@ class _MemberAvatarState extends State<MemberAvatar> {
       // pertama → skeleton di-skip. Begitu future done, snap rebuild dgn
       // fresh data — kalau sama, no visible change; kalau beda (user update),
       // UI auto-update tanpa cold restart.
-      initialData: _userDocCache[widget.uid],
+      initialData: UserService.cachedUserDoc(widget.uid),
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done && !snap.hasData) {
           return SkeletonCircleAvatar(radius: widget.radius);
@@ -125,14 +108,14 @@ class _MemberDisplayNameState extends State<MemberDisplayName> {
   @override
   void initState() {
     super.initState();
-    _userFuture = _fetchUserDocFresh(widget.uid);
+    _userFuture = UserService.getUserDocFresh(widget.uid);
   }
 
   @override
   void didUpdateWidget(covariant MemberDisplayName oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.uid != widget.uid) {
-      _userFuture = _fetchUserDocFresh(widget.uid);
+      _userFuture = UserService.getUserDocFresh(widget.uid);
     }
   }
 
@@ -140,7 +123,7 @@ class _MemberDisplayNameState extends State<MemberDisplayName> {
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>?>(
       future: _userFuture,
-      initialData: _userDocCache[widget.uid],
+      initialData: UserService.cachedUserDoc(widget.uid),
       builder: (context, snap) {
         // Kalau cache miss DAN future belum selesai → empty Text (preserve
         // height, no stale fallback).

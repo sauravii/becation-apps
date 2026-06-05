@@ -6,8 +6,6 @@ import '../../services/leaderboard_service.dart';
 
 /// Halaman leaderboard per-class. Top 100 ranked by point.
 /// Current user di-highlight kalau ada di list.
-///
-/// Kalau [isTeacher] true, tampilkan menu "Tutup Semester" di app bar.
 class LeaderboardPage extends StatefulWidget {
   final String classId;
   final String className;

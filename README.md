@@ -205,7 +205,7 @@ lib/
 │   ├── buttons/                    # Tombol kustom (auth, dll)
 │   ├── cards/                      # Card UI (kelas, materi, kuis, attachment)
 │   ├── forms/                      # Input field form
-│   ├── gamification/               # Badge card, badge_award_popup (modal congrats!), points_chip, streak_indicator
+│   ├── gamification/               # Badge card, badge_award_popup (modal congrats!), gamification_feedback (snackbar + badge popup), points_chip, streak_indicator
 │   ├── map/                        # Komponen peta pembelajaran
 │   ├── member_avatar.dart          # CircleAvatar + skeleton + auto-refresh fresh photo/name
 │   ├── navigation/                 # Bottom nav item
@@ -225,18 +225,19 @@ lib/
 │   ├── question_model.dart
 │   ├── quiz_model.dart
 │   └── topic_model.dart
-└── services/                       # Business logic & API/Firebase operations
+└── services/                       # Business logic & API/Firebase operations (pure backend, no UI)
     ├── api_client.dart             # HTTP client dengan auto-attach Firebase ID token
     ├── attachment_service.dart
+    ├── auth_service.dart           # FirebaseAuth + GoogleSignIn wrapper (login/register/logout/reset)
     ├── badges_service.dart         # /users/:uid/badges
     ├── class_service.dart
-    ├── gamification_feedback.dart  # captureBefore + showSnackbar + showBadgePopups (diff & sequential modal)
     ├── leaderboard_service.dart    # /classes/:cid/leaderboard + close-semester
     ├── material_progress_service.dart  # POST attachment access tracking
     ├── material_service.dart
+    ├── media_service.dart          # File picker + image cropper (profile photo)
     ├── points_service.dart         # /points, /points/log, /points/by-class, /me/ping
     ├── quiz_analytics_service.dart
-    ├── quiz_service.dart
+    ├── quiz_service.dart           # Quiz CRUD + submitQuizAttempt callable + AI generate + analytics reads
     ├── topic_service.dart
     └── user_service.dart           # User CRUD + photo upload + role + displayName sync
 

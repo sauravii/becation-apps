@@ -1,8 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../models/material_model.dart';
 import '../../models/attachment_model.dart';
-import '../../services/gamification_feedback.dart';
+import '../../components/gamification/gamification_feedback.dart';
+import '../../services/auth_service.dart';
 import '../../services/material_progress_service.dart';
 import '../../services/material_service.dart';
 import '../../services/attachment_service.dart';
@@ -61,7 +61,7 @@ class _StudentMaterialDetailState extends State<StudentMaterialDetail> {
   //  - kalau semua attachment udah di-click → mark complete + award point
   // Show snackbar pas justCompleted + popup untuk setiap badge baru.
   void _trackAccess(String attachmentId) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final uid = AuthService.currentUid ?? '';
     // Capture badge state SEBELUM API call (untuk diff popup).
     final preBadges = uid.isEmpty
         ? const <String, int>{}

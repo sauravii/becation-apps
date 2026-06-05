@@ -2,9 +2,6 @@ import 'api_client.dart';
 
 /// Client untuk Express API badges.
 class BadgesService {
-  /// GET /api/users/:uid/badges
-  /// Return semua badge (earned + locked). Secret badge yang belum earned
-  /// di-filter di server, jadi gak akan muncul.
   static Future<List<BadgeItem>> getBadges(String uid) async {
     final data =
         await ApiClient.get('/users/$uid/badges') as Map<String, dynamic>;
@@ -16,8 +13,6 @@ class BadgesService {
   }
 
   /// POST /api/users/:uid/badges  (admin only)
-  /// Manual grant badge. Untuk repeatable badge, dedupKey wajib (auto-gen
-  /// `manual:<grantorUid>:<timestamp>` di server kalau gak dikasih).
   static Future<BadgeGrantResult> grantBadge(
     String uid,
     String badgeId, {
@@ -33,8 +28,6 @@ class BadgesService {
   }
 
   /// DELETE /api/users/:uid/badges/:badgeId  (admin only)
-  /// Revoke badge dari user (hapus doc badge). Tidak un-award point yg
-  /// terlanjur ditambahkan.
   static Future<void> revokeBadge(String uid, String badgeId) async {
     await ApiClient.delete('/users/$uid/badges/$badgeId');
   }

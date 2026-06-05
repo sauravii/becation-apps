@@ -10,9 +10,6 @@ import '../../services/class_service.dart';
 import '../../services/topic_service.dart';
 import '../../services/material_service.dart';
 import '../../services/quiz_service.dart';
-import '../../components/cards/material_card.dart';
-import '../../components/cards/quiz_card.dart';
-import '../../components/cards/topic_section.dart';
 import '../../components/member_avatar.dart';
 import '../../components/navigation/nav_item.dart';
 import '../../components/map/learning_map.dart';
@@ -247,8 +244,6 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
     return StreamBuilder<ClassModel?>(
       stream: ClassService.classStream(widget.classId),
       builder: (context, snapshot) {
-        final classData = snapshot.data;
-
         return SingleChildScrollView(
           padding: EdgeInsets.zero,
           child: Column(
@@ -347,20 +342,6 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF1C1B20),
-        ),
-      ),
     );
   }
 
@@ -538,7 +519,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
         widget.classId,
         q.id,
       );
-      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pop(context); // close loading modal
 
       if (attempts > 0) {
@@ -583,6 +564,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
         );
 
         if (proceed == null || proceed == 'cancel') return;
+        if (!mounted) return;
 
         if (proceed == 'check') {
           showDialog(
@@ -600,7 +582,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
               q.id,
             );
 
-            if (!context.mounted) return;
+            if (!mounted) return;
             Navigator.pop(context); // close loading
 
             if (latestAttempt == null) {
@@ -610,42 +592,25 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
               return;
             }
 
-            final answersMap =
-                (latestAttempt['answers'] as Map?)?.cast<String, int>() ?? {};
-            final correctAnswersMap = <String, List<int>>{};
-            final questionSnap = latestAttempt['questionSnapshot'] as List?;
-            if (questionSnap != null) {
-              for (final qData in questionSnap) {
-                if (qData is Map) {
-                  final id = qData['id']?.toString();
-                  final indices = qData['correctIndices'];
-                  if (id != null && indices is List) {
-                    correctAnswersMap[id] = indices
-                        .whereType<num>()
-                        .map((n) => n.toInt())
-                        .toList();
-                  }
-                }
-              }
-            }
+            final review = StudentAttemptReview.fromAttempt(latestAttempt);
 
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => StudentQuizResultPage(
                   quiz: q,
                   questions: questionsSnap,
-                  answers: answersMap,
-                  correctAnswers: correctAnswersMap,
-                  score: (latestAttempt['score'] as num?)?.toInt() ?? 0,
-                  correct: (latestAttempt['correct'] as num?)?.toInt() ?? 0,
-                  total: (latestAttempt['total'] as num?)?.toInt() ?? 0,
-                  passed: latestAttempt['passed'] == true,
+                  answers: review.answers,
+                  correctAnswers: review.correctAnswers,
+                  score: review.score,
+                  correct: review.correct,
+                  total: review.total,
+                  passed: review.passed,
                   isFinalAttempt: reachedLimit,
                 ),
               ),
             );
           } catch (e) {
-            if (context.mounted) {
+            if (mounted) {
               Navigator.pop(context);
               ScaffoldMessenger.of(
                 context,
@@ -667,98 +632,12 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
         ),
       );
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error checking attempts: $e')));
     }
-  }
-
-  Widget _buildClassworkTab() {
-    return StreamBuilder<List<TopicModel>>(
-      stream: _topicsStream,
-      builder: (context, topicSnapshot) {
-        if (topicSnapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final topics = topicSnapshot.data ?? [];
-
-        if (topics.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.topic_outlined, size: 48, color: Colors.grey),
-                SizedBox(height: 12),
-                Text(
-                  'No topics yet',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                    fontSize: 16,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Your teacher will add topics and materials here.',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: topics.map<Widget>((topic) {
-              return StreamBuilder<List<MaterialModel>>(
-                stream: MaterialService.materialsStream(
-                  widget.classId,
-                  topicId: topic.id,
-                ),
-                builder: (context, materialSnapshot) {
-                  final materials = materialSnapshot.data ?? [];
-
-                  final topicItem = TopicItem(
-                    id: topic.id,
-                    title: topic.title,
-                    materials: materials
-                        .map(
-                          (m) => MaterialItem(
-                            id: m.id,
-                            title: m.title,
-                            timestamp: m.formattedDate,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => StudentMaterialDetail(
-                                    classId: widget.classId,
-                                    materialId: m.id,
-                                    materialTitle: m.title,
-                                    materialTimestamp: m.formattedDate,
-                                    topicTitle: topic.title,
-                                    topicColor: widget.classColor,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        )
-                        .toList(),
-                  );
-
-                  return TopicSection(topic: topicItem);
-                },
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
   }
 
   Widget _buildPeopleTab() {

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -26,6 +27,123 @@ class QuizKeptQuestion {
   final QuizDraftQuestion? edited;
 
   const QuizKeptQuestion({required this.id, this.edited});
+}
+
+/// Hasil submit quiz dari Callable `submitQuizAttempt` — sudah ter-parse dari
+/// payload raw. [correctAnswers] (questionId → list index benar) hanya terisi
+/// kalau quiz.showAnswer == true; selain itu kosong.
+class QuizSubmitResult {
+  final int score;
+  final int correct;
+  final int total;
+  final bool passed;
+  final Map<String, List<int>> correctAnswers;
+
+  QuizSubmitResult({
+    required this.score,
+    required this.correct,
+    required this.total,
+    required this.passed,
+    required this.correctAnswers,
+  });
+
+  factory QuizSubmitResult.fromCallable(dynamic raw) {
+    final data = Map<String, dynamic>.from(raw as Map);
+    return QuizSubmitResult(
+      score: (data['score'] as num?)?.toInt() ?? 0,
+      correct: (data['correct'] as num?)?.toInt() ?? 0,
+      total: (data['total'] as num?)?.toInt() ?? 0,
+      passed: data['passed'] as bool? ?? false,
+      correctAnswers: parseCorrectAnswers(data['correctAnswers']),
+    );
+  }
+
+  /// Normalisasi map mentah `{questionId: [idx,...]}` ke
+  /// `Map<String, List<int>>`. Dipakai juga saat parsing latest attempt.
+  static Map<String, List<int>> parseCorrectAnswers(dynamic raw) {
+    final Map<String, List<int>> out = {};
+    if (raw is Map) {
+      raw.forEach((k, v) {
+        if (v is List) {
+          out[k.toString()] =
+              v.whereType<num>().map((n) => n.toInt()).toList();
+        }
+      });
+    }
+    return out;
+  }
+}
+
+/// Latest attempt yang sudah ter-parse buat halaman review (Check Answer).
+/// [correctAnswers] direkonstruksi dari `questionSnapshot` attempt — list
+/// `{id, correctIndices}` yang disimpan saat submit.
+class StudentAttemptReview {
+  final Map<String, int> answers;
+  final Map<String, List<int>> correctAnswers;
+  final int score;
+  final int correct;
+  final int total;
+  final bool passed;
+
+  StudentAttemptReview({
+    required this.answers,
+    required this.correctAnswers,
+    required this.score,
+    required this.correct,
+    required this.total,
+    required this.passed,
+  });
+
+  factory StudentAttemptReview.fromAttempt(Map<String, dynamic> attempt) {
+    final answers = (attempt['answers'] as Map?)?.cast<String, int>() ?? {};
+
+    final correctAnswers = <String, List<int>>{};
+    final questionSnap = attempt['questionSnapshot'] as List?;
+    if (questionSnap != null) {
+      for (final qData in questionSnap) {
+        if (qData is Map) {
+          final id = qData['id']?.toString();
+          final indices = qData['correctIndices'];
+          if (id != null && indices is List) {
+            correctAnswers[id] =
+                indices.whereType<num>().map((n) => n.toInt()).toList();
+          }
+        }
+      }
+    }
+
+    return StudentAttemptReview(
+      answers: answers,
+      correctAnswers: correctAnswers,
+      score: (attempt['score'] as num?)?.toInt() ?? 0,
+      correct: (attempt['correct'] as num?)?.toInt() ?? 0,
+      total: (attempt['total'] as num?)?.toInt() ?? 0,
+      passed: attempt['passed'] == true,
+    );
+  }
+}
+
+/// Soal hasil generate AI dari `/quizzes/generate-ai`. Neutral data model —
+/// UI map ke PendingQuestion sendiri.
+class AiGeneratedQuestion {
+  final String question;
+  final List<String> options;
+  final int correctIndex;
+
+  AiGeneratedQuestion({
+    required this.question,
+    required this.options,
+    required this.correctIndex,
+  });
+
+  factory AiGeneratedQuestion.fromJson(Map<String, dynamic> json) =>
+      AiGeneratedQuestion(
+        question: json['question']?.toString() ?? '',
+        options: ((json['options'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+        correctIndex: (json['correctIndex'] as num?)?.toInt() ?? 0,
+      );
 }
 
 class QuizService {
@@ -295,6 +413,26 @@ class QuizService {
     await batch.commit();
   }
 
+  /// Submit quiz attempt via Callable `submitQuizAttempt` (region
+  /// asia-southeast2). Scoring + point award dikerjakan server-side; client
+  /// gak pernah lihat answer key sebelum submit. Return [QuizSubmitResult]
+  /// dengan field sudah ter-parse.
+  static Future<QuizSubmitResult> submitQuizAttempt({
+    required String classId,
+    required String quizId,
+    required Map<String, int> answers,
+  }) async {
+    final result =
+        await FirebaseFunctions.instanceFor(region: 'asia-southeast2')
+            .httpsCallable('submitQuizAttempt')
+            .call({
+      'classId': classId,
+      'quizId': quizId,
+      'answers': answers,
+    });
+    return QuizSubmitResult.fromCallable(result.data);
+  }
+
   static Future<int> getStudentAttemptsCount(
     String classId,
     String quizId,
@@ -318,6 +456,34 @@ class QuizService {
   ) async {
     final snap = await _questionsRef(classId, quizId).orderBy('order').get();
     return snap.docs.map((doc) => QuestionModel.fromFirestore(doc)).toList();
+  }
+
+  /// Get satu question doc (buat quick-edit dari analytics). Return null kalau
+  /// gak ada.
+  static Future<QuestionModel?> getQuestion(
+    String classId,
+    String quizId,
+    String questionId,
+  ) async {
+    final doc = await _questionsRef(classId, quizId).doc(questionId).get();
+    if (!doc.exists) return null;
+    return QuestionModel.fromFirestore(doc);
+  }
+
+  /// Get satu attempt doc lengkap (questionSnapshot + answers) buat dialog
+  /// detail attempt di analytics. Return null kalau gak ada.
+  static Future<Map<String, dynamic>?> getAttempt(
+    String classId,
+    String quizId,
+    String attemptId,
+  ) async {
+    final doc = await _quizzesRef(classId)
+        .doc(quizId)
+        .collection('attempts')
+        .doc(attemptId)
+        .get();
+    if (!doc.exists) return null;
+    return doc.data();
   }
 
   static Future<Map<String, dynamic>?> getLatestStudentAttempt(
@@ -462,6 +628,29 @@ class QuizService {
   /// DELETE /api/classes/:cid/quizzes/:qid — cascade.
   static Future<void> deleteQuizApi(String classId, String quizId) async {
     await ApiClient.delete('/classes/$classId/quizzes/$quizId');
+  }
+
+  /// POST /api/quizzes/generate-ai — generate soal pilihan ganda via AI
+  /// (teacher-only, server-side Gemini). Return list soal ter-parse.
+  static Future<List<AiGeneratedQuestion>> generateAiQuestions({
+    required String prompt,
+    required int count,
+    required int optionsCount,
+    required String difficulty,
+    required String language,
+  }) async {
+    final data = await ApiClient.post('/quizzes/generate-ai', {
+      'prompt': prompt,
+      'count': count,
+      'optionsCount': optionsCount,
+      'difficulty': difficulty,
+      'language': language,
+    }) as Map<String, dynamic>;
+    final raw = (data['data'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => AiGeneratedQuestion.fromJson(Map<String, dynamic>.from(m)))
+        .toList();
   }
 
   /// GET /api/classes/:cid/quizzes/:qid/answer-keys — teacher-only.

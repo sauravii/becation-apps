@@ -3,8 +3,6 @@ import 'api_client.dart';
 /// Client untuk Express API points + daily streak ping.
 class PointsService {
   /// POST /api/users/me/ping
-  /// Panggil di splash/cold-start. Update daily streak, award point harian,
-  /// auto-check badge Overachiever kalau hit milestone 28/56/84/...
   static Future<PingResult> ping() async {
     final data = await ApiClient.post('/users/me/ping') as Map<String, dynamic>;
     return PingResult.fromJson(data);

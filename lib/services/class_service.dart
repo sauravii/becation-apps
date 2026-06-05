@@ -87,8 +87,6 @@ class ClassService {
   }
 
   /// Count total materials yang dibuat teacher di semua class-nya.
-  /// Dipakai di teacher profile Statistics. N+1 reads (1 untuk class list,
-  /// N untuk count per class) — acceptable untuk profile page yang one-shot.
   static Future<int> teacherMaterialsCount(String teacherId) async {
     final classesSnap = await _classesRef
         .where('teacherId', isEqualTo: teacherId)

@@ -8,8 +8,6 @@ import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 
 // Service untuk CRUD data user di Firestore collection 'users'.
-// CRUD-style read/write sudah punya REST counterpart via Express (suffix `Api`);
-// stream + auth-flow helpers tetap pakai Firestore SDK langsung.
 class UserService {
   static final _firestore = FirebaseFirestore.instance;
   static CollectionReference<Map<String, dynamic>> get _usersRef =>
@@ -50,8 +48,6 @@ class UserService {
       debugPrint('[UserService] lastLogin updated!');
     }
 
-    // Sinkronkan juga displayName di FirebaseAuth user supaya greeting bisa langsung
-    // pakai nama ini tanpa perlu nunggu Firestore.
     if (name.isNotEmpty && user.displayName != name) {
       try {
         await user.updateDisplayName(name);
@@ -63,8 +59,6 @@ class UserService {
     }
   }
 
-  // Sinkronkan displayName di FirebaseAuth dari Firestore kalau belum terisi.
-  // Dipanggil misalnya saat splash / auto-login supaya dashboard langsung pakai nama.
   static Future<void> syncAuthDisplayNameFromFirestore(User user) async {
     try {
       final snapshot = await _usersRef.doc(user.uid).get();
@@ -101,6 +95,36 @@ class UserService {
   // Stream realtime data user (auto update kalau ada perubahan di Firestore).
   static Stream<DocumentSnapshot<Map<String, dynamic>>> userStream(String uid) {
     return _usersRef.doc(uid).snapshots();
+  }
+
+  // Ekstrak displayName ter-trim dari snapshot users/{uid}. Return null kalau
+  // kosong — biar parsing field Firestore gak bocor ke UI (dashboard greeting).
+  static String? displayNameFromDoc(
+    DocumentSnapshot<Map<String, dynamic>>? doc,
+  ) {
+    final name = (doc?.data()?['displayName'] as String?)?.trim();
+    return (name != null && name.isNotEmpty) ? name : null;
+  }
+
+  // Cache module-level user doc buat avatar/name reusable widget (MemberAvatar,
+  // MemberDisplayName). Cache dipakai sbg initialData → skip skeleton pas
+  // re-mount; fetch fresh tetap jalan di background supaya update auto-masuk.
+  static final Map<String, Map<String, dynamic>?> _userDocCache = {};
+
+  // User doc dari cache (sync) buat initialData FutureBuilder. Null kalau belum
+  // pernah di-fetch.
+  static Map<String, dynamic>? cachedUserDoc(String uid) => _userDocCache[uid];
+
+  // Fetch fresh users/{uid} + update cache. Fallback ke cache kalau network
+  // error, supaya UI tetap punya value.
+  static Future<Map<String, dynamic>?> getUserDocFresh(String uid) async {
+    try {
+      final snap = await _usersRef.doc(uid).get();
+      _userDocCache[uid] = snap.data();
+      return snap.data();
+    } catch (_) {
+      return _userDocCache[uid];
+    }
   }
 
   static const allowedRoles = {'student', 'teacher'};

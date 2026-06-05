@@ -1,6 +1,6 @@
+import 'package:becation_apps/services/auth_service.dart';
 import 'package:becation_apps/services/user_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/class_model.dart';
@@ -32,8 +32,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   void initState() {
     super.initState();
 
-    final currentUser = FirebaseAuth.instance.currentUser;
-    _displayName = _getTeacherNameFromUser(currentUser);
+    final currentUser = AuthService.currentUser;
+    _displayName = AuthService.currentDisplayName ?? 'Teacher';
     _selectedDate ??= DateTime.now();
     _focusedDate ??= DateTime.now();
 
@@ -42,20 +42,10 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         : const Stream.empty();
   }
 
-  String _getTeacherNameFromUser(User? user) {
-    if (user == null) return 'Teacher';
-
-    final displayName = user.displayName?.trim();
-    if (displayName != null && displayName.isNotEmpty) {
-      return displayName;
-    }
-    return 'Teacher';
-  }
-
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
-    final user = FirebaseAuth.instance.currentUser;
+    final user = AuthService.currentUser;
 
     Widget buildBody(
       String displayName,
@@ -90,13 +80,12 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: UserService.userStream(user.uid),
       builder: (context, userSnapshot) {
-        final data = userSnapshot.data?.data();
-        final firestoreName = (data?['displayName'] as String?)?.trim();
+        final firestoreName = UserService.displayNameFromDoc(userSnapshot.data);
 
-        if (firestoreName != null && firestoreName.isNotEmpty) {
+        if (firestoreName != null) {
           _displayName = firestoreName;
-        } else if (_displayName == null) {
-          _displayName = _getTeacherNameFromUser(user);
+        } else {
+          _displayName ??= AuthService.currentDisplayName ?? 'Teacher';
         }
 
         return StreamBuilder<List<ClassModel>>(
@@ -229,7 +218,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

@@ -1,12 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 
 import '../../components/gamification/badges_grid.dart';
 import '../../components/skeleton_circle_avatar.dart';
 import '../../models/class_model.dart';
+import '../../services/auth_service.dart';
 import '../../services/badges_service.dart';
 import '../../services/class_service.dart';
 import '../../services/user_service.dart';
@@ -21,12 +20,7 @@ class StudentProfilePage extends StatelessWidget {
 
   Future<void> _logout(BuildContext context) async {
     try {
-      await FirebaseAuth.instance.signOut();
-      try {
-        await GoogleSignIn().signOut();
-      } catch (_) {
-        // Ignore if not using Google sign-in.
-      }
+      await AuthService.signOut();
 
       if (!context.mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
@@ -43,7 +37,7 @@ class StudentProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = AuthService.currentUser;
     final fallbackName =
         user?.displayName ?? user?.email?.split('@').first ?? 'Username';
 

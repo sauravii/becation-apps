@@ -1,7 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../models/question_model.dart';
 import '../../services/quiz_analytics_service.dart';
@@ -571,18 +570,14 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
     );
 
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('classes')
-          .doc(widget.classId)
-          .collection('quizzes')
-          .doc(widget.quizId)
-          .collection('questions')
-          .doc(q.questionId)
-          .get();
+      final qModel = await QuizService.getQuestion(
+        widget.classId,
+        widget.quizId,
+        q.questionId,
+      );
 
-      if (!doc.exists) throw Exception('Question not found');
-      
-      final qModel = QuestionModel.fromFirestore(doc);
+      if (qModel == null) throw Exception('Question not found');
+
       final keys = await QuizService.fetchAnswerKeys(widget.classId, widget.quizId);
       final correctIndices = keys[q.questionId] ?? [];
       
@@ -993,24 +988,21 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
                   ),
                   const Divider(height: 1),
                   Expanded(
-                    child: FutureBuilder<DocumentSnapshot>(
-                      future: FirebaseFirestore.instance
-                          .collection('classes')
-                          .doc(widget.classId)
-                          .collection('quizzes')
-                          .doc(widget.quizId)
-                          .collection('attempts')
-                          .doc(a.attemptId)
-                          .get(),
+                    child: FutureBuilder<Map<String, dynamic>?>(
+                      future: QuizService.getAttempt(
+                        widget.classId,
+                        widget.quizId,
+                        a.attemptId,
+                      ),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return const Center(child: CircularProgressIndicator());
                         }
-                        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
                           return const Center(child: Text('Failed to load attempt details'));
                         }
-                        
-                        final data = snapshot.data!.data() as Map<String, dynamic>;
+
+                        final data = snapshot.data!;
                         final questionSnapshot = data['questionSnapshot'] as List<dynamic>? ?? [];
                         final answers = data['answers'] as Map<String, dynamic>? ?? {};
                         
@@ -1103,7 +1095,7 @@ class _QuizAnalyticsPageState extends State<QuizAnalyticsPage>
                                         ],
                                       ),
                                     );
-                                  }).toList(),
+                                  }),
                                 ],
                               ),
                             );

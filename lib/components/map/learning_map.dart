@@ -46,11 +46,16 @@ class LearningMap extends StatefulWidget {
 class _LearningMapState extends State<LearningMap> {
   ui.Image? _backgroundImage;
   bool _isLoading = true;
+  final GlobalKey _stackKey = GlobalKey();
+  List<GlobalKey> _nodeKeys = [];
+  List<GlobalKey> _topicKeys = [];
+  List<Offset> _nodePositions = [];
 
   @override
   void initState() {
     super.initState();
     _loadBackground();
+    _buildNodeKeys();
   }
 
   Future<void> _loadBackground() async {
@@ -84,6 +89,56 @@ class _LearningMapState extends State<LearningMap> {
   }
 
   @override
+  void didUpdateWidget(covariant LearningMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.topics != widget.topics) {
+      _buildNodeKeys();
+    }
+  }
+
+  void _buildNodeKeys() {
+    int totalNodes = 0;
+    for (final topic in widget.topics) {
+      totalNodes += topic.nodes.length;
+    }
+    _nodeKeys = List.generate(totalNodes, (_) => GlobalKey());
+    _topicKeys = List.generate(widget.topics.length, (_) => GlobalKey());
+    _nodePositions = [];
+    WidgetsBinding.instance.addPostFrameCallback((_) => _computePositions());
+  }
+
+  void _computePositions() {
+    final stackBox =
+        _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    if (stackBox == null) return;
+
+    final positions = <Offset>[];
+    // Collect node icon positions
+    for (final key in _nodeKeys) {
+      final box = key.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null) continue;
+      final nodeSize = box.size;
+      final center = Offset(nodeSize.width / 2, nodeSize.height / 2);
+      final global = box.localToGlobal(center);
+      positions.add(stackBox.globalToLocal(global));
+    }
+    // Collect topic header positions
+    for (final key in _topicKeys) {
+      final box = key.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null) continue;
+      final nodeSize = box.size;
+      final center = Offset(nodeSize.width / 2, nodeSize.height / 2);
+      final global = box.localToGlobal(center);
+      positions.add(stackBox.globalToLocal(global));
+    }
+
+    final expectedCount = _nodeKeys.length + _topicKeys.length;
+    if (mounted && positions.length == expectedCount) {
+      setState(() => _nodePositions = positions);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (widget.topics.isEmpty) {
       return const Center(
@@ -102,6 +157,7 @@ class _LearningMapState extends State<LearningMap> {
     return Container(
       constraints: BoxConstraints(minHeight: screenHeight),
       child: Stack(
+        key: _stackKey,
         children: [
           // SEAMLESS MIRRORED BACKGROUND
           if (_backgroundImage != null)
@@ -126,7 +182,7 @@ class _LearningMapState extends State<LearningMap> {
           // BEAUTIFUL 3D ROAD PATH
           Positioned.fill(
             child: ClipRect(
-              child: CustomPaint(painter: PathPainter(topics: widget.topics)),
+              child: CustomPaint(painter: PathPainter(nodePositions: _nodePositions)),
             ),
           ),
 
@@ -146,7 +202,48 @@ class _LearningMapState extends State<LearningMap> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Nodes
+                  // 1. Topic Header (Move to Top)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 60),
+                    child: Center(
+                      child: Container(
+                        key: topicIndex < _topicKeys.length
+                            ? _topicKeys[topicIndex]
+                            : null,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFFD1C4E9),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6F5AAA).withValues(alpha: 0.15),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          topic.title.toUpperCase(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF512DA8),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 2. Nodes (Underneath Header)
                   Column(
                     children: topic.nodes
                         .asMap()
@@ -195,7 +292,12 @@ class _LearningMapState extends State<LearningMap> {
                                 offset: Offset(currentX * (screenWidth / 2), 0),
                                 child: GestureDetector(
                                   onTap: node.onTap,
-                                  child: _buildNodeIcon(node),
+                                  child: _buildNodeIcon(
+                                    node,
+                                    nodeKey: absoluteIndex < _nodeKeys.length
+                                        ? _nodeKeys[absoluteIndex]
+                                        : null,
+                                  ),
                                 ),
                               ),
                             ),
@@ -204,44 +306,6 @@ class _LearningMapState extends State<LearningMap> {
                         .toList()
                         .reversed
                         .toList(),
-                  ),
-
-                  // Topic Header (Pastel Orchid Cloud Banner)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 60),
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white, // Pure white base
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFFD1C4E9), // Light Lavender
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF6F5AAA).withValues(alpha: 0.15),
-                              blurRadius: 15,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          topic.title.toUpperCase(),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF512DA8), // Royal Purple
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
                   ),
                 ],
               );
@@ -252,7 +316,7 @@ class _LearningMapState extends State<LearningMap> {
     );
   }
 
-  Widget _buildNodeIcon(LearningNode node) {
+  Widget _buildNodeIcon(LearningNode node, {GlobalKey? nodeKey}) {
     return SizedBox(
       height: 98,
       width: 160, // Constrain width so long text will wrap instead of overflowing horizontally
@@ -282,6 +346,7 @@ class _LearningMapState extends State<LearningMap> {
                   ),
                 ),
                 SizedBox(
+                  key: nodeKey,
                   width: 60,
                   height: 60,
                   child: Center(
@@ -383,13 +448,13 @@ class MirroredBackgroundPainter extends CustomPainter {
 }
 
 class PathPainter extends CustomPainter {
-  final List<LearningTopic> topics;
+  final List<Offset> nodePositions;
 
-  PathPainter({required this.topics});
+  PathPainter({required this.nodePositions});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (topics.isEmpty) return;
+    if (nodePositions.isEmpty) return;
 
     // Single glowing magical path
     final pathPaint = Paint()
@@ -407,44 +472,16 @@ class PathPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
 
-    final List<Offset> points = [];
-    int globalIndex = 0;
-    double currentY = size.height;
+    // Sort by Y descending (bottom-most node first) to draw path bottom→top
+    final sorted = List<Offset>.from(nodePositions)
+      ..sort((a, b) => b.dy.compareTo(a.dy));
 
-    for (int i = 0; i < topics.length; i++) {
-      final topic = topics[i];
-      currentY -= 123.0; // Restored exactly to original Topic Header height
-
-      for (int j = 0; j < topic.nodes.length; j++) {
-        final int absoluteIndex = globalIndex + j;
-        double xFactor = 0.0;
-        final patternPos = absoluteIndex % 8;
-        switch (patternPos) {
-          case 0: xFactor = 0.0; break;
-          case 1: xFactor = 0.35; break;
-          case 2: xFactor = 0.55; break;
-          case 3: xFactor = 0.35; break;
-          case 4: xFactor = 0.0; break;
-          case 5: xFactor = -0.35; break;
-          case 6: xFactor = -0.55; break;
-          case 7: xFactor = -0.35; break;
-        }
-        final double x = size.width / 2 + (xFactor * (size.width / 2));
-        
-        points.add(Offset(x, currentY - 148.0));
-        currentY -= 208.0; // Restored perfectly to original node height
-      }
-      globalIndex += topic.nodes.length;
-    }
-
-    // Extend the path to the very bottom edge of the screen
-    if (points.isNotEmpty) {
-      points.insert(0, Offset(points.first.dx, size.height + 100));
-      // Extend the path to the very top edge of the screen
-      points.add(Offset(points.last.dx, -100));
-    }
-
-    if (points.length < 2) return;
+    final points = <Offset>[];
+    // Extend path below the bottom-most node
+    points.add(Offset(sorted.first.dx, size.height + 100));
+    points.addAll(sorted);
+    // Extend path above the top-most node
+    points.add(Offset(sorted.last.dx, -100));
 
     final path = Path();
     path.moveTo(points[0].dx, points[0].dy);
@@ -470,8 +507,7 @@ class PathPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PathPainter oldDelegate) {
-    // Hanya repaint jika jumlah topik atau struktur node berubah
-    return oldDelegate.topics.length != topics.length;
+    return oldDelegate.nodePositions != nodePositions;
   }
 }
 

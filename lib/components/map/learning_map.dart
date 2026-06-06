@@ -1,5 +1,4 @@
 import 'dart:ui' as ui;
-import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,8 +36,17 @@ class LearningTopic {
 
 class LearningMap extends StatefulWidget {
   final List<LearningTopic> topics;
+  final ScrollController? controller;
+  final double headerHeight; // To avoid collision with main header
+  final double offsetGap;    // Gap between main header and sticky header
 
-  const LearningMap({super.key, required this.topics});
+  const LearningMap({
+    super.key,
+    required this.topics,
+    this.controller,
+    this.headerHeight = 0.0,
+    this.offsetGap = 8.0,
+  });
 
   @override
   State<LearningMap> createState() => _LearningMapState();
@@ -52,11 +60,84 @@ class _LearningMapState extends State<LearningMap> {
   List<GlobalKey> _topicKeys = [];
   List<Offset> _nodePositions = [];
 
+  // Sticky Header State
+  String? _stickyTopicId;
+  double _stickyHeaderOffset = 0.0;
+  ScrollController? _internalController;
+  
+  // Cached layout metrics for zero-lag synchronous scrolling
+  double? _cachedViewportTop;
+  double? _cachedStackScrollY;
+  List<double> _topicLocalYs = [];
+  List<double> _topicHeights = [];
+
+  ScrollController get _effectiveController =>
+      widget.controller ?? (_internalController ??= ScrollController());
+
   @override
   void initState() {
     super.initState();
     _loadBackground();
     _buildNodeKeys();
+    _effectiveController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!mounted) return;
+    // Synchronous call guarantees zero flickering
+    _updateStickyHeader();
+  }
+
+  void _updateStickyHeader() {
+    if (_topicKeys.isEmpty || !mounted || _cachedViewportTop == null || _cachedStackScrollY == null) return;
+    if (_topicLocalYs.length != widget.topics.length) return;
+
+    final double scrollOffset = _effectiveController.hasClients ? _effectiveController.offset : 0.0;
+    
+    // Predict EXACT screen position of the Stack for THIS frame mathematically.
+    // This perfectly compensates for fast scrolling without any 1-frame layout lag!
+    final double exactStackScreenTop = _cachedViewportTop! + _cachedStackScrollY! - scrollOffset;
+    final double stickyBoundaryTop = _cachedViewportTop! + widget.headerHeight + widget.offsetGap;
+
+    String? newStickyId;
+    double newOffset = 0.0;
+
+    // The reversed ListView has topic[0] at bottom, topic[N-1] at top.
+    for (int i = widget.topics.length - 1; i >= 0; i--) {
+      final double exactHeaderScreenTop = exactStackScreenTop + _topicLocalYs[i];
+      final double exactHeaderScreenBottom = exactHeaderScreenTop + _topicHeights[i];
+
+      // Header has completely scrolled past the boundary
+      if (exactHeaderScreenBottom < stickyBoundaryTop) {
+        newStickyId = widget.topics[i].id;
+      }
+    }
+
+    if (newStickyId != null) {
+      // Offset from the top of the Stack to the boundary line
+      newOffset = stickyBoundaryTop - exactStackScreenTop;
+
+      // Push-up effect
+      final currentIndex = widget.topics.indexWhere((t) => t.id == newStickyId);
+      if (currentIndex > 0) {
+        final double nextScreenTop = exactStackScreenTop + _topicLocalYs[currentIndex - 1];
+        final double currentStickyHeight = _topicHeights[currentIndex];
+        
+        // Distance from next header to our boundary
+        final double distanceToBoundary = nextScreenTop - stickyBoundaryTop;
+        
+        if (distanceToBoundary < currentStickyHeight) {
+          newOffset += (distanceToBoundary - currentStickyHeight);
+        }
+      }
+    }
+
+    if (_stickyTopicId != newStickyId || _stickyHeaderOffset != newOffset) {
+      setState(() {
+        _stickyTopicId = newStickyId;
+        _stickyHeaderOffset = newOffset;
+      });
+    }
   }
 
   Future<void> _loadBackground() async {
@@ -76,7 +157,6 @@ class _LearningMapState extends State<LearningMap> {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint("Error loading background: $e");
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -86,6 +166,11 @@ class _LearningMapState extends State<LearningMap> {
   @override
   void dispose() {
     _backgroundImage?.dispose(); // Bersihkan resource image
+    if (widget.controller == null) {
+      _internalController?.dispose();
+    } else {
+      widget.controller!.removeListener(_onScroll);
+    }
     super.dispose();
   }
 
@@ -94,6 +179,24 @@ class _LearningMapState extends State<LearningMap> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.topics != widget.topics) {
       _buildNodeKeys();
+      _cachedViewportTop = null; // Re-measure after layout change
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _computePositions();
+        _updateStickyHeader();
+      });
+    }
+
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_onScroll);
+      widget.controller?.addListener(_onScroll);
+      if (widget.controller == null) {
+        _internalController ??= ScrollController();
+        _internalController!.addListener(_onScroll);
+      } else {
+        _internalController?.removeListener(_onScroll);
+        _internalController?.dispose();
+        _internalController = null;
+      }
     }
   }
 
@@ -113,8 +216,24 @@ class _LearningMapState extends State<LearningMap> {
         _stackKey.currentContext?.findRenderObject() as RenderBox?;
     if (stackBox == null) return;
 
+    // 1. Measure viewport and scroll state ONCE
+    final ScrollableState? scrollable = Scrollable.maybeOf(context);
+    if (scrollable != null) {
+      final RenderBox? scrollBox = scrollable.context.findRenderObject() as RenderBox?;
+      if (scrollBox != null && scrollBox.hasSize) {
+        _cachedViewportTop = scrollBox.localToGlobal(Offset.zero).dy;
+      }
+    }
+    
+    final double scrollOffset = _effectiveController.hasClients ? _effectiveController.offset : 0.0;
+    final double stackGlobalY = stackBox.localToGlobal(Offset.zero).dy;
+    
+    // Y-position of the stack within the scroll view's content bounds
+    _cachedStackScrollY = stackGlobalY - (_cachedViewportTop ?? 0.0) + scrollOffset;
+
     final positions = <Offset>[];
-    // Collect node icon positions
+    
+    // 2. Collect node icon positions
     for (final key in _nodeKeys) {
       final box = key.currentContext?.findRenderObject() as RenderBox?;
       if (box == null) continue;
@@ -123,20 +242,38 @@ class _LearningMapState extends State<LearningMap> {
       final global = box.localToGlobal(center);
       positions.add(stackBox.globalToLocal(global));
     }
-    // Collect topic header positions
+
+    _topicLocalYs = [];
+    _topicHeights = [];
+    
+    // 3. Collect topic header positions
     for (final key in _topicKeys) {
       final box = key.currentContext?.findRenderObject() as RenderBox?;
-      if (box == null) continue;
+      if (box == null) {
+        _topicLocalYs.add(0.0);
+        _topicHeights.add(0.0);
+        continue;
+      }
       final nodeSize = box.size;
+      
+      // Cache local bounds for zero-lag scroll math
+      final globalTopLeft = box.localToGlobal(Offset.zero);
+      _topicLocalYs.add(stackBox.globalToLocal(globalTopLeft).dy);
+      _topicHeights.add(nodeSize.height);
+
+      // Path drawing coordinates
       final center = Offset(nodeSize.width / 2, nodeSize.height / 2);
-      final global = box.localToGlobal(center);
-      positions.add(stackBox.globalToLocal(global));
+      final globalCenter = box.localToGlobal(center);
+      positions.add(stackBox.globalToLocal(globalCenter));
     }
 
     final expectedCount = _nodeKeys.length + _topicKeys.length;
     if (mounted && positions.length == expectedCount) {
       setState(() => _nodePositions = positions);
     }
+    
+    // Trigger initial sticky header computation
+    if (mounted) _updateStickyHeader();
   }
 
   @override
@@ -288,6 +425,51 @@ class _LearningMapState extends State<LearningMap> {
               );
             },
           ),
+          // Custom Sticky Header
+          if (_stickyTopicId != null)
+            Positioned(
+              top: _stickyHeaderOffset,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 10,
+                  ),
+                  decoration: ShapeDecoration(
+                    color: const Color(0xFF4A148C).withValues(alpha: 0.8),
+                    shape: BeveledRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(
+                        color: const Color(0xFFF3E5F5).withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    shadows: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    widget.topics
+                        .firstWhere((t) => t.id == _stickyTopicId)
+                        .title
+                        .toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

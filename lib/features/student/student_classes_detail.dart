@@ -36,6 +36,7 @@ class StudentClassesDetail extends StatefulWidget {
 
 class _StudentClassesDetailState extends State<StudentClassesDetail> {
   int _selectedIndex = 0;
+  final ScrollController _scrollController = ScrollController();
 
   late final Stream<List<TopicModel>> _topicsStream;
   late final Stream<List<QuizModel>> _quizzesStream;
@@ -45,6 +46,12 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
     super.initState();
     _topicsStream = TopicService.topicsStream(widget.classId);
     _quizzesStream = QuizService.quizzesStream(widget.classId);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -245,6 +252,7 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
       stream: ClassService.classStream(widget.classId),
       builder: (context, snapshot) {
         return SingleChildScrollView(
+          controller: _scrollController,
           padding: EdgeInsets.zero,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +491,10 @@ class _StudentClassesDetailState extends State<StudentClassesDetail> {
                   );
                 }
 
-                return LearningMap(topics: learningTopics);
+                return LearningMap(
+                  topics: learningTopics,
+                  controller: _scrollController,
+                );
               },
             );
           },

@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'dart:ui';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -211,21 +212,23 @@ class _LearningMapState extends State<LearningMap> {
                             ? _topicKeys[topicIndex]
                             : null,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 14,
+                          horizontal: 24, // Reduced from 32
+                          vertical: 10,   // Reduced from 14
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFFD1C4E9),
-                            width: 2,
+                        decoration: ShapeDecoration(
+                          color: const Color(0xFF4A148C).withValues(alpha: 0.6), // Deep Royal Purple
+                          shape: BeveledRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: BorderSide(
+                              color: const Color(0xFFF3E5F5).withValues(alpha: 0.3),
+                              width: 1.5,
+                            ),
                           ),
-                          boxShadow: [
+                          shadows: [
                             BoxShadow(
-                              color: const Color(0xFF6F5AAA).withValues(alpha: 0.15),
-                              blurRadius: 15,
-                              offset: const Offset(0, 8),
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
@@ -233,9 +236,9 @@ class _LearningMapState extends State<LearningMap> {
                           topic.title.toUpperCase(),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            color: Color(0xFF512DA8),
+                            color: Colors.white,
                             fontWeight: FontWeight.w900,
-                            fontSize: 16,
+                            fontSize: 14,
                             letterSpacing: 1.2,
                           ),
                         ),
@@ -254,35 +257,9 @@ class _LearningMapState extends State<LearningMap> {
                               startGlobalIndex + localIndex;
                           final LearningNode node = entry.value;
 
-                          double currentX = 0.0;
-                          final patternPos = absoluteIndex % 8;
-
-                          switch (patternPos) {
-                            case 0:
-                              currentX = 0.0;
-                              break;
-                            case 1:
-                              currentX = 0.35;
-                              break;
-                            case 2:
-                              currentX = 0.55;
-                              break;
-                            case 3:
-                              currentX = 0.35;
-                              break;
-                            case 4:
-                              currentX = 0.0;
-                              break;
-                            case 5:
-                              currentX = -0.35;
-                              break;
-                            case 6:
-                              currentX = -0.55;
-                              break;
-                            case 7:
-                              currentX = -0.35;
-                              break;
-                          }
+                          // Smooth alternating S-curve: each node on the opposite side
+                          final double currentX =
+                              cos(absoluteIndex * pi) * 0.42;
 
                           final screenWidth = MediaQuery.of(context).size.width;
                           return Padding(
@@ -361,7 +338,7 @@ class _LearningMapState extends State<LearningMap> {
               ],
             ),
           ),
-          // Pill Container bergaya "Pastel Orchid Cloud" (Solid Soft)
+          // Pill Container bergaya "Royal Plum Mist" (Semi-transparent)
           Positioned(
             top: 68,
             left: 0,
@@ -369,17 +346,17 @@ class _LearningMapState extends State<LearningMap> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFF3E5F5), // Ultra Soft Lilac (Solid)
+                color: const Color(0xFF300030).withValues(alpha: 0.6), // Dark Plum Obsidian
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: const Color(0xFFE1BEE7), // Soft Orchid border
-                  width: 1.5,
+                  color: Colors.white.withValues(alpha: 0.2),
+                  width: 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF6F5AAA).withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
@@ -389,7 +366,7 @@ class _LearningMapState extends State<LearningMap> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF6A1B9A), // Deep Orchid for readability
+                  color: Colors.white, // Pure white for readability
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.2,
